@@ -13,7 +13,7 @@
 #   Windows: Azure Trusted Signing via trusted-signing-cli
 #   Linux:   not signed
 
-name: Release
+name: Whisp Auto Release
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -349,11 +349,14 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: NanoWhisper ${{ github.ref_name }}
+          name: Whisp Auto Build ${{ github.ref_name }}
           draft: false
+          prerelease: true
           generate_release_notes: true
           files: release/*
           body: |
+            > 本条目由 GitHub Actions 自动构建生成（Auto Build）。
+
             ### macOS
             | File | Architecture |
             |------|-------------|
