@@ -53,7 +53,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Verify version consistency
         if: startsWith(github.ref, 'refs/tags/')
@@ -91,7 +91,7 @@ jobs:
           echo "Version verified: $TAG_VERSION"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
 
