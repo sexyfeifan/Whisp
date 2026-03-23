@@ -53,18 +53,46 @@ jobs:
           APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
         run: |
+          if [ -z "${APPLE_CERTIFICATE:-}" ]; then
+            echo "::error::Missing secret: MAC_CSC_LINK"
+            exit 1
+          fi
+          if [ -z "${APPLE_CERTIFICATE_PASSWORD:-}" ]; then
+            echo "::error::Missing secret: MAC_CSC_KEY_PASSWORD"
+            exit 1
+          fi
+
           CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32 | tr -d '\n')
 
-          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+          CERT_INPUT="$APPLE_CERTIFICATE"
+          CERT_INPUT="${CERT_INPUT#data:application/x-pkcs12;base64,}"
+          CERT_INPUT="${CERT_INPUT#data:application/octet-stream;base64,}"
+
+          if ! printf '%s' "$CERT_INPUT" | base64 --decode > "$CERTIFICATE_PATH" 2>/dev/null; then
+            if ! printf '%s' "$CERT_INPUT" | base64 -D > "$CERTIFICATE_PATH" 2>/dev/null; then
+              echo "::error::MAC_CSC_LINK is not valid base64-encoded .p12 data"
+              exit 1
+            fi
+          fi
+
+          if [ ! -s "$CERTIFICATE_PATH" ]; then
+            echo "::error::Decoded certificate file is empty"
+            exit 1
+          fi
+
+          if ! openssl pkcs12 -in "$CERTIFICATE_PATH" -passin "pass:$APPLE_CERTIFICATE_PASSWORD" -nokeys >/dev/null 2>&1; then
+            echo "::error::Invalid .p12 certificate or incorrect MAC_CSC_KEY_PASSWORD"
+            exit 1
+          fi
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security default-keychain -s "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -t 21600 -u "$KEYCHAIN_PATH"
           security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" \
-            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -f pkcs12 -A
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
