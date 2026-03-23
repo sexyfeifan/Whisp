@@ -1,0 +1,316 @@
+# Build and release NanoWhisper for all supported platforms.
+#
+# Trigger: push a version tag (e.g., git tag v0.1.0 && git push --tags)
+#
+# Runner matrix:
+#   macOS ARM64  → macos-latest  (Apple Silicon, native)
+#   macOS x64    → macos-latest  (Apple Silicon, cross-compiled via --target)
+#   Linux x64    → ubuntu-22.04
+#   Windows x64  → windows-latest
+#
+# Code signing:
+#   macOS:   Developer ID Application certificate + Apple notarization
+#   Windows: Azure Trusted Signing via trusted-signing-cli
+#   Linux:   not signed
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+# Prevent concurrent releases
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: release-mac-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact: release-mac-x64
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: release-linux-x64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: release-win-x64
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.artifact }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify version consistency
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          TAG_VERSION="${TAG_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          TAURI_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+
+          echo "Tag version:       $TAG_VERSION"
+          echo "package.json:      $PKG_VERSION"
+          echo "Cargo.toml:        $CARGO_VERSION"
+          echo "tauri.conf.json:   $TAURI_VERSION"
+
+          ERRORS=0
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: package.json ($PKG_VERSION) != tag ($TAG_VERSION)"
+            ERRORS=1
+          fi
+          if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: Cargo.toml ($CARGO_VERSION) != tag ($TAG_VERSION)"
+            ERRORS=1
+          fi
+          if [ "$TAURI_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: tauri.conf.json ($TAURI_VERSION) != tag ($TAG_VERSION)"
+            ERRORS=1
+          fi
+          if [ "$ERRORS" -ne 0 ]; then
+            echo "::error::Fix: update all version fields to $TAG_VERSION before tagging"
+            exit 1
+          fi
+          echo "Version verified: $TAG_VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      # Linux: install system dependencies required by Tauri and cpal (ALSA)
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev \
+            rpm
+
+      # Install npm deps BEFORE importing signing credentials (minimize exposure window)
+      - name: Install dependencies
+        run: npm install
+
+      # ── macOS code signing setup ────────────────────────────────
+      - name: Install Apple intermediate certificate
+        if: runner.os == 'macOS'
+        run: |
+          curl -sO https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          sudo security import DeveloperIDG2CA.cer -k /Library/Keychains/System.keychain -T /usr/bin/codesign 2>&1 || echo "(already installed, skipping)"
+          echo "Apple Developer ID G2 intermediate certificate ready"
+
+      - name: Import macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERTIFICATE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -t 21600 -u "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          rm "$CERTIFICATE_PATH"
+
+      # (Windows signing is done post-build via azure/trusted-signing-action)
+
+      # ── Platform-specific builds ────────────────────────────────
+      - name: Build Tauri app (macOS, signed + notarized)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: NDX2ZZ8U2R
+        run: npx tauri build --target ${{ matrix.target }}
+
+      - name: Build Tauri app (Windows)
+        if: runner.os == 'Windows'
+        run: npx tauri build --target ${{ matrix.target }}
+
+      - name: Sign Windows artifacts
+        if: runner.os == 'Windows'
+        uses: azure/trusted-signing-action@v0.5.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: https://eus.codesigning.azure.net/
+          trusted-signing-account-name: golemancy
+          certificate-profile-name: golemancy
+          files-folder: src-tauri/target/${{ matrix.target }}/release/bundle
+          files-folder-filter: exe,msi
+          files-folder-depth: 5
+
+      - name: Build Tauri app (Linux)
+        if: runner.os == 'Linux'
+        run: npx tauri build --target ${{ matrix.target }}
+
+      # ── Verification ────────────────────────────────────────────
+      - name: Verify macOS code signing
+        if: runner.os == 'macOS'
+        run: |
+          DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.dmg" | head -1)
+          echo "Verifying DMG: $DMG"
+
+          hdiutil verify "$DMG"
+
+          hdiutil attach "$DMG" -nobrowse
+          APP=$(find /Volumes -maxdepth 2 -name "*.app" -path "*NanoWhisper*" 2>/dev/null | head -1)
+          echo "Found app: $APP"
+
+          echo "=== Code signature ==="
+          codesign --verify --deep --strict --verbose=2 "$APP"
+
+          echo "=== Gatekeeper assessment ==="
+          spctl -a -t exec -vvv "$APP" || true
+
+          echo "=== Notarization staple ==="
+          xcrun stapler validate "$DMG" || true
+
+          hdiutil detach "$(dirname "$APP")" -quiet
+
+      - name: Verify Windows code signing
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $allValid = $true
+          $files = Get-ChildItem "src-tauri/target/${{ matrix.target }}/release/bundle" -Recurse -Include *.exe,*.msi
+          foreach ($file in $files) {
+            Write-Host "Verifying: $($file.FullName)"
+            $sig = Get-AuthenticodeSignature $file.FullName
+            Write-Host "  Status: $($sig.Status)"
+            Write-Host "  Signer: $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') {
+              Write-Host "::error::Signature invalid for $($file.Name): $($sig.Status)"
+              $allValid = $false
+            }
+          }
+          if (-not $allValid) { exit 1 }
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.rpm
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+          if-no-files-found: error
+          retention-days: 3
+
+  # ── Create GitHub Release ─────────────────────────────────────
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Flatten nested bundle directory structure into a single folder
+      - name: Collect release files
+        run: |
+          mkdir -p release
+          find artifacts -type f \( \
+            -name "*.dmg" -o \
+            -name "*.exe" -o \
+            -name "*.msi" -o \
+            -name "*.deb" -o \
+            -name "*.rpm" -o \
+            -name "*.AppImage" \
+          \) -exec cp {} release/ \;
+          echo "Release files:"
+          ls -lh release/
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum * > SHA256SUMS.txt
+          echo "Generated checksums:"
+          cat SHA256SUMS.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: NanoWhisper ${{ github.ref_name }}
+          draft: false
+          generate_release_notes: true
+          files: release/*
+          body: |
+            ### macOS (signed & notarized)
+            | File | Architecture |
+            |------|-------------|
+            | `.dmg` (arm64) | Apple Silicon (M1/M2/M3/M4) — **Recommended** |
+            | `.dmg` (x64) | Intel (pre-2021 Macs) |
+
+            ### Windows (signed)
+            | File | Note |
+            |------|------|
+            | `.exe` | **Recommended** — NSIS installer |
+            | `.msi` | Enterprise / IT deployment |
+
+            ### Linux
+            | File | Distros |
+            |------|---------|
+            | `.deb` | Ubuntu, Debian, Mint — **Recommended** |
+            | `.rpm` | Fedora, RHEL, openSUSE |
+            | `.AppImage` | Universal (portable) |
+
+      # Clean up temporary build artifacts to free storage quota
+      - name: Delete temporary build artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: release-*
