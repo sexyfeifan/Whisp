@@ -17,6 +17,9 @@ jobs:
   build:
     runs-on: macos-latest
     name: Build (macOS ARM64)
+    env:
+      MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -43,14 +46,14 @@ jobs:
         run: npm install
 
       - name: Install Apple intermediate certificate
-        if: secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         run: |
           curl -sO https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
           sudo security import DeveloperIDG2CA.cer -k /Library/Keychains/System.keychain -T /usr/bin/codesign 2>&1 || echo "(already installed, skipping)"
           echo "Apple Developer ID G2 intermediate certificate ready"
 
       - name: Import macOS signing certificate
-        if: secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
@@ -102,19 +105,19 @@ jobs:
           rm "$CERTIFICATE_PATH"
 
       - name: Build Tauri app (signed)
-        if: secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
         run: npx tauri build --target aarch64-apple-darwin
 
       - name: Build Tauri app (unsigned)
-        if: secrets.MAC_CSC_LINK == '' || secrets.MAC_CSC_KEY_PASSWORD == ''
+        if: env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == ''
         run: |
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
           npx tauri build --target aarch64-apple-darwin
 
       - name: Verify code signing
-        if: secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         run: |
           DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.dmg" | head -1)
           echo "Verifying DMG: $DMG"
@@ -137,7 +140,7 @@ jobs:
           hdiutil detach "$(dirname "$APP")" -quiet
 
       - name: Verify artifact (unsigned path)
-        if: secrets.MAC_CSC_LINK == '' || secrets.MAC_CSC_KEY_PASSWORD == ''
+        if: env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == ''
         run: |
           DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.dmg" | head -1)
           echo "Verifying DMG exists: $DMG"

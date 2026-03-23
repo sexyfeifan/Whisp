@@ -50,6 +50,9 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     name: Build (${{ matrix.artifact }})
+    env:
+      MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -125,14 +128,14 @@ jobs:
 
       # ── macOS code signing setup ────────────────────────────────
       - name: Install Apple intermediate certificate
-        if: runner.os == 'macOS' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         run: |
           curl -sO https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
           sudo security import DeveloperIDG2CA.cer -k /Library/Keychains/System.keychain -T /usr/bin/codesign 2>&1 || echo "(already installed, skipping)"
           echo "Apple Developer ID G2 intermediate certificate ready"
 
       - name: Import macOS signing certificate
-        if: runner.os == 'macOS' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_CERTIFICATE: ${{ secrets.MAC_CSC_LINK }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
@@ -187,13 +190,13 @@ jobs:
 
       # ── Platform-specific builds ────────────────────────────────
       - name: Build Tauri app (macOS, signed)
-        if: runner.os == 'macOS' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
         run: npx tauri build --target ${{ matrix.target }}
 
       - name: Build Tauri app (macOS, unsigned)
-        if: runner.os == 'macOS' && (secrets.MAC_CSC_LINK == '' || secrets.MAC_CSC_KEY_PASSWORD == '')
+        if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
         run: |
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
           npx tauri build --target ${{ matrix.target }}
@@ -222,7 +225,7 @@ jobs:
 
       # ── Verification ────────────────────────────────────────────
       - name: Verify macOS code signing
-        if: runner.os == 'macOS' && secrets.MAC_CSC_LINK != '' && secrets.MAC_CSC_KEY_PASSWORD != ''
+        if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         run: |
           DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.dmg" | head -1)
           echo "Verifying DMG: $DMG"
@@ -245,7 +248,7 @@ jobs:
           hdiutil detach "$(dirname "$APP")" -quiet
 
       - name: Verify macOS artifact (unsigned path)
-        if: runner.os == 'macOS' && (secrets.MAC_CSC_LINK == '' || secrets.MAC_CSC_KEY_PASSWORD == '')
+        if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
         run: |
           DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.dmg" | head -1)
           echo "Verifying DMG exists: $DMG"
