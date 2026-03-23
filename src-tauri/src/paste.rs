@@ -1,4 +1,6 @@
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+#[cfg(target_os = "macos")]
+use std::process::Command;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
@@ -96,5 +98,47 @@ pub fn simulate_paste(app_handle: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Failed to release modifier: {}", e))?;
 
     log::info!("Paste simulated");
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn capture_frontmost_app_bundle_id() -> Option<String> {
+    let script = r#"tell application "System Events" to get bundle identifier of first application process whose frontmost is true"#;
+    let output = Command::new("osascript").arg("-e").arg(script).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let bundle_id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if bundle_id.is_empty() {
+        None
+    } else {
+        Some(bundle_id)
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn activate_app_by_bundle_id(bundle_id: &str) -> Result<(), String> {
+    let normalized = bundle_id.trim();
+    if normalized.is_empty() {
+        return Err("Empty bundle id".into());
+    }
+
+    let script = format!(
+        "tell application id \"{}\" to activate",
+        normalized.replace('\"', "")
+    );
+    let output = Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .map_err(|e| format!("Failed to run osascript: {}", e))?;
+    if !output.status.success() {
+        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if err.is_empty() {
+            "Failed to activate app".into()
+        } else {
+            err
+        });
+    }
     Ok(())
 }

@@ -25,58 +25,58 @@ const modelCatalog: ModelCatalogItem[] = [
   {
     name: "gpt-4o-transcribe",
     provider: "OpenAI",
-    description: "Higher-quality transcription in the GPT-4o family.",
+    description: "GPT-4o 系列中质量更高的转写模型。",
     baseUrlHint: "https://api.openai.com/v1",
   },
   {
     name: "gpt-4o-mini-transcribe",
     provider: "OpenAI",
-    description: "Balanced speed and quality; good default choice.",
+    description: "速度与质量较均衡，适合作为默认选择。",
     baseUrlHint: "https://api.openai.com/v1",
   },
   {
     name: "gpt-4o-transcribe-diarize",
     provider: "OpenAI",
-    description: "Transcription with speaker diarization support.",
+    description: "支持说话人区分（Diarization）的转写模型。",
     baseUrlHint: "https://api.openai.com/v1",
   },
   {
     name: "whisper-1",
     provider: "OpenAI",
-    description: "Classic Whisper model; stable and widely used.",
+    description: "经典 Whisper 模型，稳定且应用广泛。",
     baseUrlHint: "https://api.openai.com/v1",
   },
   {
     name: "whisper-large-v3-turbo",
     provider: "Groq",
-    description: "Fast Whisper-compatible transcription model.",
+    description: "速度很快的 Whisper 兼容转写模型。",
     baseUrlHint: "https://api.groq.com/openai/v1",
   },
   {
     name: "whisper-v3",
     provider: "Fireworks",
-    description: "General-purpose Whisper v3 model.",
+    description: "通用型 Whisper v3 模型。",
     baseUrlHint: "https://api.fireworks.ai/inference/v1",
   },
   {
     name: "whisper-v3-turbo",
     provider: "Fireworks",
-    description: "Whisper v3 turbo variant for lower latency.",
+    description: "Whisper v3 的低延迟 turbo 版本。",
     baseUrlHint: "https://api.fireworks.ai/inference/v1",
   },
   {
     name: "nova-3",
     provider: "Deepgram",
-    description: "Strong enterprise speech model from Deepgram.",
-    baseUrlHint: "Provider-compatible gateway URL",
-    note: "May require a compatibility gateway/proxy for this app.",
+    description: "Deepgram 的企业级语音模型。",
+    baseUrlHint: "供应商兼容网关 URL",
+    note: "当前应用可能需要兼容网关 / 代理才能接入。",
   },
   {
     name: "chirp_3",
     provider: "Google Cloud",
-    description: "Google Speech model for high-quality recognition.",
-    baseUrlHint: "Provider-compatible gateway URL",
-    note: "May require a compatibility gateway/proxy for this app.",
+    description: "Google Cloud 的高质量语音识别模型。",
+    baseUrlHint: "供应商兼容网关 URL",
+    note: "当前应用可能需要兼容网关 / 代理才能接入。",
   },
 ];
 
@@ -228,14 +228,14 @@ function ModelGuide({
                   color: selected ? "#34c759" : "var(--text)",
                 }}
               >
-                {selected ? "Selected" : "Use"}
+                {selected ? "已选择" : "使用"}
               </button>
             </div>
             <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
               {item.description}
             </p>
             <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-              Base URL hint: {item.baseUrlHint}
+              Base URL 提示：{item.baseUrlHint}
             </p>
             {item.note && (
               <p className="text-xs mt-1" style={{ color: "#ff9f0a" }}>
@@ -246,7 +246,7 @@ function ModelGuide({
         );
       })}
       <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-        You can still type any custom model name manually.
+        你也可以手动输入任意自定义模型名称。
       </p>
     </div>
   );
@@ -482,14 +482,14 @@ function App() {
             </datalist>
             <div className="flex items-center justify-between mt-2">
               <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                Pick a preset model or type your own.
+                可选择预置模型，也可手动输入自定义模型。
               </p>
               <button
                 onClick={() => setShowModelGuide((v) => !v)}
                 className="text-xs"
                 style={{ color: "var(--accent)" }}
               >
-                {showModelGuide ? "Hide Model Guide" : "Model Guide"}
+                {showModelGuide ? "收起模型说明" : "模型说明"}
               </button>
             </div>
             {showModelGuide && (
@@ -669,14 +669,14 @@ function App() {
             </datalist>
             <div className="flex items-center justify-between mt-2">
               <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                Supports preset and custom model names.
+                支持预置模型与自定义模型名。
               </p>
               <button
                 onClick={() => setShowModelGuide((v) => !v)}
                 className="text-xs"
                 style={{ color: "var(--accent)" }}
               >
-                {showModelGuide ? "Hide Model Guide" : "Model Guide"}
+                {showModelGuide ? "收起模型说明" : "模型说明"}
               </button>
             </div>
             {showModelGuide && (

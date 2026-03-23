@@ -16,6 +16,8 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+#[cfg(target_os = "macos")]
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 use tauri_plugin_clipboard_manager::ClipboardExt;
@@ -309,6 +311,8 @@ pub fn run() {
 static SHORTCUT_PROCESSING: AtomicBool = AtomicBool::new(false);
 static LAST_SHORTCUT_TIME: AtomicU64 = AtomicU64::new(0);
 const DEBOUNCE_MS: u64 = 500;
+#[cfg(target_os = "macos")]
+static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn register_shortcut(app_handle: &tauri::AppHandle, settings: &AppSettings) {
     let shortcut_str = &settings.shortcut;
@@ -409,6 +413,12 @@ fn toggle_recording(app_handle: &tauri::AppHandle) {
 
 fn start_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
+    #[cfg(target_os = "macos")]
+    if let Some(bundle_id) = paste::capture_frontmost_app_bundle_id() {
+        if let Ok(mut guard) = LAST_FRONTMOST_APP_BUNDLE_ID.lock() {
+            *guard = Some(bundle_id);
+        }
+    }
 
     // Use saved overlay position, or default to bottom-center of screen
     let saved = settings::get_settings();
@@ -575,9 +585,29 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 let _ = handle.clipboard().write_text(&text);
                 // Close overlay first so the previously active app regains focus
                 close_overlay(&handle);
+                let target_bundle_id: Option<String> = {
+                    #[cfg(target_os = "macos")]
+                    {
+                        LAST_FRONTMOST_APP_BUNDLE_ID
+                            .lock()
+                            .ok()
+                            .and_then(|mut guard| guard.take())
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        None
+                    }
+                };
                 // Paste on a dedicated OS thread — must NOT run on tokio
                 let paste_handle = handle.clone();
                 std::thread::spawn(move || {
+                    #[cfg(target_os = "macos")]
+                    if let Some(bundle_id) = target_bundle_id.as_deref() {
+                        if let Err(e) = paste::activate_app_by_bundle_id(bundle_id) {
+                            log::warn!("Failed to reactivate target app: {}", e);
+                        }
+                        std::thread::sleep(Duration::from_millis(120));
+                    }
                     // Wait for previous app to regain focus
                     std::thread::sleep(Duration::from_millis(PASTE_DELAY_MS));
                     if let Err(e) = paste::simulate_paste(&paste_handle) {
