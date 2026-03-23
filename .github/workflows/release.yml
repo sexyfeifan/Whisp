@@ -1,4 +1,4 @@
-# Build and release NanoWhisper for all supported platforms.
+# Build and release Whisp for all supported platforms.
 #
 # Trigger: push a version tag (e.g., git tag v0.1.0 && git push --tags)
 #
@@ -363,7 +363,7 @@ jobs:
             | `.dmg` (arm64) | Apple Silicon (M1/M2/M3/M4) — **Recommended** |
             | `.dmg` (x64) | Intel (pre-2021 Macs) |
 
-            ### Windows (signed)
+            ### Windows
             | File | Note |
             |------|------|
             | `.exe` | **Recommended** — NSIS installer |
