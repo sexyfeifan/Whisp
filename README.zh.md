@@ -24,6 +24,10 @@
 
 ---
 
+本项目源自于 NanoWhisper https://github.com/jicaiinc/nanowhisper
+因为原项目无法接了第三方转发服务器的api，所以才做了对应修改。
+
+---
 Whisp 是一个桌面语音输入工具：按快捷键开始说话，再按一次结束，文字自动粘贴到当前光标位置。
 
 默认接入 OpenAI，也支持 OpenAI 兼容转写 API；内置常用模型名，且支持自定义模型，使用 Tauri v2 构建。
