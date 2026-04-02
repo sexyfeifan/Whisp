@@ -28,6 +28,14 @@ Whisp is a desktop speech-to-text app focused on one thing: instantly turning yo
 
 Powered by OpenAI-compatible transcription APIs (OpenAI by default), with preset model suggestions and custom model support. Built with Tauri v2.
 
+## v2.0 Highlights
+
+- API keys are now stored in the system keychain instead of plaintext settings.
+- Transcription requests now support configurable timeout and automatic retries.
+- Silence trimming reduces upload size and improves responsiveness.
+- History now tracks success / failure state, provider, language, and retry-ready audio availability.
+- Settings now include auto-paste, audio retention, paste delay, and reliability controls.
+
 ## Product Intro
 
 Whisp is made for people who type a lot but think faster than they can type:
@@ -51,7 +59,7 @@ No complex workflows, no heavy setup, no context switching.
 - **Model Presets + Custom Models** — Built-in popular model names plus free-form custom model input.
 - **Model Guide** — In-app model guide button with model descriptions and selection hints.
 - **Waveform Overlay** — Minimal always-on-top visualizer while recording.
-- **History** — All transcriptions saved locally with audio files for retry.
+- **History** — Rich local history with success/failure status, search, and retry support.
 - **System Tray** — Runs quietly in the background.
 
 ## Xiaohongshu Style Intro (中文)

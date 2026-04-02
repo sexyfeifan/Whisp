@@ -1,4 +1,4 @@
-use crate::history::{HistoryEntry, HistoryManager};
+use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
 use std::sync::Arc;
@@ -30,14 +30,16 @@ pub fn get_settings() -> AppSettings {
 }
 
 #[tauri::command]
-pub fn save_settings(app: AppHandle, settings: AppSettings) {
+pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
     let old_settings = settings::get_settings();
-    settings::save_settings(&settings);
+    settings::save_settings(&settings)?;
 
     // Hot-reload shortcut if changed
     if settings.shortcut != old_settings.shortcut {
         crate::re_register_shortcut(&app, &old_settings.shortcut, &settings);
     }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -98,7 +100,7 @@ pub fn save_overlay_position(x: f64, y: f64) {
     let mut s = settings::get_settings();
     s.overlay_x = Some(x);
     s.overlay_y = Some(y);
-    settings::save_settings(&s);
+    let _ = settings::save_settings(&s);
 }
 
 #[tauri::command]
@@ -156,18 +158,33 @@ pub async fn retry_transcription(
         &settings.model,
         wav_data,
         lang,
+        settings.request_timeout_sec,
+        settings.retry_count,
     )
     .await
     .map_err(|e| e.to_string())?;
 
+    let provider = transcribe::provider_name(&settings.api_base_url);
+
     // Update entry in place (preserves ID and audio_path)
     history
-        .update_entry(id, &text, &settings.model)
+        .update_entry(
+            id,
+            &text,
+            &settings.model,
+            STATUS_SUCCESS,
+            None,
+            &provider,
+            &settings.api_base_url,
+            &settings.language,
+        )
         .map_err(|e| e.to_string())?;
 
     // Copy + paste
     let _ = app.clipboard().write_text(&text);
-    crate::paste::simulate_paste(&app).ok();
+    if settings.auto_paste_enabled {
+        crate::paste::simulate_paste(&app).ok();
+    }
 
     let _ = app.emit("history-updated", ());
 

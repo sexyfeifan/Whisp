@@ -2232,6 +2232,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "keyring"
+version = "3.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eebcc3aff044e5944a8fbaf69eb277d11986064cba30c468730e8b9909fb551c"
+dependencies = [
+ "log",
+ "zeroize",
+]
+
+[[package]]
 name = "kuchikiki"
 version = "0.8.8-speedreader"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2487,7 +2497,7 @@ dependencies = [
 
 [[package]]
 name = "nanowhisper"
-version = "1.0.1"
+version = "2.0.0"
 dependencies = [
  "anyhow",
  "block2",
@@ -2498,6 +2508,7 @@ dependencies = [
  "dotenvy",
  "enigo",
  "hound",
+ "keyring",
  "log",
  "objc2",
  "objc2-av-foundation",
@@ -2511,6 +2522,7 @@ dependencies = [
  "tauri-plugin-clipboard-manager",
  "tauri-plugin-global-shortcut",
  "tauri-plugin-opener",
+ "tokio",
  "windows-sys 0.59.0",
 ]
 

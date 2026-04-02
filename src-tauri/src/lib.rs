@@ -8,8 +8,8 @@ mod settings;
 mod sound;
 mod transcribe;
 
-use history::HistoryManager;
-use recorder::{encode_wav, AudioRecorder};
+use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
+use recorder::{encode_wav, trim_silence, AudioRecorder};
 use settings::AppSettings;
 #[cfg(target_os = "macos")]
 use std::collections::VecDeque;
@@ -33,7 +33,9 @@ pub fn data_dir() -> PathBuf {
 const OVERLAY_WIDTH: f64 = 320.0;
 const OVERLAY_HEIGHT: f64 = 48.0;
 const OVERLAY_BOTTOM_OFFSET: f64 = 80.0;
-const PASTE_DELAY_MS: u64 = 350;
+const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
+const SILENCE_TRIM_PADDING_MS: u32 = 120;
+const MIN_TRANSCRIBE_MS: i64 = 300;
 
 #[cfg(target_os = "macos")]
 fn to_white_icon(icon: &tauri::image::Image<'_>) -> tauri::image::Image<'static> {
@@ -505,15 +507,38 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         audio.sample_rate
     );
 
+    let settings = settings::get_settings();
+
     // Play stop sound AFTER mic is closed (async, won't be recorded)
-    if settings::get_settings().sound_enabled {
+    if settings.sound_enabled {
         sound::play_stop_sound();
     }
 
-    let sample_count = audio.samples.len();
-    let sample_rate = audio.sample_rate;
+    let processed_audio = if settings.trim_silence_enabled {
+        trim_silence(&audio, SILENCE_TRIM_THRESHOLD, SILENCE_TRIM_PADDING_MS)
+    } else {
+        audio
+    };
 
-    let wav_data = match encode_wav(&audio) {
+    let sample_count = processed_audio.samples.len();
+    let sample_rate = processed_audio.sample_rate;
+    let duration_ms = if sample_rate > 0 {
+        Some((sample_count as i64 * 1000) / sample_rate as i64)
+    } else {
+        None
+    };
+
+    if duration_ms.unwrap_or_default() < MIN_TRANSCRIBE_MS {
+        log::warn!("Recording too short after processing");
+        close_overlay(app_handle);
+        let _ = app_handle.emit(
+            "transcription-error",
+            "Recording too short. Try speaking a little longer.".to_string(),
+        );
+        return;
+    }
+
+    let wav_data = match encode_wav(&processed_audio) {
         Ok(d) => d,
         Err(e) => {
             log::error!("Failed to encode WAV: {}", e);
@@ -523,21 +548,28 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     };
     log::info!("WAV size: {} bytes", wav_data.len());
 
-    // Save WAV file to ~/.nanowhisper/audio/
-    let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S%.3f").to_string();
-    let audio_filename = format!("{}.wav", timestamp);
-    let audio_path = history.audio_dir().join(&audio_filename);
-    if let Err(e) = std::fs::write(&audio_path, &wav_data) {
-        log::error!("Failed to save audio file: {}", e);
+    let audio_path_str = if settings.save_audio_files {
+        let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S%.3f").to_string();
+        let audio_filename = format!("{}.wav", timestamp);
+        let audio_path = history.audio_dir().join(&audio_filename);
+        if let Err(e) = std::fs::write(&audio_path, &wav_data) {
+            log::error!("Failed to save audio file: {}", e);
+            None
+        } else {
+            log::info!("Audio saved: {}", audio_path.display());
+            Some(audio_path.to_string_lossy().to_string())
+        }
     } else {
-        log::info!("Audio saved: {}", audio_path.display());
-    }
-    let audio_path_str = audio_path.to_string_lossy().to_string();
+        None
+    };
 
-    let settings = settings::get_settings();
     if settings.api_key.is_empty() {
         log::error!("API key not configured!");
         close_overlay(app_handle);
+        let _ = app_handle.emit(
+            "transcription-error",
+            "API key not configured. Open settings to finish setup.".to_string(),
+        );
         if let Some(w) = app_handle.get_webview_window("main") {
             let _ = w.show();
             let _ = w.set_focus();
@@ -551,15 +583,14 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let language = settings.language.clone();
     let api_key = settings.api_key.clone();
     let api_base_url = settings.api_base_url.clone();
+    let provider = transcribe::provider_name(&api_base_url);
+    let auto_paste_enabled = settings.auto_paste_enabled;
+    let paste_delay_ms = settings.paste_delay_ms;
+    let request_timeout_sec = settings.request_timeout_sec;
+    let retry_count = settings.retry_count;
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!("Calling API with model={} via {}...", model, api_base_url);
-
-    let duration_ms = if sample_rate > 0 {
-        Some((sample_count as i64 * 1000) / sample_rate as i64)
-    } else {
-        None
-    };
 
     tauri::async_runtime::spawn(async move {
         let lang = if language == "auto" {
@@ -575,6 +606,8 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
             &model,
             wav_data,
             lang,
+            request_timeout_sec,
+            retry_count,
         )
         .await
         {
@@ -583,49 +616,71 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
                 // Copy to clipboard and auto-paste into active app
                 let _ = handle.clipboard().write_text(&text);
-                // Close overlay first so the previously active app regains focus
                 close_overlay(&handle);
-                let target_bundle_id: Option<String> = {
-                    #[cfg(target_os = "macos")]
-                    {
-                        LAST_FRONTMOST_APP_BUNDLE_ID
-                            .lock()
-                            .ok()
-                            .and_then(|mut guard| guard.take())
-                    }
-                    #[cfg(not(target_os = "macos"))]
-                    {
-                        None
-                    }
-                };
-                // Paste on a dedicated OS thread — must NOT run on tokio
-                let paste_handle = handle.clone();
-                std::thread::spawn(move || {
-                    #[cfg(target_os = "macos")]
-                    if let Some(bundle_id) = target_bundle_id.as_deref() {
-                        if let Err(e) = paste::activate_app_by_bundle_id(bundle_id) {
-                            log::warn!("Failed to reactivate target app: {}", e);
-                        }
-                        std::thread::sleep(Duration::from_millis(120));
-                    }
-                    // Wait for previous app to regain focus
-                    std::thread::sleep(Duration::from_millis(PASTE_DELAY_MS));
-                    if let Err(e) = paste::simulate_paste(&paste_handle) {
-                        log::error!("Paste failed: {}", e);
-                    }
-                });
 
-                // Save to history
-                let _ = history.add_entry(&text, &model, duration_ms, Some(&audio_path_str));
+                if auto_paste_enabled {
+                    let target_bundle_id: Option<String> = {
+                        #[cfg(target_os = "macos")]
+                        {
+                            LAST_FRONTMOST_APP_BUNDLE_ID
+                                .lock()
+                                .ok()
+                                .and_then(|mut guard| guard.take())
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            None
+                        }
+                    };
+                    let paste_handle = handle.clone();
+                    std::thread::spawn(move || {
+                        #[cfg(target_os = "macos")]
+                        if let Some(bundle_id) = target_bundle_id.as_deref() {
+                            if let Err(e) = paste::activate_app_by_bundle_id(bundle_id) {
+                                log::warn!("Failed to reactivate target app: {}", e);
+                            }
+                            std::thread::sleep(Duration::from_millis(120));
+                        }
+                        std::thread::sleep(Duration::from_millis(paste_delay_ms.max(50)));
+                        if let Err(e) = paste::simulate_paste(&paste_handle) {
+                            log::error!("Paste failed: {}", e);
+                        }
+                    });
+                }
+
+                let entry = NewHistoryEntry {
+                    text: text.clone(),
+                    model: model.clone(),
+                    duration_ms,
+                    audio_path: audio_path_str.clone(),
+                    status: STATUS_SUCCESS.to_string(),
+                    error_message: None,
+                    provider: provider.clone(),
+                    api_base_url: api_base_url.clone(),
+                    language: language.clone(),
+                    retry_of: None,
+                };
+                let _ = history.add_entry(&entry);
             }
             Err(e) => {
                 log::error!("Transcription failed: {}", e);
 
-                // Save failed entry to history so user can retry
-                let error_text = format!("[Error: {}]", e);
-                let _ = history.add_entry(&error_text, &model, duration_ms, Some(&audio_path_str));
+                let error_message = e.to_string();
+                let entry = NewHistoryEntry {
+                    text: "Transcription failed".to_string(),
+                    model: model.clone(),
+                    duration_ms,
+                    audio_path: audio_path_str.clone(),
+                    status: STATUS_FAILED.to_string(),
+                    error_message: Some(error_message.clone()),
+                    provider: provider.clone(),
+                    api_base_url: api_base_url.clone(),
+                    language: language.clone(),
+                    retry_of: None,
+                };
+                let _ = history.add_entry(&entry);
 
-                let _ = handle.emit("transcription-error", e.to_string());
+                let _ = handle.emit("transcription-error", error_message);
             }
         }
 

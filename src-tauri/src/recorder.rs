@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use tauri::{AppHandle, Emitter};
 
+#[derive(Clone)]
 pub struct RecordedAudio {
     pub samples: Vec<f32>,
     pub sample_rate: u32,
@@ -234,4 +235,43 @@ pub fn encode_wav(audio: &RecordedAudio) -> Result<Vec<u8>> {
         writer.finalize()?;
     }
     Ok(cursor.into_inner())
+}
+
+pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32) -> RecordedAudio {
+    if audio.samples.is_empty() || audio.sample_rate == 0 {
+        return audio.clone();
+    }
+
+    let peak = audio
+        .samples
+        .iter()
+        .map(|sample| sample.abs())
+        .fold(0.0_f32, f32::max);
+    if peak <= floor_threshold {
+        return audio.clone();
+    }
+
+    let threshold = floor_threshold.max(peak * 0.08);
+    let start = audio
+        .samples
+        .iter()
+        .position(|sample| sample.abs() >= threshold);
+    let end = audio
+        .samples
+        .iter()
+        .rposition(|sample| sample.abs() >= threshold);
+
+    let (start, end) = match (start, end) {
+        (Some(start), Some(end)) if end >= start => (start, end),
+        _ => return audio.clone(),
+    };
+
+    let padding = ((audio.sample_rate as u64 * padding_ms as u64) / 1000) as usize;
+    let trimmed_start = start.saturating_sub(padding);
+    let trimmed_end = (end + padding + 1).min(audio.samples.len());
+
+    RecordedAudio {
+        samples: audio.samples[trimmed_start..trimmed_end].to_vec(),
+        sample_rate: audio.sample_rate,
+    }
 }
