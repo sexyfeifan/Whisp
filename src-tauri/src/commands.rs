@@ -139,7 +139,11 @@ pub async fn retry_transcription(
 
     let settings = crate::settings::get_settings();
     if settings.api_key.is_empty() {
-        return Err("API key not configured".into());
+        return Err(match settings.ui_language.as_str() {
+            "en" => "API key not configured".into(),
+            "ja" => "API キーが未設定です".into(),
+            _ => "尚未配置 API Key".into(),
+        });
     }
 
     let lang = if settings.language == "auto" {

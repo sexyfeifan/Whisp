@@ -116,6 +116,23 @@ pub async fn validate_api_key(
     if resp.status() == StatusCode::UNAUTHORIZED {
         anyhow::bail!("Invalid API key");
     }
+    if resp.status() == StatusCode::FORBIDDEN {
+        anyhow::bail!("The server rejected this API key");
+    }
+    if matches!(
+        resp.status(),
+        StatusCode::BAD_REQUEST
+            | StatusCode::NOT_FOUND
+            | StatusCode::METHOD_NOT_ALLOWED
+            | StatusCode::UNSUPPORTED_MEDIA_TYPE
+            | StatusCode::UNPROCESSABLE_ENTITY
+    ) {
+        let body = shorten_error_body(resp.text().await.unwrap_or_default());
+        anyhow::bail!(
+            "The relay rejected the validation probe. Your configuration may still work for real transcription. Details: {}",
+            body
+        );
+    }
     if !resp.status().is_success() {
         let body = shorten_error_body(resp.text().await.unwrap_or_default());
         anyhow::bail!("{}", body);

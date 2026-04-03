@@ -37,6 +37,14 @@ const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
 const SILENCE_TRIM_PADDING_MS: u32 = 120;
 const MIN_TRANSCRIBE_MS: i64 = 300;
 
+fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
+    match ui_language {
+        "en" => en.to_string(),
+        "ja" => ja.to_string(),
+        _ => zh.to_string(),
+    }
+}
+
 #[cfg(target_os = "macos")]
 fn to_white_icon(icon: &tauri::image::Image<'_>) -> tauri::image::Image<'static> {
     fn color_dist_sq(a: (u8, u8, u8), b: (u8, u8, u8)) -> u32 {
@@ -533,7 +541,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         close_overlay(app_handle);
         let _ = app_handle.emit(
             "transcription-error",
-            "Recording too short. Try speaking a little longer.".to_string(),
+            tr(
+                &settings.ui_language,
+                "录音太短了，请稍微多说一点。",
+                "Recording too short. Try speaking a little longer.",
+                "録音が短すぎます。もう少し長く話してください。",
+            ),
         );
         return;
     }
@@ -568,7 +581,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         close_overlay(app_handle);
         let _ = app_handle.emit(
             "transcription-error",
-            "API key not configured. Open settings to finish setup.".to_string(),
+            tr(
+                &settings.ui_language,
+                "尚未配置 API Key，请打开设置完成配置。",
+                "API key not configured. Open settings to finish setup.",
+                "API キーが未設定です。設定を開いて完了してください。",
+            ),
         );
         if let Some(w) = app_handle.get_webview_window("main") {
             let _ = w.show();

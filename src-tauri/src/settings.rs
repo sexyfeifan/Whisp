@@ -15,6 +15,8 @@ pub struct AppSettings {
     pub model: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
     #[serde(default = "default_shortcut")]
     pub shortcut: String,
     #[serde(default = "default_sound_enabled")]
@@ -45,6 +47,10 @@ struct StoredSettings {
     pub model: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
+    #[serde(default = "default_api_key")]
+    pub api_key: String,
     #[serde(default = "default_shortcut")]
     pub shortcut: String,
     #[serde(default = "default_sound_enabled")]
@@ -77,6 +83,8 @@ struct LegacySettings {
     pub model: String,
     #[serde(default = "default_language")]
     pub language: String,
+    #[serde(default = "default_ui_language")]
+    pub ui_language: String,
     #[serde(default = "default_shortcut")]
     pub shortcut: String,
     #[serde(default = "default_sound_enabled")]
@@ -119,6 +127,10 @@ fn default_shortcut() -> String {
     String::new()
 }
 
+fn default_ui_language() -> String {
+    "zh-CN".to_string()
+}
+
 fn default_sound_enabled() -> bool {
     true
 }
@@ -154,6 +166,7 @@ impl Default for AppSettings {
             api_base_url: default_api_base_url(),
             model: default_model(),
             language: default_language(),
+            ui_language: default_ui_language(),
             shortcut: default_shortcut(),
             sound_enabled: default_sound_enabled(),
             auto_paste_enabled: default_auto_paste_enabled(),
@@ -174,6 +187,8 @@ impl Default for StoredSettings {
             api_base_url: default_api_base_url(),
             model: default_model(),
             language: default_language(),
+            ui_language: default_ui_language(),
+            api_key: default_api_key(),
             shortcut: default_shortcut(),
             sound_enabled: default_sound_enabled(),
             auto_paste_enabled: default_auto_paste_enabled(),
@@ -195,6 +210,7 @@ impl Default for LegacySettings {
             api_base_url: default_api_base_url(),
             model: default_model(),
             language: default_language(),
+            ui_language: default_ui_language(),
             shortcut: default_shortcut(),
             sound_enabled: default_sound_enabled(),
             auto_paste_enabled: default_auto_paste_enabled(),
@@ -215,6 +231,8 @@ impl From<&AppSettings> for StoredSettings {
             api_base_url: value.api_base_url.clone(),
             model: value.model.clone(),
             language: value.language.clone(),
+            ui_language: value.ui_language.clone(),
+            api_key: value.api_key.clone(),
             shortcut: value.shortcut.clone(),
             sound_enabled: value.sound_enabled,
             auto_paste_enabled: value.auto_paste_enabled,
@@ -236,6 +254,7 @@ impl From<LegacySettings> for AppSettings {
             api_base_url: value.api_base_url,
             model: value.model,
             language: value.language,
+            ui_language: value.ui_language,
             shortcut: value.shortcut,
             sound_enabled: value.sound_enabled,
             auto_paste_enabled: value.auto_paste_enabled,
@@ -314,8 +333,6 @@ pub fn get_settings() -> AppSettings {
                 settings.api_key = legacy.api_key.clone();
                 if let Err(e) = store_api_key(&legacy.api_key) {
                     log::warn!("Failed to migrate API key to system keychain: {}", e);
-                } else if let Err(e) = save_stored_settings(&settings) {
-                    log::warn!("Failed to rewrite settings without plaintext API key: {}", e);
                 }
             } else if let Some(api_key) = env_api_key() {
                 settings.api_key = api_key;
@@ -335,6 +352,11 @@ pub fn get_settings() -> AppSettings {
 }
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
-    store_api_key(&settings.api_key)?;
+    if let Err(e) = store_api_key(&settings.api_key) {
+        log::warn!(
+            "Failed to store API key in system keychain, falling back to local settings storage: {}",
+            e
+        );
+    }
     save_stored_settings(settings)
 }
