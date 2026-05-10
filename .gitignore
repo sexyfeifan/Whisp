@@ -9,3 +9,8 @@ src-tauri/target/
 *.dmg
 *.zip
 .idea/
+
+plans/
+.claude/
+Whisp-*/
+dmg/

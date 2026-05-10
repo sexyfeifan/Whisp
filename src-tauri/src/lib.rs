@@ -12,14 +12,14 @@ use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use recorder::{encode_wav, trim_silence, AudioRecorder};
 use settings::AppSettings;
 #[cfg(target_os = "macos")]
-use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 #[cfg(target_os = "macos")]
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{Emitter, Manager};
+use tauri::{Emitter, Listener, Manager};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -45,132 +45,21 @@ fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     }
 }
 
-#[cfg(target_os = "macos")]
-fn to_white_icon(icon: &tauri::image::Image<'_>) -> tauri::image::Image<'static> {
-    fn color_dist_sq(a: (u8, u8, u8), b: (u8, u8, u8)) -> u32 {
-        let dr = a.0 as i32 - b.0 as i32;
-        let dg = a.1 as i32 - b.1 as i32;
-        let db = a.2 as i32 - b.2 as i32;
-        (dr * dr + dg * dg + db * db) as u32
-    }
-
-    fn dominant_opaque_color(rgba: &[u8]) -> Option<(u8, u8, u8)> {
-        let mut bins = [0u32; 16 * 16 * 16];
-        for px in rgba.chunks_exact(4) {
-            let alpha = px[3];
-            if alpha < 220 {
-                continue;
-            }
-            let r = (px[0] >> 4) as usize;
-            let g = (px[1] >> 4) as usize;
-            let b = (px[2] >> 4) as usize;
-            bins[(r << 8) | (g << 4) | b] += 1;
-        }
-        let (idx, count) = bins
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, c)| *c)
-            .unwrap_or((0, &0));
-        if *count == 0 {
-            return None;
-        }
-        let r = (((idx >> 8) & 0xF) as u8) * 16 + 8;
-        let g = (((idx >> 4) & 0xF) as u8) * 16 + 8;
-        let b = ((idx & 0xF) as u8) * 16 + 8;
-        Some((r, g, b))
-    }
-
-    let mut rgba = icon.rgba().to_vec();
-    let width = icon.width() as usize;
-    let height = icon.height() as usize;
-    let pixel_count = width * height;
-    let mut is_background = vec![false; pixel_count];
-    let background_color = dominant_opaque_color(&rgba).unwrap_or((255, 255, 255));
-    let bg_tolerance_sq = 45 * 45;
-
-    let is_background_candidate = |idx: usize, rgba_data: &[u8]| -> bool {
-        let base = idx * 4;
-        let alpha = rgba_data[base + 3];
-        if alpha <= 24 {
-            return true;
-        }
-        if alpha < 200 {
-            return false;
-        }
-        let color = (rgba_data[base], rgba_data[base + 1], rgba_data[base + 2]);
-        color_dist_sq(color, background_color) <= bg_tolerance_sq
-    };
-
-    let mut queue = VecDeque::new();
-    for y in 0..height {
-        for x in [0, width - 1] {
-            let idx = y * width + x;
-            if !is_background[idx] && is_background_candidate(idx, &rgba) {
-                is_background[idx] = true;
-                queue.push_back(idx);
-            }
-        }
-    }
-    for x in 0..width {
-        for y in [0, height - 1] {
-            let idx = y * width + x;
-            if !is_background[idx] && is_background_candidate(idx, &rgba) {
-                is_background[idx] = true;
-                queue.push_back(idx);
-            }
-        }
-    }
-
-    while let Some(idx) = queue.pop_front() {
-        let x = idx % width;
-        let y = idx / width;
-        let neighbors = [
-            (x.wrapping_sub(1), y, x > 0),
-            (x + 1, y, x + 1 < width),
-            (x, y.wrapping_sub(1), y > 0),
-            (x, y + 1, y + 1 < height),
-        ];
-        for (nx, ny, valid) in neighbors {
-            if !valid {
-                continue;
-            }
-            let nidx = ny * width + nx;
-            if !is_background[nidx] && is_background_candidate(nidx, &rgba) {
-                is_background[nidx] = true;
-                queue.push_back(nidx);
-            }
-        }
-    }
-
-    for (idx, pixel) in rgba.chunks_exact_mut(4).enumerate() {
-        if is_background[idx] {
-            pixel[0] = 0;
-            pixel[1] = 0;
-            pixel[2] = 0;
-            pixel[3] = 0;
-            continue;
-        }
-        if pixel[3] > 0 {
-            pixel[0] = 255;
-            pixel[1] = 255;
-            pixel[2] = 255;
-            pixel[3] = pixel[3].max(120);
-        }
-    }
-    tauri::image::Image::new_owned(rgba, icon.width(), icon.height())
-}
 
 pub fn run() {
     // Load .env file if present (for development)
     let _ = dotenvy::dotenv();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_history,
+            commands::get_history_page,
             commands::delete_history_entry,
+            commands::delete_history_entries,
             commands::clear_history,
             commands::get_settings,
             commands::save_settings,
@@ -184,6 +73,8 @@ pub fn run() {
             commands::save_overlay_position,
             commands::pause_shortcut,
             commands::resume_shortcut,
+            commands::export_history,
+            commands::toggle_autostart,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -219,6 +110,17 @@ pub fn run() {
                     .visible(false)
                     .build()?;
 
+            // Apply saved launch-at-startup setting
+            {
+                let saved = settings::get_settings();
+                let autolaunch = app.autolaunch();
+                if saved.launch_at_startup {
+                    let _ = autolaunch.enable();
+                } else {
+                    let _ = autolaunch.disable();
+                }
+            }
+
             // System tray
             let show_i = tauri::menu::MenuItem::with_id(
                 app,
@@ -229,23 +131,56 @@ pub fn run() {
             )?;
             let quit_i = tauri::menu::MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
-            let menu = tauri::menu::Menu::with_items(app, &[&show_i, &separator, &quit_i])?;
 
-            let mut tray_icon = app
+            // Build recent-history menu items (up to 5)
+            let recent_entries = history_manager.get_entries().unwrap_or_default();
+            let recent: Vec<_> = recent_entries.into_iter().take(5).collect();
+            let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> =
+                vec![Box::new(show_i), Box::new(separator)];
+            for (i, entry) in recent.iter().enumerate() {
+                let label: String = entry.text.chars().take(40).collect();
+                let label = if entry.text.len() > 40 {
+                    format!("{}…", label)
+                } else {
+                    label
+                };
+                let item = tauri::menu::MenuItem::with_id(
+                    app,
+                    format!("history_{}", i),
+                    label,
+                    true,
+                    None::<&str>,
+                )?;
+                menu_items.push(Box::new(item));
+            }
+            let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
+            menu_items.push(Box::new(sep2));
+            menu_items.push(Box::new(quit_i));
+
+            let menu_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
+                menu_items.iter().map(|b| b.as_ref()).collect();
+            let menu = tauri::menu::Menu::with_items(app, &menu_refs)?;
+
+            // Store recent texts for tray click handler
+            let recent_texts: Vec<String> = recent.iter().map(|e| e.text.clone()).collect();
+
+            #[cfg(target_os = "macos")]
+            let tray_icon = {
+                let bytes = include_bytes!("../icons/tray_icon_template.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
+            };
+            #[cfg(not(target_os = "macos"))]
+            let tray_icon = app
                 .default_window_icon()
                 .cloned()
                 .expect("No default window icon configured")
                 .to_owned();
-            #[cfg(target_os = "macos")]
-            {
-                tray_icon = to_white_icon(&tray_icon);
-            }
 
             tauri::tray::TrayIconBuilder::new()
                 .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(true)
-                .icon_as_template(false)
+                .icon_as_template(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
@@ -255,6 +190,17 @@ pub fn run() {
                     }
                     "quit" => {
                         app.exit(0);
+                    }
+                    id if id.starts_with("history_") => {
+                        if let Ok(idx) = id["history_".len()..].parse::<usize>() {
+                            if let Some(text) = recent_texts.get(idx) {
+                                let _ = app.clipboard().write_text(text);
+                                let settings = settings::get_settings();
+                                if settings.auto_paste_enabled {
+                                    crate::paste::simulate_paste(app).ok();
+                                }
+                            }
+                        }
                     }
                     _ => {}
                 })
@@ -282,6 +228,16 @@ pub fn run() {
             // Register global shortcut (secondary, user-configurable)
             let settings = settings::get_settings();
             register_shortcut(&app_handle, &settings);
+
+            // Listen for silence auto-stop from recorder worker
+            let silence_handle = app_handle.clone();
+            app_handle.listen("silence-auto-stop", move |_| {
+                let h = silence_handle.clone();
+                let _ = h.emit("silence-stopping", ());
+                std::thread::spawn(move || {
+                    stop_and_transcribe(&h);
+                });
+            });
 
             // Show main window
             if let Some(w) = app.get_webview_window("main") {
@@ -338,7 +294,7 @@ pub fn register_shortcut(app_handle: &tauri::AppHandle, settings: &AppSettings) 
     };
 
     let handle = app_handle.clone();
-    let _ = app_handle
+    if let Err(e) = app_handle
         .global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
             if event.state == ShortcutState::Pressed {
@@ -368,7 +324,11 @@ pub fn register_shortcut(app_handle: &tauri::AppHandle, settings: &AppSettings) 
                     SHORTCUT_PROCESSING.store(false, Ordering::SeqCst);
                 });
             }
-        });
+        })
+    {
+        log::error!("Failed to register shortcut '{}': {}", shortcut_str, e);
+        let _ = app_handle.emit("shortcut-conflict", e.to_string());
+    }
 }
 
 /// Unregister old shortcut and register new one (called when settings change)
@@ -450,10 +410,11 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let _ = w.hide();
     }
 
+    let overlay_url = format!("/src/overlay/index.html?lang={}", saved.ui_language);
     match tauri::WebviewWindowBuilder::new(
         app_handle,
         "overlay",
-        tauri::WebviewUrl::App("/src/overlay/index.html".into()),
+        tauri::WebviewUrl::App(overlay_url.into()),
     )
     .title("")
     .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
@@ -481,8 +442,17 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         sound::play_start_sound();
     }
 
-    if let Err(e) = recorder.start(app_handle.clone()) {
+    if let Err(e) = recorder.start(app_handle.clone(), saved.silence_timeout_sec, saved.silence_threshold as f32) {
         log::error!("Failed to start recording: {}", e);
+        let _ = app_handle.emit(
+            "transcription-error",
+            tr(
+                &saved.ui_language,
+                "麦克风启动失败，请检查权限设置。",
+                "Failed to start microphone. Check permission settings.",
+                "マイクの起動に失敗しました。権限設定を確認してください。",
+            ),
+        );
         close_overlay(app_handle);
         return;
     }
@@ -501,12 +471,18 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     // Notify overlay
     let _ = app_handle.emit("transcribing", ());
 
-    let audio = match recorder.stop() {
-        Ok(a) => a,
-        Err(e) => {
-            log::error!("Failed to stop recording: {}", e);
-            close_overlay(app_handle);
-            return;
+    // If silence auto-stop already fired, the audio is in the auto_stop channel
+    let audio = if let Some(a) = recorder.take_auto_stop_audio() {
+        recorder.join_worker_after_auto_stop();
+        a
+    } else {
+        match recorder.stop() {
+            Ok(a) => a,
+            Err(e) => {
+                log::error!("Failed to stop recording: {}", e);
+                close_overlay(app_handle);
+                return;
+            }
         }
     };
     log::info!(
@@ -538,7 +514,6 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
     if duration_ms.unwrap_or_default() < MIN_TRANSCRIBE_MS {
         log::warn!("Recording too short after processing");
-        close_overlay(app_handle);
         let _ = app_handle.emit(
             "transcription-error",
             tr(
@@ -548,6 +523,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "録音が短すぎます。もう少し長く話してください。",
             ),
         );
+        // Overlay self-closes after 2.5s; also schedule a fallback close
+        let handle = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(3000));
+            close_overlay(&handle);
+        });
         return;
     }
 
@@ -578,7 +559,6 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
     if settings.api_key.is_empty() {
         log::error!("API key not configured!");
-        close_overlay(app_handle);
         let _ = app_handle.emit(
             "transcription-error",
             tr(
@@ -588,6 +568,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "API キーが未設定です。設定を開いて完了してください。",
             ),
         );
+        // Fallback close after overlay self-closes
+        let handle = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(3000));
+            close_overlay(&handle);
+        });
         if let Some(w) = app_handle.get_webview_window("main") {
             let _ = w.show();
             let _ = w.set_focus();
@@ -606,6 +592,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let paste_delay_ms = settings.paste_delay_ms;
     let request_timeout_sec = settings.request_timeout_sec;
     let retry_count = settings.retry_count;
+    let whisper_prompt = settings.whisper_prompt.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!("Calling API with model={} via {}...", model, api_base_url);
@@ -616,6 +603,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         } else {
             Some(language.as_str())
         };
+        let prompt = if whisper_prompt.trim().is_empty() {
+            None
+        } else {
+            Some(whisper_prompt.as_str())
+        };
 
         match transcribe::transcribe_audio(
             &http_client,
@@ -624,6 +616,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
             &model,
             wav_data,
             lang,
+            prompt,
             request_timeout_sec,
             retry_count,
         )
@@ -679,6 +672,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     retry_of: None,
                 };
                 let _ = history.add_entry(&entry);
+                let _ = history.cleanup_old_audio(50);
             }
             Err(e) => {
                 log::error!("Transcription failed: {}", e);
@@ -697,12 +691,21 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     retry_of: None,
                 };
                 let _ = history.add_entry(&entry);
+                let _ = history.cleanup_old_audio(50);
 
-                let _ = handle.emit("transcription-error", error_message);
+                // Emit error to overlay — overlay will show it and self-close after 2.5s
+                let _ = handle.emit("transcription-error", &error_message);
+                // Emit to main window for retry toast
+                let _ = handle.emit("transcription-failed", &error_message);
+                // Fallback close in case overlay missed the event
+                let fallback_handle = handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+                    close_overlay(&fallback_handle);
+                });
             }
         }
 
-        close_overlay(&handle);
         // Notify main window to refresh (both success and failure)
         let _ = handle.emit("history-updated", ());
     });
@@ -714,7 +717,14 @@ fn cancel_recording(app_handle: &tauri::AppHandle) {
         log::info!("Cancelling recording...");
         unregister_escape(app_handle);
         recorder.cancel();
-        close_overlay(app_handle);
+        // Notify overlay so it can show brief "cancelled" feedback before self-closing
+        let _ = app_handle.emit("recording-cancelled", ());
+        // Fallback: close overlay after delay in case the frontend missed the event
+        let handle = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(1000));
+            close_overlay(&handle);
+        });
     }
 }
 

@@ -22,6 +22,7 @@ pub struct AudioRecorder {
     cmd_tx: Mutex<Option<mpsc::Sender<Cmd>>>,
     worker: Mutex<Option<JoinHandle<()>>>,
     is_recording: Arc<Mutex<bool>>,
+    auto_stop_rx: Mutex<Option<mpsc::Receiver<RecordedAudio>>>,
 }
 
 impl AudioRecorder {
@@ -30,6 +31,7 @@ impl AudioRecorder {
             cmd_tx: Mutex::new(None),
             worker: Mutex::new(None),
             is_recording: Arc::new(Mutex::new(false)),
+            auto_stop_rx: Mutex::new(None),
         }
     }
 
@@ -37,12 +39,13 @@ impl AudioRecorder {
         *self.is_recording.lock().unwrap()
     }
 
-    pub fn start(&self, app_handle: AppHandle) -> Result<()> {
+    pub fn start(&self, app_handle: AppHandle, silence_timeout_sec: u64, silence_threshold: f32) -> Result<()> {
         if self.is_recording() {
             return Ok(());
         }
 
         let (cmd_tx, cmd_rx) = mpsc::channel::<Cmd>();
+        let (auto_stop_tx, auto_stop_rx) = mpsc::channel::<RecordedAudio>();
         let is_recording = self.is_recording.clone();
 
         // Mark as recording before spawning thread to prevent double-start
@@ -107,10 +110,20 @@ impl AudioRecorder {
 
             let mut buffer: Vec<f32> = Vec::new();
 
+            // Silence auto-stop tracking: count consecutive silent 512-sample chunks
+            let silence_chunks_limit = if silence_timeout_sec == 0 {
+                u64::MAX
+            } else {
+                // chunks are emitted ~every 512 samples
+                (silence_timeout_sec as u64 * sample_rate as u64) / 512
+            };
+            let mut silent_chunks: u64 = 0;
+
             let drain_audio =
                 |audio_rx: &mpsc::Receiver<Vec<f32>>,
                  buffer: &mut Vec<f32>,
-                 app_handle: &AppHandle| {
+                 app_handle: &AppHandle,
+                 silent_chunks: &mut u64| {
                     while let Ok(chunk) = audio_rx.try_recv() {
                         buffer.extend_from_slice(&chunk);
 
@@ -120,19 +133,38 @@ impl AudioRecorder {
                                 / recent.len() as f32)
                                 .sqrt();
                             let _ = app_handle.emit("audio-level", rms.min(1.0));
+                            if rms < silence_threshold {
+                                *silent_chunks += 1;
+                            } else {
+                                *silent_chunks = 0;
+                            }
                         }
                     }
                 };
 
             loop {
                 // Drain audio data
-                drain_audio(&audio_rx, &mut buffer, &app_handle);
+                drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
+
+                // Silence auto-stop
+                if silent_chunks >= silence_chunks_limit {
+                    log::info!("Silence timeout reached, auto-stopping recording");
+                    drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
+                    *is_recording.lock().unwrap() = false;
+                    let audio = RecordedAudio {
+                        samples: std::mem::take(&mut buffer),
+                        sample_rate,
+                    };
+                    let _ = auto_stop_tx.send(audio);
+                    let _ = app_handle.emit("silence-auto-stop", ());
+                    break;
+                }
 
                 // Check commands (blocking with timeout instead of polling)
                 match cmd_rx.recv_timeout(std::time::Duration::from_millis(5)) {
                     Ok(Cmd::Stop(reply)) => {
                         // Drain remaining audio before returning
-                        drain_audio(&audio_rx, &mut buffer, &app_handle);
+                        drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
                         *is_recording.lock().unwrap() = false;
                         let audio = RecordedAudio {
                             samples: std::mem::take(&mut buffer),
@@ -155,6 +187,7 @@ impl AudioRecorder {
 
         *self.cmd_tx.lock().unwrap() = Some(cmd_tx);
         *self.worker.lock().unwrap() = Some(worker);
+        *self.auto_stop_rx.lock().unwrap() = Some(auto_stop_rx);
         Ok(())
     }
 
@@ -173,6 +206,17 @@ impl AudioRecorder {
         self.join_worker();
     }
 
+    /// Returns audio if silence auto-stop fired, None otherwise (non-blocking).
+    pub fn take_auto_stop_audio(&self) -> Option<RecordedAudio> {
+        let rx = self.auto_stop_rx.lock().unwrap();
+        rx.as_ref()?.try_recv().ok()
+    }
+
+    /// Joins the worker thread after silence auto-stop (worker already exited).
+    pub fn join_worker_after_auto_stop(&self) {
+        self.join_worker();
+    }
+
     fn send_cmd(&self, cmd: Cmd) {
         if let Some(tx) = self.cmd_tx.lock().unwrap().as_ref() {
             let _ = tx.send(cmd);
@@ -184,6 +228,7 @@ impl AudioRecorder {
             let _ = handle.join();
         }
         *self.cmd_tx.lock().unwrap() = None;
+        *self.auto_stop_rx.lock().unwrap() = None;
     }
 }
 

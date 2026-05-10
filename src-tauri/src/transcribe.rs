@@ -35,7 +35,12 @@ pub fn provider_name(api_base_url: &str) -> String {
     }
 }
 
-fn build_form(wav_data: Vec<u8>, model: &str, language: Option<&str>) -> Result<multipart::Form> {
+fn build_form(
+    wav_data: Vec<u8>,
+    model: &str,
+    language: Option<&str>,
+    prompt: Option<&str>,
+) -> Result<multipart::Form> {
     let file_part = multipart::Part::bytes(wav_data)
         .file_name("audio.wav")
         .mime_str("audio/wav")?;
@@ -47,6 +52,13 @@ fn build_form(wav_data: Vec<u8>, model: &str, language: Option<&str>) -> Result<
     if let Some(lang) = language {
         if lang != "auto" {
             form = form.text("language", lang.to_string());
+        }
+    }
+
+    if let Some(p) = prompt {
+        let trimmed = p.trim();
+        if !trimmed.is_empty() {
+            form = form.text("prompt", trimmed.to_string());
         }
     }
 
@@ -101,7 +113,7 @@ pub async fn validate_api_key(
     } else {
         model
     };
-    let form = build_form(wav, model, None)?;
+    let form = build_form(wav, model, None, None)?;
     let endpoint = transcription_endpoint(api_base_url)?;
 
     let resp = client
@@ -171,6 +183,7 @@ pub async fn transcribe_audio(
     model: &str,
     wav_data: Vec<u8>,
     language: Option<&str>,
+    prompt: Option<&str>,
     timeout_secs: u64,
     retry_count: u8,
 ) -> Result<String> {
@@ -179,7 +192,7 @@ pub async fn transcribe_audio(
     let attempts = retry_count.saturating_add(1);
 
     for attempt in 0..attempts {
-        let form = build_form(wav_data.clone(), model, language)?;
+        let form = build_form(wav_data.clone(), model, language, prompt)?;
         let response = client
             .post(endpoint.clone())
             .bearer_auth(api_key)

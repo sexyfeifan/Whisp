@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { AppSettings, HistoryEntry } from "./types";
@@ -63,6 +64,7 @@ const messages = {
     timeout: "超时（秒）",
     retryCount: "重试次数",
     pasteDelay: "粘贴延迟（毫秒）",
+    silenceTimeout: "静音自动停止（秒，0 为关闭）",
     microphone: "麦克风",
     accessibility: "辅助功能",
     shortcut: "快捷键",
@@ -130,6 +132,18 @@ const messages = {
     openSettingsIfNeeded: "如果测试失败但参数确认无误，先保存后直接试录音。",
     providerLabel: "服务商",
     notesForCustomProvider: "第三方中转通常也可用，只要兼容 OpenAI 风格的音频转写接口。",
+    launchAtStartup: "开机启动",
+    launchAtStartupDesc: "登录后自动启动 Whisp。",
+    whisperPrompt: "Whisper 提示词（可选）",
+    whisperPromptPlaceholder: "输入专有名词、特定词汇等，提升识别准确率…",
+    silenceThreshold: "静音阈值（0.0–1.0）",
+    exportHistory: "导出记录",
+    transcriptionFailed: "转写失败",
+    loadMore: "加载更多",
+    deleteSelected: "删除所选",
+    shortcutConflict: "快捷键冲突",
+    selectAll: "全选",
+    deselectAll: "取消全选",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -146,6 +160,7 @@ const messages = {
     timeout: "Timeout (sec)",
     retryCount: "Retry count",
     pasteDelay: "Paste delay (ms)",
+    silenceTimeout: "Silence auto-stop (sec, 0 to disable)",
     microphone: "Microphone",
     accessibility: "Accessibility",
     shortcut: "Shortcut",
@@ -213,6 +228,18 @@ const messages = {
     openSettingsIfNeeded: "If connection testing fails but your relay settings are correct, save first and try a real recording.",
     providerLabel: "Provider",
     notesForCustomProvider: "Third-party relay endpoints work as long as they expose an OpenAI-compatible transcription route.",
+    launchAtStartup: "Launch at startup",
+    launchAtStartupDesc: "Automatically start Whisp when you log in.",
+    whisperPrompt: "Whisper prompt (optional)",
+    whisperPromptPlaceholder: "Enter proper nouns, domain terms, etc. to improve accuracy…",
+    silenceThreshold: "Silence threshold (0.0–1.0)",
+    exportHistory: "Export history",
+    transcriptionFailed: "Transcription failed",
+    loadMore: "Load more",
+    deleteSelected: "Delete selected",
+    shortcutConflict: "Shortcut conflict",
+    selectAll: "Select all",
+    deselectAll: "Deselect all",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -229,6 +256,7 @@ const messages = {
     timeout: "タイムアウト（秒）",
     retryCount: "再試行回数",
     pasteDelay: "貼り付け待機（ms）",
+    silenceTimeout: "無音自動停止（秒、0で無効）",
     microphone: "マイク",
     accessibility: "アクセシビリティ",
     shortcut: "ショートカット",
@@ -296,6 +324,18 @@ const messages = {
     openSettingsIfNeeded: "接続テストが失敗しても、中継設定が正しければ保存して実録音を試してください。",
     providerLabel: "Provider",
     notesForCustomProvider: "OpenAI 互換の音声文字起こし API であれば、中継サービスも利用できます。",
+    launchAtStartup: "ログイン時に起動",
+    launchAtStartupDesc: "ログイン後、自動的に Whisp を起動します。",
+    whisperPrompt: "Whisper プロンプト（任意）",
+    whisperPromptPlaceholder: "固有名詞や専門用語などを入力して精度を上げる…",
+    silenceThreshold: "無音閾値（0.0–1.0）",
+    exportHistory: "履歴をエクスポート",
+    transcriptionFailed: "文字起こし失敗",
+    loadMore: "さらに読み込む",
+    deleteSelected: "選択を削除",
+    shortcutConflict: "ショートカット競合",
+    selectAll: "すべて選択",
+    deselectAll: "選択解除",
   },
 } as const;
 
@@ -522,7 +562,6 @@ function FilterChip({
 
 function ToggleRow({
   label,
-  description,
   value,
   onChange,
 }: {
@@ -536,9 +575,6 @@ function ToggleRow({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium">{label}</div>
-          <div className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-            {description}
-          </div>
         </div>
         <button
           onClick={() => onChange(!value)}
@@ -769,11 +805,32 @@ function App() {
   const [settingsFeedback, setSettingsFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const clearTimerRef = useRef<number | null>(null);
+  const [appVersion, setAppVersion] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [historyOffset, setHistoryOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [shortcutConflictMsg, setShortcutConflictMsg] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<number>(0);
 
-  const loadHistory = useCallback(async () => {
-    const entries = await invoke<HistoryEntry[]>("get_history");
-    setHistory(entries);
+  useEffect(() => {
+    getVersion().then(setAppVersion);
   }, []);
+
+  const HISTORY_PAGE_SIZE = 50;
+
+  const loadHistory = useCallback(async (reset = true) => {
+    const offset = reset ? 0 : historyOffset;
+    const entries = await invoke<HistoryEntry[]>("get_history_page", { limit: HISTORY_PAGE_SIZE, offset });
+    if (reset) {
+      setHistory(entries);
+      setHistoryOffset(entries.length);
+      setSelectedIds(new Set());
+    } else {
+      setHistory((prev) => [...prev, ...entries]);
+      setHistoryOffset((prev) => prev + entries.length);
+    }
+    setHasMore(entries.length === HISTORY_PAGE_SIZE);
+  }, [historyOffset]);
 
   const loadSettings = useCallback(async () => {
     const nextSettings = await invoke<AppSettings>("get_settings");
@@ -816,15 +873,24 @@ function App() {
     void loadSettings();
     void checkPermissions();
     const unlistenHistory = listen("history-updated", () => {
-      void loadHistory();
+      void loadHistory(true);
     });
     const unlistenError = listen<string>("transcription-error", (event) => {
       setErrorMsg(event.payload);
       window.setTimeout(() => setErrorMsg(null), 5000);
     });
+    const unlistenFailed = listen<string>("transcription-failed", (event) => {
+      setErrorMsg(event.payload);
+      window.setTimeout(() => setErrorMsg(null), 5000);
+    });
+    const unlistenShortcutConflict = listen<string>("shortcut-conflict", (event) => {
+      setShortcutConflictMsg(event.payload);
+    });
     return () => {
       unlistenHistory.then((dispose) => dispose());
       unlistenError.then((dispose) => dispose());
+      unlistenFailed.then((dispose) => dispose());
+      unlistenShortcutConflict.then((dispose) => dispose());
     };
   }, [checkPermissions, loadHistory, loadSettings]);
 
@@ -867,6 +933,15 @@ function App() {
       setApiKeyStatus("untested");
       setApiKeyError(null);
     }
+    window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      setSettings((current) => {
+        if (current) {
+          invoke("save_settings", { settings: current }).catch(() => {});
+        }
+        return current;
+      });
+    }, 800);
   };
 
   const uiLanguage: UiLanguage = settings?.ui_language ?? "zh-CN";
@@ -912,6 +987,15 @@ function App() {
   const deleteEntry = async (id: number) => {
     await invoke("delete_history_entry", { id });
     setHistory((items) => items.filter((item) => item.id !== id));
+    setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    await invoke("delete_history_entries", { ids });
+    setHistory((items) => items.filter((item) => !selectedIds.has(item.id)));
+    setSelectedIds(new Set());
   };
 
   const clearHistory = async () => {
@@ -992,7 +1076,6 @@ function App() {
 
   const hasApiConfig = Boolean(settings.api_key.trim() && settings.api_base_url.trim());
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
-  const defaultShortcutText = formatTemplate(m.defaultShortcut, { shortcut: defaultHotkey });
   const startHint = formatTemplate(m.startHint, { shortcut: translateShortcut(settings.shortcut || "") });
 
   if (view === "onboarding") {
@@ -1047,10 +1130,6 @@ function App() {
               style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text)" }}
             />
 
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-              {m.apiKeyStorageHint}
-            </p>
-
             <input
               list="model-options"
               value={settings.model}
@@ -1066,10 +1145,7 @@ function App() {
               ))}
             </datalist>
 
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                {m.customModelHint}
-              </p>
+            <div className="flex items-center justify-end mt-2">
               <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "var(--accent)" }}>
                 {showModelGuide ? m.collapseModelGuide : m.modelGuide}
               </button>
@@ -1099,9 +1175,6 @@ function App() {
               {apiKeyStatus === "testing" ? m.testing : apiKeyStatus === "ok" ? m.connected : m.testConnection}
             </button>
 
-            <p className="text-xs mt-2" style={{ color: "var(--text-secondary)" }}>
-              {m.notesForCustomProvider}
-            </p>
 
             {apiKeyStatus === "error" && apiKeyError && (
               <p className="text-xs mt-1 whitespace-pre-wrap" style={{ color: "#ff453a" }}>
@@ -1163,9 +1236,6 @@ function App() {
               </span>
               <span className="text-sm font-medium">{m.onboardingStep4}</span>
             </div>
-            <p className="text-xs mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              {defaultShortcutText}
-            </p>
             <ShortcutInput
               shortcut={settings.shortcut}
               onCapture={(shortcut) => updateSettings({ shortcut })}
@@ -1174,10 +1244,6 @@ function App() {
             />
           </div>
         </div>
-
-        <p className="text-xs mt-4" style={{ color: "var(--text-secondary)" }}>
-          {m.openSettingsIfNeeded}
-        </p>
 
         {settingsFeedback && (
           <p className="text-xs mt-3" style={{ color: settingsFeedback.tone === "success" ? "#34c759" : "#ff453a" }}>
@@ -1279,9 +1345,6 @@ function App() {
               placeholder="sk-..."
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
             />
-            <p className="text-xs mt-1" style={{ color: "var(--text-secondary)" }}>
-              {m.apiKeyStorageHint}
-            </p>
             <button
               onClick={() => testApiKey(settings.api_key, settings.api_base_url, settings.model)}
               disabled={!settings.api_key || !settings.api_base_url || apiKeyStatus === "testing"}
@@ -1317,10 +1380,7 @@ function App() {
                 <option key={modelName} value={modelName} />
               ))}
             </datalist>
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-                {m.customModelHint}
-              </p>
+            <div className="flex items-center justify-end mt-2">
               <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "var(--accent)" }}>
                 {showModelGuide ? m.collapseModelGuide : m.modelGuide}
               </button>
@@ -1400,18 +1460,59 @@ function App() {
             />
           </div>
 
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+              {m.silenceTimeout}
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={3600}
+              step={10}
+              value={settings.silence_timeout_sec}
+              onChange={(event) => updateSettings({ silence_timeout_sec: Math.max(0, Number(event.target.value) || 0) })}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+              {m.silenceThreshold}
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.005}
+              value={settings.silence_threshold}
+              onChange={(event) => updateSettings({ silence_threshold: Math.min(1, Math.max(0, Number(event.target.value) || 0)) })}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
+              {m.whisperPrompt}
+            </label>
+            <textarea
+              value={settings.whisper_prompt}
+              onChange={(event) => updateSettings({ whisper_prompt: event.target.value })}
+              placeholder={m.whisperPromptPlaceholder}
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+            />
+          </div>
+
           <ToggleRow label={m.autoPaste} description={m.autoPasteDesc} value={settings.auto_paste_enabled} onChange={(value) => updateSettings({ auto_paste_enabled: value })} />
           <ToggleRow label={m.saveAudioFiles} description={m.saveAudioFilesDesc} value={settings.save_audio_files} onChange={(value) => updateSettings({ save_audio_files: value })} />
           <ToggleRow label={m.trimSilence} description={m.trimSilenceDesc} value={settings.trim_silence_enabled} onChange={(value) => updateSettings({ trim_silence_enabled: value })} />
           <ToggleRow label={m.soundEffects} description={m.soundEffectsDesc} value={settings.sound_enabled} onChange={(value) => updateSettings({ sound_enabled: value })} />
+          <ToggleRow label={m.launchAtStartup} description={m.launchAtStartupDesc} value={settings.launch_at_startup} onChange={(value) => updateSettings({ launch_at_startup: value })} />
 
           <div>
             <label className="block text-xs mb-1" style={{ color: "var(--text-secondary)" }}>
               {m.shortcut}
             </label>
-            <p className="text-xs mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              {defaultShortcutText}
-            </p>
             <ShortcutInput
               shortcut={settings.shortcut}
               onCapture={(shortcut) => updateSettings({ shortcut })}
@@ -1422,6 +1523,11 @@ function App() {
               <button onClick={() => updateSettings({ shortcut: "" })} className="text-xs mt-1" style={{ color: "var(--accent)" }}>
                 {m.resetToDefault}
               </button>
+            )}
+            {shortcutConflictMsg && (
+              <p className="text-xs mt-1" style={{ color: "#ff453a" }}>
+                {m.shortcutConflict}: {shortcutConflictMsg}
+              </p>
             )}
           </div>
 
@@ -1456,10 +1562,6 @@ function App() {
             </div>
           </div>
 
-          <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
-            {m.openSettingsIfNeeded}
-          </p>
-
           {settingsFeedback && (
             <p className="text-xs" style={{ color: settingsFeedback.tone === "success" ? "#34c759" : "#ff453a" }}>
               {settingsFeedback.message}
@@ -1478,11 +1580,20 @@ function App() {
           <div>
             <h1 className="text-lg font-semibold">Whisp</h1>
             <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-              {m.versionLabel}
+              {appVersion ? `v${appVersion}` : ""}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={deleteSelected}
+              className="text-sm px-2 py-1 rounded-md"
+              style={{ color: "#ff453a" }}
+            >
+              {m.deleteSelected} ({selectedIds.size})
+            </button>
+          )}
           <button
             onClick={clearHistory}
             className="text-sm px-2 py-1 rounded-md"
@@ -1490,16 +1601,24 @@ function App() {
           >
             {confirmingClear ? m.clearConfirm : m.clear}
           </button>
+          <button
+            onClick={async () => {
+              try {
+                const csv = await invoke<string>("export_history");
+                await writeText(csv);
+              } catch (error) {
+                console.error("Export failed:", error);
+              }
+            }}
+            className="text-sm px-2 py-1 rounded-md"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            {m.exportHistory}
+          </button>
           <button onClick={() => setView("settings")} className="text-xl px-1" style={{ color: "var(--text-secondary)" }}>
             &#9881;
           </button>
         </div>
-      </div>
-
-      <div className="px-4 pb-1">
-        <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-          {m.historyClearButtonHint}
-        </p>
       </div>
 
       <div className="px-4 pb-3 grid grid-cols-2 gap-2">
@@ -1549,6 +1668,7 @@ function App() {
         ) : (
           <div className="space-y-2">
             {filteredHistory.map((entry) => {
+
               const failed = entry.status === "failed";
               const canRetry = Boolean(entry.audio_path);
               return (
@@ -1561,6 +1681,20 @@ function App() {
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(entry.id)}
+                      onChange={(e) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(entry.id);
+                          else next.delete(entry.id);
+                          return next;
+                        });
+                      }}
+                      className="mt-0.5 flex-shrink-0"
+                    />
                     <div className="flex gap-2 flex-wrap">
                       <span
                         className="text-[11px] px-2 py-0.5 rounded-full"
@@ -1577,6 +1711,7 @@ function App() {
                       <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "var(--border)", color: "var(--text)" }}>
                         {displaySpeechLanguage(entry.language, uiLanguage)}
                       </span>
+                    </div>
                     </div>
                     <div className="text-xs" style={{ color: "var(--text-secondary)" }}>
                       {formatTime(entry.timestamp, uiLanguage)}
@@ -1648,6 +1783,15 @@ function App() {
                 </div>
               );
             })}
+            {hasMore && !searchQuery && statusFilter === "all" && (
+              <button
+                onClick={() => loadHistory(false)}
+                className="w-full py-2 text-sm rounded-xl"
+                style={{ background: "var(--card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}
+              >
+                {m.loadMore}
+              </button>
+            )}
           </div>
         )}
       </div>

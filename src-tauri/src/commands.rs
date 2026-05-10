@@ -3,6 +3,7 @@ use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 
@@ -12,11 +13,28 @@ pub fn get_history(history: State<'_, Arc<HistoryManager>>) -> Result<Vec<Histor
 }
 
 #[tauri::command]
+pub fn get_history_page(
+    history: State<'_, Arc<HistoryManager>>,
+    limit: i64,
+    offset: i64,
+) -> Result<Vec<HistoryEntry>, String> {
+    history.get_entries_page(limit, offset).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn delete_history_entry(
     history: State<'_, Arc<HistoryManager>>,
     id: i64,
 ) -> Result<(), String> {
     history.delete_entry(id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_history_entries(
+    history: State<'_, Arc<HistoryManager>>,
+    ids: Vec<i64>,
+) -> Result<(), String> {
+    history.delete_entries(&ids).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -37,6 +55,16 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
     // Hot-reload shortcut if changed
     if settings.shortcut != old_settings.shortcut {
         crate::re_register_shortcut(&app, &old_settings.shortcut, &settings);
+    }
+
+    // Apply launch-at-startup if changed
+    if settings.launch_at_startup != old_settings.launch_at_startup {
+        let autolaunch = app.autolaunch();
+        if settings.launch_at_startup {
+            let _ = autolaunch.enable();
+        } else {
+            let _ = autolaunch.disable();
+        }
     }
 
     Ok(())
@@ -117,6 +145,37 @@ pub fn initialize_enigo(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn export_history(history: State<'_, Arc<HistoryManager>>) -> Result<String, String> {
+    let entries = history.get_entries().map_err(|e| e.to_string())?;
+    let mut csv = String::from("id,timestamp,text,model,provider,language,status,duration_ms\n");
+    for entry in entries {
+        let text_escaped = entry.text.replace('"', "\"\"");
+        csv.push_str(&format!(
+            "{},{},\"{}\",{},{},{},{},{}\n",
+            entry.id,
+            entry.timestamp,
+            text_escaped,
+            entry.model,
+            entry.provider,
+            entry.language,
+            entry.status,
+            entry.duration_ms.map(|d| d.to_string()).unwrap_or_default()
+        ));
+    }
+    Ok(csv)
+}
+
+#[tauri::command]
+pub fn toggle_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let autolaunch = app.autolaunch();
+    if enabled {
+        autolaunch.enable().map_err(|e| e.to_string())
+    } else {
+        autolaunch.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
 pub async fn retry_transcription(
     app: AppHandle,
     history: State<'_, Arc<HistoryManager>>,
@@ -155,6 +214,11 @@ pub async fn retry_transcription(
     let client = app
         .try_state::<reqwest::Client>()
         .ok_or("HTTP client not initialized")?;
+    let prompt = if settings.whisper_prompt.trim().is_empty() {
+        None
+    } else {
+        Some(settings.whisper_prompt.as_str())
+    };
     let text = transcribe::transcribe_audio(
         &client,
         &settings.api_key,
@@ -162,6 +226,7 @@ pub async fn retry_transcription(
         &settings.model,
         wav_data,
         lang,
+        prompt,
         settings.request_timeout_sec,
         settings.retry_count,
     )
