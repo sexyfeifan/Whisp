@@ -27,6 +27,10 @@ export interface AppSettings {
   request_timeout_sec: number;
   retry_count: number;
   paste_delay_ms: number;
+  silence_timeout_sec: number;
   overlay_x: number | null;
   overlay_y: number | null;
+  launch_at_startup: boolean;
+  whisper_prompt: string;
+  silence_threshold: number;
 }

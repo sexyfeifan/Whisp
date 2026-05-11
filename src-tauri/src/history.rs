@@ -222,6 +222,32 @@ impl HistoryManager {
         Ok(entries)
     }
 
+    pub fn get_entries_page(&self, limit: i64, offset: i64) -> Result<Vec<HistoryEntry>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT
+                id,
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of
+             FROM transcriptions
+             ORDER BY timestamp DESC
+             LIMIT ?1 OFFSET ?2",
+        )?;
+        let entries = stmt
+            .query_map(rusqlite::params![limit, offset], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
     pub fn delete_entry(&self, id: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let audio_path: Option<String> = conn
@@ -236,6 +262,63 @@ impl HistoryManager {
             let _ = std::fs::remove_file(&path);
         }
         conn.execute("DELETE FROM transcriptions WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    pub fn delete_entries(&self, ids: &[i64]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let conn = self.conn.lock().unwrap();
+        // Collect audio paths first
+        let placeholders: String = ids.iter().enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT audio_path FROM transcriptions WHERE id IN ({})",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&query)?;
+        let paths: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(ids.iter()), |row| row.get::<_, Option<String>>(0))?
+            .filter_map(|r| r.ok())
+            .flatten()
+            .collect();
+        drop(stmt);
+        for path in paths {
+            let _ = std::fs::remove_file(&path);
+        }
+        let del_query = format!(
+            "DELETE FROM transcriptions WHERE id IN ({})",
+            placeholders
+        );
+        conn.execute(&del_query, rusqlite::params_from_iter(ids.iter()))?;
+        Ok(())
+    }
+
+    /// Deletes audio files for entries beyond the most recent `keep` entries.
+    pub fn cleanup_old_audio(&self, keep: usize) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT audio_path FROM transcriptions
+             ORDER BY timestamp DESC
+             LIMIT -1 OFFSET ?1",
+        )?;
+        let paths: Vec<String> = stmt
+            .query_map([keep as i64], |row| row.get::<_, Option<String>>(0))?
+            .filter_map(|r| r.ok())
+            .flatten()
+            .collect();
+        drop(stmt);
+        for path in paths {
+            if std::fs::remove_file(&path).is_ok() {
+                conn.execute(
+                    "UPDATE transcriptions SET audio_path = NULL WHERE audio_path = ?1",
+                    [&path],
+                )?;
+            }
+        }
         Ok(())
     }
 
