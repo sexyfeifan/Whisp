@@ -28,6 +28,19 @@ Whisp is a desktop speech-to-text app focused on one thing: instantly turning yo
 
 Powered by OpenAI-compatible transcription APIs (OpenAI by default), with preset model suggestions and custom model support. Built with Tauri v2.
 
+## v2.4 Highlights
+
+- **Silence auto-stop** — Configurable silence detection automatically stops recording when you stop speaking, no need to press the hotkey again.
+- **Whisper prompt support** — Add context hints to improve transcription accuracy for domain-specific vocabulary.
+- **Silence threshold tuning** — Adjust the silence detection sensitivity to match your environment.
+- **Japanese UI** — Full Japanese language support alongside Chinese and English.
+- **Mic selection** — Choose your preferred microphone device from settings.
+- **Overlay position memory** — The waveform overlay remembers its last position across sessions.
+- **Launch at startup** — Option to automatically start Whisp when you log in.
+- **History pagination & batch operations** — Paginated history loading with batch delete and clear all.
+- **Multi-provider auto-detection** — Automatically identifies OpenAI, Groq, Fireworks, Deepgram, Google Cloud, or Custom providers.
+- **Tray icon support** — System tray with custom template icons for macOS dark/light mode.
+
 ## v2.0 Highlights
 
 - API keys are now stored in the system keychain instead of plaintext settings.
@@ -50,28 +63,39 @@ No complex workflows, no heavy setup, no context switching.
 
 1. Tap `Right ⌘` on macOS / `Right Ctrl` on Windows (customizable)
 2. Speak
-3. Tap again to stop — text is transcribed and pasted instantly
+3. Tap again to stop (or let silence auto-stop kick in) — text is transcribed and pasted instantly
 
 ## Features
 
 - **One Shortcut** — Global hotkey to start/stop recording. No UI to navigate.
 - **Auto-Paste** — Transcribed text goes straight to your cursor. No copy needed.
+- **Silence Auto-Stop** — Automatically stops recording after configurable silence duration.
 - **Model Presets + Custom Models** — Built-in popular model names plus free-form custom model input.
 - **Model Guide** — In-app model guide button with model descriptions and selection hints.
-- **Waveform Overlay** — Minimal always-on-top visualizer while recording.
-- **History** — Rich local history with success/failure status, search, and retry support.
-- **System Tray** — Runs quietly in the background.
+- **Waveform Overlay** — Minimal always-on-top visualizer while recording, position persists across sessions.
+- **History** — Rich local history with success/failure status, search, pagination, batch delete, and retry support.
+- **Multi-Language UI** — Simplified Chinese, English, and Japanese interface.
+- **System Tray** — Runs quietly in the background with launch-at-startup option.
+
+## Download
+
+Download the latest DMG for macOS from [Releases](https://github.com/sexyfeifan/Whisp/releases/latest):
+
+| File | Architecture |
+|------|-------------|
+| `Whisp_2.4.0_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+| `Whisp_2.4.0_x64.dmg` | Intel Mac |
 
 ## Xiaohongshu Style Intro (中文)
 
-真的会爱上这种“张嘴就能写字”的效率感 ✨  
+真的会爱上这种"张嘴就能写字"的效率感 ✨  
 `Whisp` 就是那种你用了就回不去的办公小工具：
 
 - 开会复盘：边听边说重点，秒变文字。
 - 写作卡壳：先说出来，再慢慢润色。
 - 日常回复：不用来回切输入法，想到就说。
 
-一句话总结：**把“打字焦虑”换成“说话自由”。**
+一句话总结：**把"打字焦虑"换成"说话自由"。**
 
 ## Build from Source
 
