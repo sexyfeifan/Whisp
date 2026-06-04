@@ -14,3 +14,5 @@ plans/
 .claude/
 Whisp-*/
 dmg/
+legacy/
+_design/

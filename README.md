@@ -28,6 +28,14 @@ Whisp is a desktop speech-to-text app focused on one thing: instantly turning yo
 
 Powered by OpenAI-compatible transcription APIs (OpenAI by default), with preset model suggestions and custom model support. Built with Tauri v2.
 
+## v2.5 Highlights
+
+- **Check for Updates** — Built-in update checker that queries GitHub Releases for new versions, shows release notes, and provides direct download links.
+- **Improved Toggle Descriptions** — Settings toggle rows now display descriptive text below each label for better clarity.
+- **API Key Security** — API keys are no longer written to disk when system keychain storage succeeds.
+- **UTF-8 Safety** — Fixed a potential crash when truncating multi-byte (CJK) error messages.
+- **Performance** — Reduced memory allocations in the transcription retry loop.
+
 ## v2.4 Highlights
 
 - **Silence auto-stop** — Configurable silence detection automatically stops recording when you stop speaking, no need to press the hotkey again.
@@ -76,6 +84,7 @@ No complex workflows, no heavy setup, no context switching.
 - **History** — Rich local history with success/failure status, search, pagination, batch delete, and retry support.
 - **Multi-Language UI** — Simplified Chinese, English, and Japanese interface.
 - **System Tray** — Runs quietly in the background with launch-at-startup option.
+- **Check for Updates** — Built-in update checker with release notes and direct download links.
 
 ## Download
 
@@ -83,8 +92,8 @@ Download the latest DMG for macOS from [Releases](https://github.com/sexyfeifan/
 
 | File | Architecture |
 |------|-------------|
-| `Whisp_2.4.0_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
-| `Whisp_2.4.0_x64.dmg` | Intel Mac |
+| `Whisp_2.5.0_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+| `Whisp_2.5.0_x64.dmg` | Intel Mac |
 
 ## Xiaohongshu Style Intro (中文)
 

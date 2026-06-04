@@ -72,6 +72,7 @@ pub fn run() {
             commands::resume_shortcut,
             commands::export_history,
             commands::toggle_autostart,
+            commands::check_for_updates,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

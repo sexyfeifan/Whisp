@@ -1,11 +1,31 @@
 use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
+use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+
+#[derive(Serialize)]
+pub struct UpdateInfo {
+    pub has_update: bool,
+    pub current_version: String,
+    pub latest_version: String,
+    pub release_url: String,
+    pub release_notes: String,
+    pub published_at: String,
+    pub assets: Vec<ReleaseAsset>,
+    pub error: String,
+}
+
+#[derive(Serialize)]
+pub struct ReleaseAsset {
+    pub name: String,
+    pub url: String,
+    pub size: u64,
+}
 
 #[tauri::command]
 pub fn get_history(history: State<'_, Arc<HistoryManager>>) -> Result<Vec<HistoryEntry>, String> {
@@ -265,4 +285,116 @@ pub async fn retry_transcription(
     let _ = app.emit("history-updated", ());
 
     Ok(text)
+}
+
+fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+    let parse = |v: &str| -> Vec<u32> {
+        v.trim_start_matches('v')
+            .split('.')
+            .filter_map(|s| s.parse().ok())
+            .collect()
+    };
+    let pa = parse(a);
+    let pb = parse(b);
+    pa.cmp(&pb)
+}
+
+#[tauri::command]
+pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
+    let current_version = env!("CARGO_PKG_VERSION").to_string();
+    let github_repo = "sexyfeifan/Whisp";
+    let url = format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        github_repo
+    );
+
+    let client = app
+        .try_state::<reqwest::Client>()
+        .map(|s| (*s).clone())
+        .unwrap_or_else(|| reqwest::Client::new());
+
+    match client
+        .get(&url)
+        .header("Accept", "application/vnd.github.v3+json")
+        .header("User-Agent", format!("Whisp/{}", current_version))
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                let tag = json["tag_name"].as_str().unwrap_or("");
+                let latest = tag.trim_start_matches('v').to_string();
+                let has_update = matches!(
+                    compare_versions(&latest, &current_version),
+                    std::cmp::Ordering::Greater
+                );
+                let release_url = json["html_url"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let release_notes = json["body"].as_str().unwrap_or("").to_string();
+                let published_at = json["published_at"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let assets: Vec<ReleaseAsset> = json["assets"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .map(|a| ReleaseAsset {
+                                name: a["name"].as_str().unwrap_or("").to_string(),
+                                url: a["browser_download_url"]
+                                    .as_str()
+                                    .unwrap_or("")
+                                    .to_string(),
+                                size: a["size"].as_u64().unwrap_or(0),
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                return UpdateInfo {
+                    has_update,
+                    current_version,
+                    latest_version: latest,
+                    release_url,
+                    release_notes,
+                    published_at,
+                    assets,
+                    error: String::new(),
+                };
+            }
+            UpdateInfo {
+                has_update: false,
+                current_version,
+                latest_version: String::new(),
+                release_url: String::new(),
+                release_notes: String::new(),
+                published_at: String::new(),
+                assets: vec![],
+                error: "Failed to parse response".to_string(),
+            }
+        }
+        Ok(resp) => UpdateInfo {
+            has_update: false,
+            current_version,
+            latest_version: String::new(),
+            release_url: String::new(),
+            release_notes: String::new(),
+            published_at: String::new(),
+            assets: vec![],
+            error: format!("HTTP {}", resp.status()),
+        },
+        Err(e) => UpdateInfo {
+            has_update: false,
+            current_version,
+            latest_version: String::new(),
+            release_url: String::new(),
+            release_notes: String::new(),
+            published_at: String::new(),
+            assets: vec![],
+            error: e.to_string(),
+        },
+    }
 }

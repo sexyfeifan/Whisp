@@ -144,6 +144,15 @@ const messages = {
     shortcutConflict: "快捷键冲突",
     selectAll: "全选",
     deselectAll: "取消全选",
+    checkForUpdates: "检查更新",
+    checkingUpdates: "检查中…",
+    updateAvailable: "发现新版本",
+    upToDate: "已是最新版本",
+    updateError: "检查更新失败",
+    downloadUpdate: "前往下载",
+    viewOnGitHub: "在 GitHub 查看",
+    releaseNotes: "更新日志",
+    publishedAt: "发布时间",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -240,6 +249,15 @@ const messages = {
     shortcutConflict: "Shortcut conflict",
     selectAll: "Select all",
     deselectAll: "Deselect all",
+    checkForUpdates: "Check for Updates",
+    checkingUpdates: "Checking…",
+    updateAvailable: "Update Available",
+    upToDate: "You are up to date",
+    updateError: "Failed to check updates",
+    downloadUpdate: "Download",
+    viewOnGitHub: "View on GitHub",
+    releaseNotes: "Release Notes",
+    publishedAt: "Published",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -336,6 +354,15 @@ const messages = {
     shortcutConflict: "ショートカット競合",
     selectAll: "すべて選択",
     deselectAll: "選択解除",
+    checkForUpdates: "更新を確認",
+    checkingUpdates: "確認中…",
+    updateAvailable: "新しいバージョンがあります",
+    upToDate: "最新バージョンです",
+    updateError: "更新の確認に失敗しました",
+    downloadUpdate: "ダウンロード",
+    viewOnGitHub: "GitHub で見る",
+    releaseNotes: "リリースノート",
+    publishedAt: "公開日",
   },
 } as const;
 
@@ -562,6 +589,7 @@ function FilterChip({
 
 function ToggleRow({
   label,
+  description,
   value,
   onChange,
 }: {
@@ -575,6 +603,11 @@ function ToggleRow({
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium">{label}</div>
+          {description && (
+            <div className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
+              {description}
+            </div>
+          )}
         </div>
         <button
           onClick={() => onChange(!value)}
@@ -811,6 +844,50 @@ function App() {
   const [shortcutConflictMsg, setShortcutConflictMsg] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<number>(0);
   const historyOffsetRef = useRef(0);
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "latest" | "error">("idle");
+  const [updateInfo, setUpdateInfo] = useState<{
+    latestVersion: string;
+    releaseUrl: string;
+    releaseNotes: string;
+    publishedAt: string;
+    assets: { name: string; url: string; size: number }[];
+  } | null>(null);
+
+  async function checkForUpdates() {
+    setUpdateStatus("checking");
+    try {
+      const result = await invoke<{
+        has_update: boolean;
+        latest_version: string;
+        release_url: string;
+        release_notes: string;
+        published_at: string;
+        assets: { name: string; url: string; size: number }[];
+        error: string;
+      }>("check_for_updates");
+      if (result.error) {
+        setUpdateStatus("error");
+        setTimeout(() => setUpdateStatus("idle"), 3000);
+        return;
+      }
+      if (result.has_update) {
+        setUpdateStatus("available");
+        setUpdateInfo({
+          latestVersion: result.latest_version,
+          releaseUrl: result.release_url,
+          releaseNotes: result.release_notes,
+          publishedAt: result.published_at,
+          assets: result.assets,
+        });
+      } else {
+        setUpdateStatus("latest");
+        setTimeout(() => setUpdateStatus("idle"), 3000);
+      }
+    } catch {
+      setUpdateStatus("error");
+      setTimeout(() => setUpdateStatus("idle"), 3000);
+    }
+  }
 
   useEffect(() => {
     getVersion().then(setAppVersion);
@@ -1566,6 +1643,95 @@ function App() {
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Update Checker */}
+          <div className="rounded-xl p-3" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium">{m.checkForUpdates}</div>
+                <div className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                  {appVersion ? `v${appVersion}` : ""}
+                </div>
+              </div>
+              <button
+                onClick={checkForUpdates}
+                disabled={updateStatus === "checking"}
+                className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                style={{
+                  background: updateStatus === "checking" ? "var(--border)" : "var(--accent)",
+                  color: updateStatus === "checking" ? "var(--text-secondary)" : "white",
+                  opacity: updateStatus === "checking" ? 0.6 : 1,
+                }}
+              >
+                {updateStatus === "checking" ? m.checkingUpdates : m.checkForUpdates}
+              </button>
+            </div>
+
+            {updateStatus === "latest" && (
+              <div className="flex items-center gap-1.5 mt-2 text-xs" style={{ color: "#34c759" }}>
+                ✓ {m.upToDate}
+              </div>
+            )}
+
+            {updateStatus === "error" && (
+              <div className="text-xs mt-2" style={{ color: "#ff453a" }}>
+                {m.updateError}
+              </div>
+            )}
+
+            {updateStatus === "available" && updateInfo && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ background: "var(--accent)", color: "white" }}>
+                    {m.updateAvailable}
+                  </span>
+                  <span className="text-xs font-mono" style={{ color: "var(--text-secondary)" }}>
+                    v{updateInfo.latestVersion}
+                  </span>
+                </div>
+
+                {updateInfo.publishedAt && (
+                  <div className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+                    {m.publishedAt}: {new Date(updateInfo.publishedAt).toLocaleDateString()}
+                  </div>
+                )}
+
+                {updateInfo.releaseNotes && (
+                  <details className="group">
+                    <summary className="text-xs cursor-pointer" style={{ color: "var(--accent)" }}>
+                      {m.releaseNotes}
+                    </summary>
+                    <div className="mt-1.5 text-xs whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto rounded-lg p-2.5"
+                      style={{ background: "var(--bg)", color: "var(--text-secondary)" }}>
+                      {updateInfo.releaseNotes}
+                    </div>
+                  </details>
+                )}
+
+                <div className="flex flex-wrap gap-1.5">
+                  {updateInfo.assets.filter(a => a.name.endsWith(".dmg") || a.name.endsWith(".app.tar.gz")).map(asset => (
+                    <button
+                      key={asset.name}
+                      onClick={() => window.open(asset.url)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                      style={{ background: "var(--accent)", color: "white" }}
+                    >
+                      {m.downloadUpdate} ({asset.name.includes("aarch64") || asset.name.includes("arm64") ? "Apple Silicon" : asset.name.includes("x64") ? "Intel" : asset.name.split(".").pop()})
+                    </button>
+                  ))}
+                  {updateInfo.releaseUrl && (
+                    <button
+                      onClick={() => window.open(updateInfo.releaseUrl)}
+                      className="px-3 py-1.5 rounded-lg text-xs transition-colors"
+                      style={{ background: "var(--card)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}
+                    >
+                      {m.viewOnGitHub}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {settingsFeedback && (

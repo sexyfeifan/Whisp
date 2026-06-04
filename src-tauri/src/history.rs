@@ -299,18 +299,24 @@ impl HistoryManager {
 
     /// Deletes audio files for entries beyond the most recent `keep` entries.
     pub fn cleanup_old_audio(&self, keep: usize) -> Result<()> {
+        // Collect paths first, then release lock before doing filesystem I/O
+        let paths: Vec<String> = {
+            let conn = self.conn.lock().unwrap();
+            let mut stmt = conn.prepare(
+                "SELECT audio_path FROM transcriptions
+                 ORDER BY timestamp DESC
+                 LIMIT -1 OFFSET ?1",
+            )?;
+            let paths: Vec<String> = stmt
+                .query_map([keep as i64], |row| row.get::<_, Option<String>>(0))?
+                .filter_map(|r| r.ok())
+                .flatten()
+                .collect();
+            paths
+        };
+
+        // Delete files and update DB
         let conn = self.conn.lock().unwrap();
-        let mut stmt = conn.prepare(
-            "SELECT audio_path FROM transcriptions
-             ORDER BY timestamp DESC
-             LIMIT -1 OFFSET ?1",
-        )?;
-        let paths: Vec<String> = stmt
-            .query_map([keep as i64], |row| row.get::<_, Option<String>>(0))?
-            .filter_map(|r| r.ok())
-            .flatten()
-            .collect();
-        drop(stmt);
         for path in paths {
             if std::fs::remove_file(&path).is_ok() {
                 conn.execute(

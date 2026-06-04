@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use reqwest::multipart;
 use reqwest::{StatusCode, Url};
+use std::sync::Arc;
 use std::time::Duration;
 
 fn transcription_endpoint(api_base_url: &str) -> Result<Url> {
@@ -96,7 +97,8 @@ fn shorten_error_body(body: String) -> String {
     if trimmed.len() <= 500 {
         trimmed.to_string()
     } else {
-        format!("{}…", &trimmed[..500])
+        let end = trimmed.floor_char_boundary(500);
+        format!("{}…", &trimmed[..end])
     }
 }
 
@@ -199,9 +201,10 @@ pub async fn transcribe_audio(
     let endpoint = transcription_endpoint(api_base_url)?;
     let timeout = Duration::from_secs(timeout_secs.max(10));
     let attempts = retry_count.saturating_add(1);
+    let wav_arc = Arc::new(wav_data);
 
     for attempt in 0..attempts {
-        let form = build_form(wav_data.clone(), model, language, prompt)?;
+        let form = build_form((*wav_arc).clone(), model, language, prompt)?;
         let response = client
             .post(endpoint.clone())
             .bearer_auth(api_key)
