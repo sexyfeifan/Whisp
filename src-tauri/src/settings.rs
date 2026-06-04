@@ -295,16 +295,10 @@ pub fn get_settings() -> AppSettings {
 }
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
-    // Try keychain first
-    let keychain_ok = store_api_key(&settings.api_key).is_ok();
-    if !keychain_ok {
-        log::warn!("Keychain unavailable, falling back to disk storage for API key");
+    // Best-effort keychain store (may fail on ad-hoc signed builds)
+    if let Err(e) = store_api_key(&settings.api_key) {
+        log::warn!("Failed to store API key in system keychain: {}", e);
     }
-    // Only write API key to disk as fallback when keychain fails
-    let disk_settings = if keychain_ok {
-        AppSettings { api_key: String::new(), ..settings.clone() }
-    } else {
-        settings.clone()
-    };
-    save_disk_settings(&disk_settings)
+    // Always persist to disk as the reliable source of truth
+    save_disk_settings(settings)
 }

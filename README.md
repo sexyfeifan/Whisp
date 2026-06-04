@@ -32,7 +32,7 @@ Powered by OpenAI-compatible transcription APIs (OpenAI by default), with preset
 
 - **Check for Updates** — Built-in update checker that queries GitHub Releases for new versions, shows release notes, and provides direct download links.
 - **Improved Toggle Descriptions** — Settings toggle rows now display descriptive text below each label for better clarity.
-- **API Key Security** — API keys are no longer written to disk when system keychain storage succeeds.
+- **API Key Persistence Fix** — Fixed a critical bug where API key was not saved to disk, causing "not configured" prompt on every restart.
 - **UTF-8 Safety** — Fixed a potential crash when truncating multi-byte (CJK) error messages.
 - **Performance** — Reduced memory allocations in the transcription retry loop.
 
@@ -92,8 +92,8 @@ Download the latest DMG for macOS from [Releases](https://github.com/sexyfeifan/
 
 | File | Architecture |
 |------|-------------|
-| `Whisp_2.5.0_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
-| `Whisp_2.5.0_x64.dmg` | Intel Mac |
+| `Whisp_2.5.1_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+| `Whisp_2.5.1_x64.dmg` | Intel Mac |
 
 ## Xiaohongshu Style Intro (中文)
 
