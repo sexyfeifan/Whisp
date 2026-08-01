@@ -303,98 +303,120 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
 pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
     let github_repo = "sexyfeifan/Whisp";
-    let url = format!(
-        "https://api.github.com/repos/{}/releases/latest",
-        github_repo
-    );
 
     let client = app
         .try_state::<reqwest::Client>()
         .map(|s| (*s).clone())
         .unwrap_or_else(|| reqwest::Client::new());
 
-    match client
-        .get(&url)
-        .header("Accept", "application/vnd.github.v3+json")
-        .header("User-Agent", format!("Whisp/{}", current_version))
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status().is_success() => {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                let tag = json["tag_name"].as_str().unwrap_or("");
-                let latest = tag.trim_start_matches('v').to_string();
-                let has_update = matches!(
-                    compare_versions(&latest, &current_version),
-                    std::cmp::Ordering::Greater
-                );
-                let release_url = json["html_url"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-                let release_notes = json["body"].as_str().unwrap_or("").to_string();
-                let published_at = json["published_at"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string();
-                let assets: Vec<ReleaseAsset> = json["assets"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .map(|a| ReleaseAsset {
-                                name: a["name"].as_str().unwrap_or("").to_string(),
-                                url: a["browser_download_url"]
-                                    .as_str()
-                                    .unwrap_or("")
-                                    .to_string(),
-                                size: a["size"].as_u64().unwrap_or(0),
-                            })
-                            .collect()
-                    })
-                    .unwrap_or_default();
+    // Try /releases/latest first (non-prerelease), fall back to /releases (includes prerelease)
+    let urls = [
+        format!("https://api.github.com/repos/{}/releases/latest", github_repo),
+        format!("https://api.github.com/repos/{}/releases?per_page=10", github_repo),
+    ];
 
+    for (i, url) in urls.iter().enumerate() {
+        let resp = match client
+            .get(url)
+            .header("Accept", "application/vnd.github.v3+json")
+            .header("User-Agent", format!("Whisp/{}", current_version))
+            .timeout(std::time::Duration::from_secs(10))
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                if i == urls.len() - 1 {
+                    return UpdateInfo {
+                        has_update: false,
+                        current_version,
+                        latest_version: String::new(),
+                        release_url: String::new(),
+                        release_notes: String::new(),
+                        published_at: String::new(),
+                        assets: vec![],
+                        error: e.to_string(),
+                    };
+                }
+                continue;
+            }
+        };
+
+        if !resp.status().is_success() {
+            if i == urls.len() - 1 {
                 return UpdateInfo {
-                    has_update,
+                    has_update: false,
                     current_version,
-                    latest_version: latest,
-                    release_url,
-                    release_notes,
-                    published_at,
-                    assets,
-                    error: String::new(),
+                    latest_version: String::new(),
+                    release_url: String::new(),
+                    release_notes: String::new(),
+                    published_at: String::new(),
+                    assets: vec![],
+                    error: format!("HTTP {}", resp.status()),
                 };
             }
-            UpdateInfo {
-                has_update: false,
-                current_version,
-                latest_version: String::new(),
-                release_url: String::new(),
-                release_notes: String::new(),
-                published_at: String::new(),
-                assets: vec![],
-                error: "Failed to parse response".to_string(),
-            }
+            continue;
         }
-        Ok(resp) => UpdateInfo {
-            has_update: false,
+
+        let json: serde_json::Value = match resp.json().await {
+            Ok(j) => j,
+            Err(_) => continue,
+        };
+
+        // /releases/latest returns a single object, /releases returns an array
+        let release = if i == 0 {
+            json.clone()
+        } else {
+            match json.as_array().and_then(|arr| {
+                arr.iter().find(|r| !r["draft"].as_bool().unwrap_or(false)).cloned()
+            }) {
+                Some(r) => r,
+                None => continue,
+            }
+        };
+
+        let tag = release["tag_name"].as_str().unwrap_or("");
+        let latest = tag.trim_start_matches('v').to_string();
+        let has_update = matches!(
+            compare_versions(&latest, &current_version),
+            std::cmp::Ordering::Greater
+        );
+        let release_url = release["html_url"].as_str().unwrap_or("").to_string();
+        let release_notes = release["body"].as_str().unwrap_or("").to_string();
+        let published_at = release["published_at"].as_str().unwrap_or("").to_string();
+        let assets: Vec<ReleaseAsset> = release["assets"]
+            .as_array()
+            .map(|arr| {
+                arr.iter()
+                    .map(|a| ReleaseAsset {
+                        name: a["name"].as_str().unwrap_or("").to_string(),
+                        url: a["browser_download_url"].as_str().unwrap_or("").to_string(),
+                        size: a["size"].as_u64().unwrap_or(0),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        return UpdateInfo {
+            has_update,
             current_version,
-            latest_version: String::new(),
-            release_url: String::new(),
-            release_notes: String::new(),
-            published_at: String::new(),
-            assets: vec![],
-            error: format!("HTTP {}", resp.status()),
-        },
-        Err(e) => UpdateInfo {
-            has_update: false,
-            current_version,
-            latest_version: String::new(),
-            release_url: String::new(),
-            release_notes: String::new(),
-            published_at: String::new(),
-            assets: vec![],
-            error: e.to_string(),
-        },
+            latest_version: latest,
+            release_url,
+            release_notes,
+            published_at,
+            assets,
+            error: String::new(),
+        };
+    }
+
+    UpdateInfo {
+        has_update: false,
+        current_version,
+        latest_version: String::new(),
+        release_url: String::new(),
+        release_notes: String::new(),
+        published_at: String::new(),
+        assets: vec![],
+        error: "No releases found".to_string(),
     }
 }
