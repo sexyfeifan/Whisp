@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use base64::Engine;
 use reqwest::multipart;
 use reqwest::{StatusCode, Url};
 use std::sync::Arc;
@@ -31,9 +32,76 @@ pub fn provider_name(api_base_url: &str) -> String {
         "Deepgram".to_string()
     } else if raw.contains("googleapis.com") || raw.contains("vertexai") {
         "Google Cloud".to_string()
+    } else if raw.contains("xiaomimimo.com") {
+        "MiMo".to_string()
     } else {
         "Custom".to_string()
     }
+}
+
+fn is_mimo_asr(model: &str) -> bool {
+    model.trim().to_ascii_lowercase() == "mimo-v2.5-asr"
+}
+
+fn mimo_endpoint(api_base_url: &str) -> Result<Url> {
+    let raw = api_base_url.trim();
+    if raw.is_empty() {
+        anyhow::bail!("API base URL is empty");
+    }
+    let endpoint = if raw.ends_with("/chat/completions") {
+        raw.to_string()
+    } else {
+        format!("{}/chat/completions", raw.trim_end_matches('/'))
+    };
+    Url::parse(&endpoint).context("Invalid API base URL")
+}
+
+fn build_mimo_json(
+    wav_data: Vec<u8>,
+    model: &str,
+    language: Option<&str>,
+) -> Result<serde_json::Value> {
+    use base64::engine::general_purpose::STANDARD;
+    let encoded = STANDARD.encode(&wav_data);
+    let data_url = format!("data:audio/wav;base64,{}", encoded);
+
+    let lang = match language {
+        Some(l) if l != "auto" => l.to_string(),
+        _ => "auto".to_string(),
+    };
+
+    Ok(serde_json::json!({
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": data_url
+                        }
+                    }
+                ]
+            }
+        ],
+        "asr_options": {
+            "language": lang
+        }
+    }))
+}
+
+fn extract_mimo_text(json: &serde_json::Value) -> Result<String> {
+    if let Some(err) = json.get("error") {
+        let msg = err.get("message").and_then(serde_json::Value::as_str).unwrap_or("unknown error");
+        anyhow::bail!("MiMo API error: {}", msg);
+    }
+    json.pointer("/choices/0/message/content")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| anyhow::anyhow!("Missing transcription text in MiMo response"))
 }
 
 fn build_form(
@@ -73,6 +141,8 @@ fn extract_text(json: &serde_json::Value) -> Option<String> {
         json.pointer("/results/channels/0/alternatives/0/transcript")
             .and_then(serde_json::Value::as_str),
         json.pointer("/results/alternatives/0/transcript")
+            .and_then(serde_json::Value::as_str),
+        json.pointer("/choices/0/message/content")
             .and_then(serde_json::Value::as_str),
     ];
 
@@ -115,17 +185,30 @@ pub async fn validate_api_key(
     } else {
         model
     };
-    let form = build_form(wav, model, None, None)?;
-    let endpoint = transcription_endpoint(api_base_url)?;
 
-    let resp = client
-        .post(endpoint)
-        .bearer_auth(api_key)
-        .timeout(Duration::from_secs(15))
-        .multipart(form)
-        .send()
-        .await
-        .context("Network error")?;
+    let resp = if is_mimo_asr(model) {
+        let endpoint = mimo_endpoint(api_base_url)?;
+        let json_body = build_mimo_json(wav, model, None)?;
+        client
+            .post(endpoint)
+            .header("api-key", api_key)
+            .timeout(Duration::from_secs(15))
+            .json(&json_body)
+            .send()
+            .await
+            .context("Network error")?
+    } else {
+        let form = build_form(wav, model, None, None)?;
+        let endpoint = transcription_endpoint(api_base_url)?;
+        client
+            .post(endpoint)
+            .bearer_auth(api_key)
+            .timeout(Duration::from_secs(15))
+            .multipart(form)
+            .send()
+            .await
+            .context("Network error")?
+    };
 
     if resp.status() == StatusCode::UNAUTHORIZED {
         anyhow::bail!("Invalid API key");
@@ -198,47 +281,87 @@ pub async fn transcribe_audio(
     timeout_secs: u64,
     retry_count: u8,
 ) -> Result<String> {
-    let endpoint = transcription_endpoint(api_base_url)?;
     let timeout = Duration::from_secs(timeout_secs.max(10));
     let attempts = retry_count.saturating_add(1);
     let wav_arc = Arc::new(wav_data);
 
-    for attempt in 0..attempts {
-        let form = build_form((*wav_arc).clone(), model, language, prompt)?;
-        let response = client
-            .post(endpoint.clone())
-            .bearer_auth(api_key)
-            .timeout(timeout)
-            .multipart(form)
-            .send()
-            .await;
+    if is_mimo_asr(model) {
+        let endpoint = mimo_endpoint(api_base_url)?;
+        for attempt in 0..attempts {
+            let json_body = build_mimo_json((*wav_arc).clone(), model, language)?;
+            let response = client
+                .post(endpoint.clone())
+                .header("api-key", api_key)
+                .timeout(timeout)
+                .json(&json_body)
+                .send()
+                .await;
 
-        match response {
-            Ok(resp) if resp.status().is_success() => {
-                let json: serde_json::Value = resp
-                    .json()
-                    .await
-                    .context("Failed to parse API response")?;
-                if let Some(text) = extract_text(&json) {
-                    return Ok(text);
+            match response {
+                Ok(resp) if resp.status().is_success() => {
+                    let json: serde_json::Value = resp
+                        .json()
+                        .await
+                        .context("Failed to parse MiMo API response")?;
+                    return extract_mimo_text(&json);
                 }
-                anyhow::bail!("Missing transcription text in response");
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = shorten_error_body(resp.text().await.unwrap_or_default());
+                    if attempt + 1 < attempts && should_retry_status(status) {
+                        tokio::time::sleep(backoff_duration(attempt)).await;
+                        continue;
+                    }
+                    anyhow::bail!("MiMo API error {}: {}", status, body);
+                }
+                Err(error) => {
+                    if attempt + 1 < attempts {
+                        tokio::time::sleep(backoff_duration(attempt)).await;
+                        continue;
+                    }
+                    anyhow::bail!("Failed to send MiMo transcription request: {}", error);
+                }
             }
-            Ok(resp) => {
-                let status = resp.status();
-                let body = shorten_error_body(resp.text().await.unwrap_or_default());
-                if attempt + 1 < attempts && should_retry_status(status) {
-                    tokio::time::sleep(backoff_duration(attempt)).await;
-                    continue;
+        }
+    } else {
+        let endpoint = transcription_endpoint(api_base_url)?;
+        for attempt in 0..attempts {
+            let form = build_form((*wav_arc).clone(), model, language, prompt)?;
+            let response = client
+                .post(endpoint.clone())
+                .bearer_auth(api_key)
+                .timeout(timeout)
+                .multipart(form)
+                .send()
+                .await;
+
+            match response {
+                Ok(resp) if resp.status().is_success() => {
+                    let json: serde_json::Value = resp
+                        .json()
+                        .await
+                        .context("Failed to parse API response")?;
+                    if let Some(text) = extract_text(&json) {
+                        return Ok(text);
+                    }
+                    anyhow::bail!("Missing transcription text in response");
                 }
-                anyhow::bail!("API error {}: {}", status, body);
-            }
-            Err(error) => {
-                if attempt + 1 < attempts {
-                    tokio::time::sleep(backoff_duration(attempt)).await;
-                    continue;
+                Ok(resp) => {
+                    let status = resp.status();
+                    let body = shorten_error_body(resp.text().await.unwrap_or_default());
+                    if attempt + 1 < attempts && should_retry_status(status) {
+                        tokio::time::sleep(backoff_duration(attempt)).await;
+                        continue;
+                    }
+                    anyhow::bail!("API error {}: {}", status, body);
                 }
-                anyhow::bail!("Failed to send transcription request: {}", error);
+                Err(error) => {
+                    if attempt + 1 < attempts {
+                        tokio::time::sleep(backoff_duration(attempt)).await;
+                        continue;
+                    }
+                    anyhow::bail!("Failed to send transcription request: {}", error);
+                }
             }
         }
     }

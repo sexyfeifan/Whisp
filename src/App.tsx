@@ -378,6 +378,7 @@ const endpointPresets = [
   { label: "OpenAI", value: "https://api.openai.com/v1" },
   { label: "Groq", value: "https://api.groq.com/openai/v1" },
   { label: "Fireworks", value: "https://api.fireworks.ai/inference/v1" },
+  { label: "MiMo", value: "https://api.xiaomimimo.com/v1" },
 ];
 
 const modelCatalog: ModelCatalogItem[] = [
@@ -470,6 +471,16 @@ const modelCatalog: ModelCatalogItem[] = [
       ja: "通常は OpenAI 互換の中継ゲートウェイが必要です。",
     },
     baseUrlHint: "OpenAI-compatible relay URL",
+  },
+  {
+    name: "mimo-v2.5-asr",
+    provider: "MiMo",
+    description: {
+      "zh-CN": "小米 MiMo 语音识别，支持中英双语、方言、歌词转写及嘈杂环境。",
+      en: "Xiaomi MiMo ASR with bilingual, dialect, lyrics, and noisy-environment support.",
+      ja: "Xiaomi MiMo 音声認識、中国語・英語・方言・歌詞・騒音環境対応。",
+    },
+    baseUrlHint: "https://api.xiaomimimo.com/v1",
   },
 ];
 
