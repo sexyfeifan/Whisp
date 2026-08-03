@@ -287,6 +287,38 @@ pub async fn retry_transcription(
     Ok(text)
 }
 
+#[tauri::command]
+pub async fn polish_text(
+    app: AppHandle,
+    api_key: String,
+    api_base_url: String,
+    model: String,
+    text: String,
+    prompt: String,
+) -> Result<String, String> {
+    let client = app
+        .try_state::<reqwest::Client>()
+        .ok_or("HTTP client not initialized")?;
+    crate::polish::polish_text(&client, &api_key, &api_base_url, &model, &text, &prompt)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn test_polish_connection(
+    app: AppHandle,
+    api_key: String,
+    api_base_url: String,
+    model: String,
+) -> Result<(), String> {
+    let client = app
+        .try_state::<reqwest::Client>()
+        .ok_or("HTTP client not initialized")?;
+    crate::polish::validate_polish_key(&client, &api_key, &api_base_url, &model)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     let parse = |v: &str| -> Vec<u32> {
         v.trim_start_matches('v')

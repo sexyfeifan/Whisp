@@ -3,6 +3,7 @@ mod history;
 mod hotkey;
 pub mod paste;
 mod permissions;
+mod polish;
 mod recorder;
 mod settings;
 mod sound;
@@ -73,6 +74,8 @@ pub fn run() {
             commands::export_history,
             commands::toggle_autostart,
             commands::check_for_updates,
+            commands::polish_text,
+            commands::test_polish_connection,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -101,9 +104,8 @@ pub fn run() {
             let _main_window =
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
                     .title("Whisp")
-                    .inner_size(420.0, 680.0)
-                    .min_inner_size(380.0, 400.0)
-                    .resizable(true)
+                    .inner_size(960.0, 640.0)
+                    .resizable(false)
                     .maximizable(false)
                     .visible(false)
                     .build()?;
@@ -656,6 +658,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let request_timeout_sec = settings.request_timeout_sec;
     let retry_count = settings.retry_count;
     let whisper_prompt = settings.whisper_prompt.clone();
+    let ai_polish_enabled = settings.ai_polish_enabled;
+    let ai_polish_api_key = settings.ai_polish_api_key.clone();
+    let ai_polish_api_url = settings.ai_polish_api_url.clone();
+    let ai_polish_model = settings.ai_polish_model.clone();
+    let ai_polish_prompt = settings.ai_polish_prompt.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!("Calling API with model={} via {}...", model, api_base_url);
@@ -687,6 +694,31 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         {
             Ok(text) => {
                 log::info!("Transcription: {}", text);
+
+                let text = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
+                    log::info!("Polishing text with AI...");
+                    match polish::polish_text(
+                        &http_client,
+                        &ai_polish_api_key,
+                        &ai_polish_api_url,
+                        &ai_polish_model,
+                        &text,
+                        &ai_polish_prompt,
+                    )
+                    .await
+                    {
+                        Ok(polished) => {
+                            log::info!("Polished: {}", polished);
+                            polished
+                        }
+                        Err(e) => {
+                            log::warn!("Polish failed, using original text: {}", e);
+                            text
+                        }
+                    }
+                } else {
+                    text
+                };
 
                 // Copy to clipboard and auto-paste into active app
                 let _ = handle.clipboard().write_text(&text);

@@ -33,4 +33,9 @@ export interface AppSettings {
   launch_at_startup: boolean;
   whisper_prompt: string;
   silence_threshold: number;
+  ai_polish_enabled: boolean;
+  ai_polish_api_key: string;
+  ai_polish_api_url: string;
+  ai_polish_model: string;
+  ai_polish_prompt: string;
 }

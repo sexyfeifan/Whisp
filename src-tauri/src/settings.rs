@@ -45,6 +45,16 @@ pub struct AppSettings {
     pub whisper_prompt: String,
     #[serde(default = "default_silence_threshold")]
     pub silence_threshold: f64,
+    #[serde(default = "default_ai_polish_enabled")]
+    pub ai_polish_enabled: bool,
+    #[serde(default)]
+    pub ai_polish_api_key: String,
+    #[serde(default = "default_ai_polish_api_url")]
+    pub ai_polish_api_url: String,
+    #[serde(default = "default_ai_polish_model")]
+    pub ai_polish_model: String,
+    #[serde(default)]
+    pub ai_polish_prompt: String,
 }
 
 /// Stored on disk — no api_key field (stored in keychain instead)
@@ -86,6 +96,16 @@ struct DiskSettings {
     pub whisper_prompt: String,
     #[serde(default = "default_silence_threshold")]
     pub silence_threshold: f64,
+    #[serde(default = "default_ai_polish_enabled")]
+    pub ai_polish_enabled: bool,
+    #[serde(default)]
+    pub ai_polish_api_key: String,
+    #[serde(default = "default_ai_polish_api_url")]
+    pub ai_polish_api_url: String,
+    #[serde(default = "default_ai_polish_model")]
+    pub ai_polish_model: String,
+    #[serde(default)]
+    pub ai_polish_prompt: String,
     /// api_key is normally empty here (stored in keychain).
     /// Written as fallback when keychain is unavailable (e.g. ad-hoc signed builds).
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -156,6 +176,18 @@ fn default_silence_threshold() -> f64 {
     0.01
 }
 
+fn default_ai_polish_enabled() -> bool {
+    false
+}
+
+fn default_ai_polish_api_url() -> String {
+    "https://api.openai.com/v1".to_string()
+}
+
+fn default_ai_polish_model() -> String {
+    "gpt-4o-mini".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -178,6 +210,11 @@ impl Default for AppSettings {
             launch_at_startup: default_launch_at_startup(),
             whisper_prompt: String::new(),
             silence_threshold: default_silence_threshold(),
+            ai_polish_enabled: default_ai_polish_enabled(),
+            ai_polish_api_key: String::new(),
+            ai_polish_api_url: default_ai_polish_api_url(),
+            ai_polish_model: default_ai_polish_model(),
+            ai_polish_prompt: String::new(),
         }
     }
 }
@@ -249,6 +286,11 @@ fn save_disk_settings(settings: &AppSettings) -> Result<(), String> {
         launch_at_startup: settings.launch_at_startup,
         whisper_prompt: settings.whisper_prompt.clone(),
         silence_threshold: settings.silence_threshold,
+        ai_polish_enabled: settings.ai_polish_enabled,
+        ai_polish_api_key: settings.ai_polish_api_key.clone(),
+        ai_polish_api_url: settings.ai_polish_api_url.clone(),
+        ai_polish_model: settings.ai_polish_model.clone(),
+        ai_polish_prompt: settings.ai_polish_prompt.clone(),
         api_key: settings.api_key.clone(), // always persist to disk; keychain is best-effort only
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
@@ -277,6 +319,11 @@ pub fn get_settings() -> AppSettings {
         launch_at_startup: disk.launch_at_startup,
         whisper_prompt: disk.whisper_prompt,
         silence_threshold: disk.silence_threshold,
+        ai_polish_enabled: disk.ai_polish_enabled,
+        ai_polish_api_key: disk.ai_polish_api_key,
+        ai_polish_api_url: disk.ai_polish_api_url,
+        ai_polish_model: disk.ai_polish_model,
+        ai_polish_prompt: disk.ai_polish_prompt,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
