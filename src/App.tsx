@@ -188,6 +188,12 @@ const messages = {
     totalCost: "累计费用",
     totalTokens: "累计 Token",
     aiPolishPromptDesc: "留空使用上方默认提示词，修改后自动保存",
+    exportSettings: "导出设置",
+    importSettings: "导入设置",
+    exportImportSettings: "数据备份",
+    exportImportSettingsDesc: "导出当前设置到剪贴板，或从剪贴板导入设置",
+    settingsExported: "设置已复制到剪贴板",
+    importSettingsError: "剪贴板中没有有效的设置数据",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -339,6 +345,12 @@ const messages = {
     totalCost: "Total Cost",
     totalTokens: "Total Tokens",
     aiPolishPromptDesc: "Leave empty to use default prompt above, changes auto-save",
+    exportSettings: "Export Settings",
+    importSettings: "Import Settings",
+    exportImportSettings: "Data Backup",
+    exportImportSettingsDesc: "Export current settings to clipboard, or import settings from clipboard",
+    settingsExported: "Settings copied to clipboard",
+    importSettingsError: "Clipboard does not contain valid settings",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -490,6 +502,12 @@ const messages = {
     totalCost: "合計費用",
     totalTokens: "合計トークン",
     aiPolishPromptDesc: "空欄で上記のデフォルトプロンプト使用、変更は自動保存",
+    exportSettings: "設定エクスポート",
+    importSettings: "設定インポート",
+    exportImportSettings: "データバックアップ",
+    exportImportSettingsDesc: "現在の設定をクリップボードにエクスポート、またはクリップボードから設定をインポート",
+    settingsExported: "設定がクリップボードにコピーされました",
+    importSettingsError: "クリップボードに有効な設定データがありません",
   },
 } as const;
 
@@ -1046,9 +1064,13 @@ function App() {
   }, []);
 
   const loadSettings = useCallback(async () => {
-    const nextSettings = await invoke<AppSettings>("get_settings");
-    setSettings(nextSettings);
-    if (!nextSettings.api_key) { setView("onboarding"); }
+    try {
+      const nextSettings = await invoke<AppSettings>("get_settings");
+      setSettings(nextSettings);
+      if (!nextSettings.api_key) { setView("onboarding"); }
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+    }
   }, []);
 
   const checkPermissions = useCallback(async () => {
@@ -1071,7 +1093,13 @@ function App() {
   );
 
   useEffect(() => {
-    void loadHistory(); void loadSettings(); void checkPermissions();
+    try {
+      void loadHistory();
+      void loadSettings();
+      void checkPermissions();
+    } catch (error) {
+      console.error("Initialization error:", error);
+    }
     const unlistenHistory = listen("history-updated", () => { void loadHistory(true); });
     const unlistenError = listen<string>("transcription-error", (event) => {
       setErrorMsg(event.payload); window.setTimeout(() => setErrorMsg(null), 5000);
@@ -1981,6 +2009,52 @@ function App() {
                     </div>
                   </div>
                 )}
+              </SettingsSection>
+
+              <SettingsSection
+                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+                title={m.exportImportSettings}
+                description={m.exportImportSettingsDesc}
+              >
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const json = await invoke<string>("export_settings_json");
+                        await writeText(json);
+                        setSettingsFeedback({ tone: "success", message: m.settingsExported });
+                        setTimeout(() => setSettingsFeedback(null), 3000);
+                      } catch (error) {
+                        setSettingsFeedback({ tone: "error", message: String(error) });
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium"
+                    style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))", border: "1px solid hsl(var(--border))" }}
+                  >
+                    {m.exportSettings}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const text = await navigator.clipboard.readText();
+                        if (!text.trim().startsWith("{")) {
+                          setSettingsFeedback({ tone: "error", message: m.importSettingsError });
+                          return;
+                        }
+                        const result = await invoke<string>("import_settings_json", { json: text });
+                        await loadSettings();
+                        setSettingsFeedback({ tone: "success", message: result });
+                        setTimeout(() => setSettingsFeedback(null), 3000);
+                      } catch (error) {
+                        setSettingsFeedback({ tone: "error", message: String(error) });
+                      }
+                    }}
+                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium"
+                    style={{ background: "hsl(var(--brand))", color: "white" }}
+                  >
+                    {m.importSettings}
+                  </button>
+                </div>
               </SettingsSection>
 
               {settingsFeedback && (

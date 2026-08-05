@@ -520,6 +520,80 @@ pub fn get_default_polish_prompt() -> String {
 }
 
 #[tauri::command]
+pub fn export_settings_json() -> Result<String, String> {
+    let s = settings::get_settings();
+    let map = serde_json::json!({
+        "api_base_url": s.api_base_url,
+        "api_key": s.api_key,
+        "model": s.model,
+        "language": s.language,
+        "shortcut": s.shortcut,
+        "auto_paste_enabled": s.auto_paste_enabled,
+        "paste_delay_ms": s.paste_delay_ms,
+        "save_audio_files": s.save_audio_files,
+        "sound_enabled": s.sound_enabled,
+        "ui_language": s.ui_language,
+        "request_timeout_sec": s.request_timeout_sec,
+        "retry_count": s.retry_count,
+        "silence_timeout_sec": s.silence_timeout_sec,
+        "silence_threshold": s.silence_threshold,
+        "trim_silence_enabled": s.trim_silence_enabled,
+        "whisper_prompt": s.whisper_prompt,
+        "launch_at_startup": s.launch_at_startup,
+        "ai_polish_enabled": s.ai_polish_enabled,
+        "ai_polish_api_url": s.ai_polish_api_url,
+        "ai_polish_api_key": s.ai_polish_api_key,
+        "ai_polish_model": s.ai_polish_model,
+        "ai_polish_prompt": s.ai_polish_prompt,
+        "audio_retention_limit": s.audio_retention_limit,
+    });
+    serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn import_settings_json(app: AppHandle, json: String) -> Result<String, String> {
+    let value: serde_json::Value =
+        serde_json::from_str(&json).map_err(|e| format!("Invalid JSON: {}", e))?;
+    let obj = value.as_object().ok_or("JSON must be an object")?;
+
+    let mut s = settings::get_settings();
+
+    if let Some(v) = obj.get("api_base_url").and_then(|v| v.as_str()) { s.api_base_url = v.to_string(); }
+    if let Some(v) = obj.get("api_key").and_then(|v| v.as_str()) { s.api_key = v.to_string(); }
+    if let Some(v) = obj.get("model").and_then(|v| v.as_str()) { s.model = v.to_string(); }
+    if let Some(v) = obj.get("language").and_then(|v| v.as_str()) { s.language = v.to_string(); }
+    if let Some(v) = obj.get("shortcut").and_then(|v| v.as_str()) { s.shortcut = v.to_string(); }
+    if let Some(v) = obj.get("auto_paste_enabled").and_then(|v| v.as_bool()) { s.auto_paste_enabled = v; }
+    if let Some(v) = obj.get("paste_delay_ms").and_then(|v| v.as_u64()) { s.paste_delay_ms = v; }
+    if let Some(v) = obj.get("save_audio_files").and_then(|v| v.as_bool()) { s.save_audio_files = v; }
+    if let Some(v) = obj.get("sound_enabled").and_then(|v| v.as_bool()) { s.sound_enabled = v; }
+    if let Some(v) = obj.get("ui_language").and_then(|v| v.as_str()) { s.ui_language = v.to_string(); }
+    if let Some(v) = obj.get("request_timeout_sec").and_then(|v| v.as_u64()) { s.request_timeout_sec = v; }
+    if let Some(v) = obj.get("retry_count").and_then(|v| v.as_u64()) { s.retry_count = v as u8; }
+    if let Some(v) = obj.get("silence_timeout_sec").and_then(|v| v.as_u64()) { s.silence_timeout_sec = v; }
+    if let Some(v) = obj.get("silence_threshold").and_then(|v| v.as_f64()) { s.silence_threshold = v; }
+    if let Some(v) = obj.get("trim_silence_enabled").and_then(|v| v.as_bool()) { s.trim_silence_enabled = v; }
+    if let Some(v) = obj.get("whisper_prompt").and_then(|v| v.as_str()) { s.whisper_prompt = v.to_string(); }
+    if let Some(v) = obj.get("launch_at_startup").and_then(|v| v.as_bool()) { s.launch_at_startup = v; }
+    if let Some(v) = obj.get("ai_polish_enabled").and_then(|v| v.as_bool()) { s.ai_polish_enabled = v; }
+    if let Some(v) = obj.get("ai_polish_api_url").and_then(|v| v.as_str()) { s.ai_polish_api_url = v.to_string(); }
+    if let Some(v) = obj.get("ai_polish_api_key").and_then(|v| v.as_str()) { s.ai_polish_api_key = v.to_string(); }
+    if let Some(v) = obj.get("ai_polish_model").and_then(|v| v.as_str()) { s.ai_polish_model = v.to_string(); }
+    if let Some(v) = obj.get("ai_polish_prompt").and_then(|v| v.as_str()) { s.ai_polish_prompt = v.to_string(); }
+    if let Some(v) = obj.get("audio_retention_limit").and_then(|v| v.as_u64()) { s.audio_retention_limit = v as usize; }
+
+    let old_settings = settings::get_settings();
+    settings::save_settings(&s).map_err(|e| e.to_string())?;
+
+    if s.shortcut != old_settings.shortcut {
+        crate::re_register_shortcut(&app, &old_settings.shortcut, &s);
+    }
+
+    log::info!("Settings imported successfully");
+    Ok("Settings imported successfully".to_string())
+}
+
+#[tauri::command]
 pub async fn download_and_install_update(
     app: AppHandle,
     url: String,
