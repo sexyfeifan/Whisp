@@ -19,6 +19,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,7 +38,8 @@
     "updater": {
       "endpoints": [
         "https://github.com/sexyfeifan/Whisp/releases/latest/download/latest.json"
-      ]
+      ],
+      "pubkey": "RWRTY19e5anhI4Hh+xIvZndbtrPBkapHzKvW6mTskG+h5soOQY1jGObq"
     }
   }
 }
