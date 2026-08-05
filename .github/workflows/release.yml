@@ -59,6 +59,8 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
       - name: Checkout
@@ -199,17 +201,17 @@ jobs:
         if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
-        run: npx tauri build --target ${{ matrix.target }}
+        run: npx tauri build --target ${{ matrix.target }} --updater
 
       - name: Build Tauri app (macOS, unsigned)
         if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
         run: |
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
-          npx tauri build --target ${{ matrix.target }}
+          npx tauri build --target ${{ matrix.target }} --updater
 
       - name: Build Tauri app (Windows)
         if: runner.os == 'Windows'
-        run: npx tauri build --target ${{ matrix.target }}
+        run: npx tauri build --target ${{ matrix.target }} --updater
 
       - name: Sign Windows artifacts
         if: runner.os == 'Windows' && env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
@@ -231,7 +233,7 @@ jobs:
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
-        run: npx tauri build --target ${{ matrix.target }}
+        run: npx tauri build --target ${{ matrix.target }} --updater
 
       # ── Verification ────────────────────────────────────────────
       - name: Verify macOS code signing
@@ -306,6 +308,8 @@ jobs:
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.rpm
             src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.sig
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/latest.json
           if-no-files-found: error
           retention-days: 3
 
@@ -334,10 +338,59 @@ jobs:
             -name "*.msi" -o \
             -name "*.deb" -o \
             -name "*.rpm" -o \
-            -name "*.AppImage" \
+            -name "*.AppImage" -o \
+            -name "*.sig" \
           \) -exec cp {} release/ \;
+          
+          # Collect all latest.json files from each platform build
+          find artifacts -name "latest.json" -exec cp {} release/ \;
+          
           echo "Release files:"
           ls -lh release/
+
+      - name: Merge updater latest.json
+        run: |
+          cd release
+          # If multiple latest.json exist, merge their platforms into one
+          JSON_COUNT=$(ls latest.json 2>/dev/null | wc -l)
+          if [ "$JSON_COUNT" -gt 0 ]; then
+            echo "Found latest.json files, merging..."
+            # Use node to merge all latest.json files
+            node -e '
+              const fs = require("fs");
+              const merged = { version: "", notes: "", pub_date: "", platforms: {} };
+              const files = fs.readdirSync(".").filter(f => f === "latest.json");
+              // Read from artifacts subdirectories too
+              const walk = (dir) => {
+                try {
+                  for (const f of fs.readdirSync(dir)) {
+                    const p = dir + "/" + f;
+                    if (f === "latest.json") {
+                      const data = JSON.parse(fs.readFileSync(p, "utf8"));
+                      merged.version = data.version || merged.version;
+                      merged.notes = data.notes || merged.notes;
+                      merged.pub_date = data.pub_date || merged.pub_date;
+                      Object.assign(merged.platforms, data.platforms || {});
+                    } else if (fs.statSync(p).isDirectory()) {
+                      walk(p);
+                    }
+                  }
+                } catch {}
+              };
+              walk("../artifacts");
+              // Fix URLs to point to GitHub release
+              for (const [key, val] of Object.entries(merged.platforms)) {
+                if (val.url) {
+                  const filename = val.url.split("/").pop();
+                  val.url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" + filename;
+                }
+              }
+              fs.writeFileSync("latest.json", JSON.stringify(merged, null, 2));
+              console.log("Merged latest.json:", JSON.stringify(merged, null, 2));
+            '
+          else
+            echo "No latest.json found, skipping updater manifest"
+          fi
 
       - name: Generate checksums
         run: |
@@ -351,7 +404,7 @@ jobs:
         with:
           name: Whisp Auto Build ${{ github.ref_name }}
           draft: false
-          prerelease: true
+          prerelease: false
           generate_release_notes: true
           files: release/*
           body: |
