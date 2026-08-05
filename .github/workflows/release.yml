@@ -201,17 +201,17 @@ jobs:
         if: runner.os == 'macOS' && env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
-        run: npx tauri build --target ${{ matrix.target }} --updater
+        run: npx tauri build --target ${{ matrix.target }}
 
       - name: Build Tauri app (macOS, unsigned)
         if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
         run: |
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
-          npx tauri build --target ${{ matrix.target }} --updater
+          npx tauri build --target ${{ matrix.target }}
 
       - name: Build Tauri app (Windows)
         if: runner.os == 'Windows'
-        run: npx tauri build --target ${{ matrix.target }} --updater
+        run: npx tauri build --target ${{ matrix.target }}
 
       - name: Sign Windows artifacts
         if: runner.os == 'Windows' && env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
@@ -233,7 +233,7 @@ jobs:
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
-        run: npx tauri build --target ${{ matrix.target }} --updater
+        run: npx tauri build --target ${{ matrix.target }}
 
       # ── Verification ────────────────────────────────────────────
       - name: Verify macOS code signing
