@@ -6,6 +6,18 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { check as checkUpdaterUpdate } from "@tauri-apps/plugin-updater";
 import type { AppSettings, HistoryEntry, LogEntry } from "./types";
 import logoUrl from "./assets/logo.png";
+import { motion } from "framer-motion";
+import {
+  History, Settings, Download, Mic, Search, Copy, Trash2,
+  Play, Pause, Check, AlertCircle,
+  Volume2, Keyboard, Shield, Zap, Clock, FileAudio,
+  BarChart3, Activity, RefreshCw, ExternalLink, Loader2
+} from "lucide-react";
+import { Button } from "./components/ui/button";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./components/ui/card";
+import { Input } from "./components/ui/input";
+import { Switch } from "./components/ui/switch";
+import { Badge } from "./components/ui/badge";
 
 type View = "onboarding" | "history" | "settingsApi" | "settingsPolish" | "settingsRecording" | "settingsBehavior" | "settingsApp" | "diagnostics";
 type StatusFilter = "all" | "success" | "failed";
@@ -102,7 +114,7 @@ const messages = {
     filterAll: "全部",
     filterSuccess: "成功",
     filterFailed: "失败",
-    noHistory: "还没有转写记录。",
+    noHistory: "还没有转写记录",
     noResults: "没有匹配当前筛选条件的记录。",
     startHint: "按下 {shortcut} 开始。",
     stopHint: "再次按下结束，按 Escape 取消。",
@@ -259,7 +271,7 @@ const messages = {
     filterAll: "All",
     filterSuccess: "Success",
     filterFailed: "Failed",
-    noHistory: "No transcriptions yet.",
+    noHistory: "No transcriptions yet",
     noResults: "No entries match the current filter.",
     startHint: "Press {shortcut} to start.",
     stopHint: "Press again to stop. Escape cancels.",
@@ -416,7 +428,7 @@ const messages = {
     filterAll: "すべて",
     filterSuccess: "成功",
     filterFailed: "失敗",
-    noHistory: "まだ文字起こし履歴はありません。",
+    noHistory: "まだ転写記録がありません",
     noResults: "現在の条件に一致する履歴がありません。",
     startHint: "{shortcut} を押して開始。",
     stopHint: "もう一度押すと終了、Escape でキャンセル。",
@@ -748,33 +760,24 @@ function ToggleRow({
           <div className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{description}</div>
         )}
       </div>
-      <button
-        onClick={() => onChange(!value)}
-        className="relative w-10 h-5 rounded-full transition-colors shrink-0"
-        style={{ background: value ? "hsl(var(--brand))" : "hsl(var(--muted))" }}
-      >
-        <span
-          className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
-          style={{ left: value ? "calc(100% - 18px)" : "2px" }}
-        />
-      </button>
+      <Switch checked={value} onCheckedChange={onChange} />
     </div>
   );
 }
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-xl p-4" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
+    <Card className="p-4">
       <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
+        <div className="w-9 h-9 rounded-lg bg-[hsl(var(--brand)/0.1)] flex items-center justify-center">
           {icon}
         </div>
         <div>
-          <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{label}</p>
-          <p className="text-2xl font-bold mt-0.5" style={{ color: "hsl(var(--foreground))" }}>{value}</p>
+          <p className="text-[11px]" style={{ color: "hsl(var(--muted-foreground))" }}>{label}</p>
+          <p className="text-xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{value}</p>
         </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -782,18 +785,18 @@ function SettingsSection({
   icon, title, description, children,
 }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <span style={{ color: "hsl(var(--muted-foreground))" }}>{icon}</span>
-        <div>
-          <h3 className="text-sm font-medium" style={{ color: "hsl(var(--foreground))" }}>{title}</h3>
-          <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{description}</p>
-        </div>
-      </div>
-      <div className="rounded-xl p-4 space-y-4" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <span style={{ color: "hsl(var(--muted-foreground))" }}>{icon}</span>
+          {title}
+        </CardTitle>
+        {description && <CardDescription>{description}</CardDescription>}
+      </CardHeader>
+      <CardContent className="space-y-4">
         {children}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -887,16 +890,13 @@ function ModelGuide({
                 <p className="text-xs font-medium" style={{ color: "hsl(var(--foreground))" }}>{item.name}</p>
                 <p className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{item.provider}</p>
               </div>
-              <button
+              <Button
+                variant={selected ? "brand" : "secondary"}
+                size="sm"
                 onClick={() => onSelectModel(item.name)}
-                className="px-2 py-1 rounded-md text-xs"
-                style={{
-                  background: selected ? "hsl(var(--success) / 0.15)" : "hsl(var(--secondary))",
-                  color: selected ? "hsl(var(--success))" : "hsl(var(--foreground))",
-                }}
               >
                 {selected ? selectedText : chooseText}
-              </button>
+              </Button>
             </div>
             <p className="text-xs mt-2" style={{ color: "hsl(var(--muted-foreground))" }}>{item.description[uiLanguage]}</p>
             <p className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>{toggleText}: {item.baseUrlHint}</p>
@@ -914,20 +914,23 @@ function IconButton({
   title, onClick, children, accent,
 }: { title: string; onClick: () => void; children: React.ReactNode; accent?: boolean }) {
   return (
-    <button
+    <Button
+      variant={accent ? "brand" : "ghost"}
+      size="icon"
       onClick={onClick}
       title={title}
-      className="p-1.5 rounded-md transition-colors"
-      style={{
-        background: accent ? "hsl(var(--brand))" : "transparent",
-        color: accent ? "hsl(var(--brand-foreground))" : "hsl(var(--muted-foreground))",
-        lineHeight: 0,
-      }}
+      className="h-7 w-7"
     >
       {children}
-    </button>
+    </Button>
   );
 }
+
+const viewVariants = {
+  initial: { opacity: 0, x: 10 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -10 },
+};
 
 function App() {
   const [view, setView] = useState<View>("history");
@@ -1012,7 +1015,6 @@ function App() {
     setDownloading(true);
     setDownloadMsg(null);
     try {
-      // Find the right asset from updateInfo if not provided
       if (!url || !filename) {
         const platform = navigator.platform.toLowerCase();
         const isMac = platform.includes("mac");
@@ -1350,106 +1352,16 @@ function App() {
 
   const hasApiConfig = Boolean(settings.api_key.trim() && settings.api_base_url.trim());
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
-  const startHint = formatTemplate(m.startHint, { shortcut: translateShortcut(settings.shortcut || "") });
-
-  // Sidebar icons
-  const HistoryIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-
-  const SettingsIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-
-  const SearchIcon = (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-
-  const SuccessIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-
-  const AudioIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-
-  const DownloadIcon = (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-
-  const ApiIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-
-  const PolishIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2l1.09 3.26L16 6l-2.91.74L12 10l-1.09-3.26L8 6l2.91-.74z" />
-      <path d="M18 12l.6 1.82L20.5 14.5l-1.9.68L18 17l-.6-1.82-1.9-.68 1.9-.66z" />
-      <path d="M7 16l.45 1.35L9 18l-1.55.5L7 20l-.45-1.35L5 18l1.55-.5z" />
-    </svg>
-  );
-
-  const MicIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-      <line x1="12" y1="19" x2="12" y2="23" />
-      <line x1="8" y1="23" x2="16" y2="23" />
-    </svg>
-  );
-
-  const BehaviorIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="4" y1="21" x2="4" y2="14" />
-      <line x1="4" y1="10" x2="4" y2="3" />
-      <line x1="12" y1="21" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12" y2="3" />
-      <line x1="20" y1="21" x2="20" y2="16" />
-      <line x1="20" y1="12" x2="20" y2="3" />
-      <line x1="1" y1="14" x2="7" y2="14" />
-      <line x1="9" y1="8" x2="15" y2="8" />
-      <line x1="17" y1="16" x2="23" y2="16" />
-    </svg>
-  );
-
-  const DiagnosticsIcon = (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-    </svg>
-  );
 
   // Sidebar nav items
   const navItems: Array<{ id: View; icon: React.ReactNode; label: string; group?: string }> = [
-    { id: "history", icon: HistoryIcon, label: m.history, group: "main" },
-    { id: "settingsApi", icon: ApiIcon, label: m.apiConfiguration, group: "config" },
-    { id: "settingsPolish", icon: PolishIcon, label: m.aiPolishSettings, group: "config" },
-    { id: "settingsRecording", icon: MicIcon, label: m.recordingSettings, group: "config" },
-    { id: "settingsBehavior", icon: BehaviorIcon, label: m.behaviorSettings, group: "config" },
-    { id: "settingsApp", icon: SettingsIcon, label: m.appSettings, group: "config" },
-    { id: "diagnostics", icon: DiagnosticsIcon, label: m.diagnostics, group: "footer" },
+    { id: "history", icon: <History size={16} />, label: m.history, group: "main" },
+    { id: "settingsApi", icon: <Shield size={16} />, label: m.apiConfiguration, group: "config" },
+    { id: "settingsPolish", icon: <Zap size={16} />, label: m.aiPolishSettings, group: "config" },
+    { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
+    { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
+    { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
+    { id: "diagnostics", icon: <BarChart3 size={16} />, label: m.diagnostics, group: "footer" },
   ];
 
   // Onboarding (standalone, no sidebar)
@@ -1463,7 +1375,12 @@ function App() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 ">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="p-6"
+          >
             <div className="flex flex-col items-center mb-6">
               <div className="flex items-center gap-2 mb-1">
                 <img src={logoUrl} alt="" width={28} height={28} />
@@ -1477,17 +1394,17 @@ function App() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>1</span>
                   <span className="text-sm font-medium">{m.onboardingStep1}</span>
-                  {apiKeyStatus === "ok" && <span style={{ color: "hsl(var(--success))" }}>&#10003;</span>}
-                  {apiKeyStatus === "warn" && <span style={{ color: "hsl(var(--warning))" }}>&#9888;</span>}
+                  {apiKeyStatus === "ok" && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
+                  {apiKeyStatus === "warn" && <AlertCircle size={14} style={{ color: "hsl(var(--warning))" }} />}
                 </div>
                 <div className="flex gap-2 flex-wrap mb-2">
                   {endpointPresets.map((preset) => (
                     <FilterChip key={preset.value} active={settings.api_base_url === preset.value} label={preset.label} onClick={() => updateSettings({ api_base_url: preset.value })} />
                   ))}
                 </div>
-                <input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-2" />
-                <input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-proj-..." className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
-                <input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" className="w-full px-3 py-2 rounded-lg text-sm outline-none mt-2" />
+                <Input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} className="mb-2" />
+                <Input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-proj-..." />
+                <Input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" className="mt-2" />
                 <datalist id="model-options">
                   {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                 </datalist>
@@ -1499,18 +1416,14 @@ function App() {
                 {showModelGuide && (
                   <ModelGuide currentModel={settings.model} onSelectModel={(modelName) => updateSettings({ model: modelName })} uiLanguage={uiLanguage} toggleText={m.apiBaseUrl} selectedText={m.connected} chooseText={m.save} />
                 )}
-                <button
+                <Button
+                  variant="brand"
+                  className="w-full mt-2"
                   onClick={() => testApiKey(settings.api_key, settings.api_base_url, settings.model)}
                   disabled={!settings.api_key || !settings.api_base_url || apiKeyStatus === "testing"}
-                  className="w-full mt-2 px-3 py-2 rounded-lg text-sm font-medium"
-                  style={{
-                    background: apiKeyStatus === "ok" ? "hsl(var(--success) / 0.15)" : apiKeyStatus === "warn" ? "hsl(var(--warning) / 0.15)" : "hsl(var(--brand))",
-                    color: apiKeyStatus === "ok" ? "hsl(var(--success))" : apiKeyStatus === "warn" ? "hsl(var(--warning))" : "white",
-                    opacity: !settings.api_key || !settings.api_base_url || apiKeyStatus === "testing" ? 0.5 : 1,
-                  }}
                 >
                   {apiKeyStatus === "testing" ? m.testing : apiKeyStatus === "ok" ? m.connected : apiKeyStatus === "warn" ? m.optionalValidationHint.split("。")[0] : m.testConnection}
-                </button>
+                </Button>
                 {(apiKeyStatus === "error" || apiKeyStatus === "warn") && apiKeyError && (
                   <p className="text-xs mt-1 whitespace-pre-wrap" style={{ color: apiKeyStatus === "warn" ? "hsl(var(--warning))" : "hsl(var(--destructive))" }}>{apiKeyError}</p>
                 )}
@@ -1520,12 +1433,12 @@ function App() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>2</span>
                   <span className="text-sm font-medium">{m.onboardingStep2}</span>
-                  {microphoneOk && <span style={{ color: "hsl(var(--success))" }}>&#10003;</span>}
+                  {microphoneOk && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
                 </div>
                 {microphoneOk ? (
                   <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--success))" }}>{m.enabled}</div>
                 ) : (
-                  <button onClick={handleEnableMicrophone} className="w-full px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>{m.allowMicrophone}</button>
+                  <Button variant="brand" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
                 )}
               </div>
 
@@ -1533,12 +1446,12 @@ function App() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>3</span>
                   <span className="text-sm font-medium">{m.onboardingStep3}</span>
-                  {accessibilityOk && <span style={{ color: "hsl(var(--success))" }}>&#10003;</span>}
+                  {accessibilityOk && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
                 </div>
                 {accessibilityOk ? (
                   <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--success))" }}>{m.enabled}</div>
                 ) : (
-                  <button onClick={handleEnableAccessibility} className="w-full px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>{m.allowAccessibility}</button>
+                  <Button variant="brand" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
                 )}
               </div>
 
@@ -1555,19 +1468,15 @@ function App() {
               <p className="text-xs mt-3" style={{ color: settingsFeedback.tone === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>{settingsFeedback.message}</p>
             )}
 
-            <button
+            <Button
+              variant="brand"
+              className="w-full mt-6 py-2.5"
               onClick={async () => { const ok = await persistSettings(); if (ok) setView("history"); }}
               disabled={!canProceed || savingSettings}
-              className="w-full mt-6 py-2.5 rounded-lg text-sm font-medium"
-              style={{
-                background: canProceed ? "hsl(var(--brand))" : "hsl(var(--muted))",
-                color: canProceed ? "white" : "hsl(var(--muted-foreground))",
-                cursor: canProceed ? "pointer" : "not-allowed",
-              }}
             >
               {savingSettings ? m.saving : (apiKeyStatus === "ok" || apiKeyStatus === "warn") ? m.getStarted : m.saveAndContinue}
-            </button>
-          </div>
+            </Button>
+          </motion.div>
         </div>
       </div>
     );
@@ -1585,16 +1494,20 @@ function App() {
         {navItems.map((item, idx) => {
           const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
           const showSeparator = item.group !== prevGroup && item.group === "footer";
+          const isActive = view === item.id;
           return (
             <React.Fragment key={item.id}>
               {showSeparator && <div className="mx-3 my-2 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />}
               <button
                 onClick={() => { flushAutoSave(); setView(item.id); }}
-                className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-colors"
+                className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 border-l-2 ${
+                  isActive
+                    ? "border-[hsl(var(--brand))] bg-[hsl(var(--sidebar-item-active-bg))]"
+                    : "border-transparent hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
+                }`}
                 style={{
-                  background: view === item.id ? "hsl(var(--sidebar-item-active-bg))" : "transparent",
-                  color: view === item.id ? "hsl(var(--sidebar-text-active))" : "hsl(var(--sidebar-text))",
-                  fontWeight: view === item.id ? 500 : 400,
+                  color: isActive ? "hsl(var(--sidebar-text-active))" : "hsl(var(--sidebar-text))",
+                  fontWeight: isActive ? 500 : 400,
                 }}
               >
                 {item.icon}
@@ -1612,7 +1525,7 @@ function App() {
           className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-xs transition-colors"
           style={{ color: "hsl(var(--sidebar-text))" }}
         >
-          {DownloadIcon}
+          <Download size={16} />
           {updateStatus === "checking" ? m.checkingUpdates : updateStatus === "available" ? m.updateAvailable : m.checkForUpdates}
         </button>
         <div className="px-3 flex items-center gap-2">
@@ -1620,10 +1533,7 @@ function App() {
             {appVersion ? `v${appVersion}` : ""}
           </span>
           {updateStatus === "available" && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" 
-                  style={{ background: "hsl(var(--success) / 0.15)", color: "hsl(var(--success))" }}>
-              {m.newVersionAvailable}
-            </span>
+            <Badge variant="success">{m.newVersionAvailable}</Badge>
           )}
         </div>
       </div>
@@ -1638,13 +1548,13 @@ function App() {
           {savingSettings ? m.saving : settingsFeedback?.message ?? ""}
         </p>
       </div>
-      <button
+      <Button
+        variant="brand"
+        size="sm"
         onClick={async () => { const ok = await persistSettings(); if (ok) setView("history"); }}
-        className="text-sm px-4 py-1.5 rounded-lg font-medium"
-        style={{ background: "hsl(var(--brand))", color: "white" }}
       >
         {savingSettings ? m.saving : m.done}
-      </button>
+      </Button>
     </div>
   );
 
@@ -1654,11 +1564,19 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="settingsApi"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             {settingsPageHeader(m.apiConfiguration)}
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></svg>}
+                icon={<Shield size={14} />}
                 title={m.apiConfiguration}
                 description={m.apiConfigurationDesc}
               >
@@ -1672,30 +1590,26 @@ function App() {
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.apiBaseUrl}</label>
-                  <input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                  <Input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} />
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.apiKey}</label>
-                  <input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-..." className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
-                  <button
+                  <Input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-..." />
+                  <Button
+                    variant="secondary"
+                    className="w-full mt-2"
                     onClick={() => testApiKey(settings.api_key, settings.api_base_url, settings.model)}
                     disabled={!settings.api_key || !settings.api_base_url || apiKeyStatus === "testing"}
-                    className="w-full mt-2 px-3 py-2 rounded-lg text-sm font-medium"
-                    style={{
-                      background: apiKeyStatus === "ok" ? "hsl(var(--success) / 0.15)" : apiKeyStatus === "warn" ? "hsl(var(--warning) / 0.15)" : "hsl(var(--secondary))",
-                      color: apiKeyStatus === "ok" ? "hsl(var(--success))" : apiKeyStatus === "warn" ? "hsl(var(--warning))" : "hsl(var(--foreground))",
-                      opacity: !settings.api_key || !settings.api_base_url || apiKeyStatus === "testing" ? 0.5 : 1,
-                    }}
                   >
                     {apiKeyStatus === "testing" ? m.testing : apiKeyStatus === "ok" ? m.connected : m.testConnection}
-                  </button>
+                  </Button>
                   {(apiKeyStatus === "error" || apiKeyStatus === "warn") && apiKeyError && (
                     <p className="text-xs mt-1 whitespace-pre-wrap" style={{ color: apiKeyStatus === "warn" ? "hsl(var(--warning))" : "hsl(var(--destructive))" }}>{apiKeyError}</p>
                   )}
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.model}</label>
-                  <input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                  <Input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
                   <datalist id="model-options">
                     {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                   </datalist>
@@ -1719,7 +1633,7 @@ function App() {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.timeout}</label>
-                    <input type="number" min={10} max={300} value={settings.request_timeout_sec} onChange={(event) => updateSettings({ request_timeout_sec: Math.max(10, Number(event.target.value) || 10) })} className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                    <Input type="number" min={10} max={300} value={settings.request_timeout_sec} onChange={(event) => updateSettings({ request_timeout_sec: Math.max(10, Number(event.target.value) || 10) })} />
                   </div>
                   <div>
                     <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.retryCount}</label>
@@ -1730,7 +1644,7 @@ function App() {
                 </div>
               </SettingsSection>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -1742,11 +1656,19 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="settingsPolish"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             {settingsPageHeader(m.aiPolishSettings)}
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" /></svg>}
+                icon={<Zap size={14} />}
                 title={m.aiPolishSettings}
                 description={m.aiPolishSettingsDesc}
               >
@@ -1760,15 +1682,15 @@ function App() {
                           <FilterChip key={`polish-${preset.apiUrl}-${preset.model}`} active={settings.ai_polish_api_url === preset.apiUrl && settings.ai_polish_model === preset.model} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.apiUrl, ai_polish_model: preset.model }); setPolishStatus("untested"); setPolishError(null); }} />
                         ))}
                       </div>
-                      <input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="https://api.openai.com/v1" className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                      <Input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="https://api.openai.com/v1" />
                     </div>
                     <div>
                       <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishApiKey}</label>
-                      <input type="password" value={settings.ai_polish_api_key} onChange={(event) => { updateSettings({ ai_polish_api_key: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="sk-..." className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                      <Input type="password" value={settings.ai_polish_api_key} onChange={(event) => { updateSettings({ ai_polish_api_key: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="sk-..." />
                     </div>
                     <div>
                       <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishModel}</label>
-                      <input list="polish-model-options" value={settings.ai_polish_model} onChange={(event) => updateSettings({ ai_polish_model: event.target.value })} placeholder="gpt-4o-mini" className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                      <Input list="polish-model-options" value={settings.ai_polish_model} onChange={(event) => updateSettings({ ai_polish_model: event.target.value })} placeholder="gpt-4o-mini" />
                       <datalist id="polish-model-options">
                         <option value="gpt-4o-mini" /><option value="gpt-4o" /><option value="deepseek-chat" /><option value="deepseek-reasoner" />
                       </datalist>
@@ -1787,18 +1709,14 @@ function App() {
                         {m.aiPolishPromptDesc}
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="secondary"
+                      className="w-full"
                       onClick={testPolishConnection}
                       disabled={!settings.ai_polish_api_url || !settings.ai_polish_api_key || polishStatus === "testing"}
-                      className="w-full px-3 py-2 rounded-lg text-sm font-medium"
-                      style={{
-                        background: polishStatus === "ok" ? "hsl(var(--success) / 0.15)" : "hsl(var(--secondary))",
-                        color: polishStatus === "ok" ? "hsl(var(--success))" : "hsl(var(--foreground))",
-                        opacity: !settings.ai_polish_api_url || !settings.ai_polish_api_key || polishStatus === "testing" ? 0.5 : 1,
-                      }}
                     >
                       {polishStatus === "testing" ? m.testing : polishStatus === "ok" ? m.connected : m.testPolishConnection}
-                    </button>
+                    </Button>
                     {polishStatus === "error" && polishError && (
                       <p className="text-xs whitespace-pre-wrap" style={{ color: "hsl(var(--destructive))" }}>{polishError}</p>
                     )}
@@ -1806,7 +1724,7 @@ function App() {
                 )}
               </SettingsSection>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -1818,21 +1736,29 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="settingsRecording"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             {settingsPageHeader(m.recordingSettings)}
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>}
+                icon={<Mic size={14} />}
                 title={m.recordingSettings}
                 description={m.recordingSettingsDesc}
               >
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.silenceTimeout}</label>
-                  <input type="number" min={0} max={3600} step={10} value={settings.silence_timeout_sec} onChange={(event) => updateSettings({ silence_timeout_sec: Math.max(0, Number(event.target.value) || 0) })} className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                  <Input type="number" min={0} max={3600} step={10} value={settings.silence_timeout_sec} onChange={(event) => updateSettings({ silence_timeout_sec: Math.max(0, Number(event.target.value) || 0) })} />
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.silenceThreshold}</label>
-                  <input type="number" min={0} max={1} step={0.005} value={settings.silence_threshold} onChange={(event) => updateSettings({ silence_threshold: Math.min(1, Math.max(0, Number(event.target.value) || 0)) })} className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                  <Input type="number" min={0} max={1} step={0.005} value={settings.silence_threshold} onChange={(event) => updateSettings({ silence_threshold: Math.min(1, Math.max(0, Number(event.target.value) || 0)) })} />
                 </div>
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.whisperPrompt}</label>
@@ -1844,19 +1770,18 @@ function App() {
                     {m.audioRetentionLimit}
                   </label>
                   <p className="text-[11px] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{m.audioRetentionLimitDesc}</p>
-                  <input
+                  <Input
                     type="number"
                     min={10}
                     max={1000}
                     step={10}
                     value={settings.audio_retention_limit}
                     onChange={(event) => updateSettings({ audio_retention_limit: Math.max(10, Number(event.target.value) || 10) })}
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                   />
                 </div>
               </SettingsSection>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -1868,24 +1793,32 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="settingsBehavior"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             {settingsPageHeader(m.behaviorSettings)}
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>}
+                icon={<Activity size={14} />}
                 title={m.behaviorSettings}
                 description={m.behaviorSettingsDesc}
               >
                 <ToggleRow label={m.autoPaste} description={m.autoPasteDesc} value={settings.auto_paste_enabled} onChange={(value) => updateSettings({ auto_paste_enabled: value })} />
                 <div>
                   <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.pasteDelay}</label>
-                  <input type="number" min={50} max={2000} step={50} value={settings.paste_delay_ms} onChange={(event) => updateSettings({ paste_delay_ms: Math.max(50, Number(event.target.value) || 50) })} className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
+                  <Input type="number" min={50} max={2000} step={50} value={settings.paste_delay_ms} onChange={(event) => updateSettings({ paste_delay_ms: Math.max(50, Number(event.target.value) || 50) })} />
                 </div>
                 <ToggleRow label={m.saveAudioFiles} description={m.saveAudioFilesDesc} value={settings.save_audio_files} onChange={(value) => updateSettings({ save_audio_files: value })} />
                 <ToggleRow label={m.soundEffects} description={m.soundEffectsDesc} value={settings.sound_enabled} onChange={(value) => updateSettings({ sound_enabled: value })} />
               </SettingsSection>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -1906,11 +1839,19 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="settingsApp"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             {settingsPageHeader(m.appSettings)}
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2" /><path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M7 16h10" /></svg>}
+                icon={<Keyboard size={14} />}
                 title={m.shortcutsPermissions}
                 description={m.shortcutsPermissionsDesc}
               >
@@ -1936,7 +1877,7 @@ function App() {
                     {microphoneOk ? (
                       <StatusIcon ok={true} label={m.enabled} />
                     ) : (
-                      <button onClick={handleEnableMicrophone} className="w-full px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>{m.allowMicrophone}</button>
+                      <Button variant="brand" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
                     )}
                   </div>
                   <div>
@@ -1944,14 +1885,14 @@ function App() {
                     {accessibilityOk ? (
                       <StatusIcon ok={true} label={m.enabled} />
                     ) : (
-                      <button onClick={handleEnableAccessibility} className="w-full px-3 py-2 rounded-lg text-sm font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>{m.allowAccessibility}</button>
+                      <Button variant="brand" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
                     )}
                   </div>
                 </div>
               </SettingsSection>
 
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>}
+                icon={<Settings size={14} />}
                 title={m.appSettings}
                 description={m.appSettingsDesc}
               >
@@ -1961,21 +1902,19 @@ function App() {
                     <div className="text-sm font-medium" style={{ color: "hsl(var(--foreground))" }}>{m.checkForUpdates}</div>
                     <div className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{appVersion ? `v${appVersion}` : ""}</div>
                   </div>
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={checkForUpdates}
                     disabled={updateStatus === "checking"}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                    style={{
-                      background: updateStatus === "checking" ? "hsl(var(--muted))" : "hsl(var(--secondary))",
-                      color: updateStatus === "checking" ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))",
-                      opacity: updateStatus === "checking" ? 0.6 : 1,
-                    }}
                   >
                     {updateStatus === "checking" ? m.checkingUpdates : m.checkForUpdates}
-                  </button>
+                  </Button>
                 </div>
                 {updateStatus === "latest" && (
-                  <div className="flex items-center gap-1.5 text-xs" style={{ color: "hsl(var(--success))" }}>✓ {m.upToDate}</div>
+                  <div className="flex items-center gap-1.5 text-xs" style={{ color: "hsl(var(--success))" }}>
+                    <Check size={14} /> {m.upToDate}
+                  </div>
                 )}
                 {updateStatus === "error" && (
                   <div className="text-xs" style={{ color: "hsl(var(--destructive))" }}>{m.updateError}</div>
@@ -1983,7 +1922,7 @@ function App() {
                 {updateStatus === "available" && updateInfo && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 rounded-md font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>{m.updateAvailable}</span>
+                      <Badge variant="brand">{m.updateAvailable}</Badge>
                       <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>v{updateInfo.latestVersion}</span>
                     </div>
                     {updateInfo.publishedAt && (
@@ -1996,18 +1935,24 @@ function App() {
                       </details>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      <button onClick={() => downloadAndInstall()} disabled={downloading} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: downloading ? "hsl(var(--muted))" : "hsl(var(--brand))", color: downloading ? "hsl(var(--muted-foreground))" : "white", opacity: downloading ? 0.7 : 1 }}>
+                      <Button
+                        variant="brand"
+                        size="sm"
+                        onClick={() => downloadAndInstall()}
+                        disabled={downloading}
+                      >
                         {downloading ? (downloadMsg || m.checkingUpdates) : `${m.downloadUpdate} v${updateInfo.latestVersion}`}
-                      </button>
+                      </Button>
                       {downloadMsg && !downloading && (
                         <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
                           {downloadMsg}
                         </div>
                       )}
                       {updateInfo.releaseUrl && (
-                        <button onClick={() => window.open(updateInfo.releaseUrl)} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))", border: "1px solid hsl(var(--border))" }}>
+                        <Button variant="secondary" size="sm" onClick={() => window.open(updateInfo.releaseUrl)}>
+                          <ExternalLink size={12} className="mr-1" />
                           {m.viewOnGitHub}
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </div>
@@ -2015,12 +1960,14 @@ function App() {
               </SettingsSection>
 
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>}
+                icon={<Download size={14} />}
                 title={m.exportImportSettings}
                 description={m.exportImportSettingsDesc}
               >
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    variant="secondary"
+                    className="flex-1"
                     onClick={async () => {
                       try {
                         const json = await invoke<string>("export_settings_json");
@@ -2031,12 +1978,12 @@ function App() {
                         setSettingsFeedback({ tone: "error", message: String(error) });
                       }
                     }}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium"
-                    style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))", border: "1px solid hsl(var(--border))" }}
                   >
                     {m.exportSettings}
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="brand"
+                    className="flex-1"
                     onClick={async () => {
                       try {
                         const text = await navigator.clipboard.readText();
@@ -2052,11 +1999,9 @@ function App() {
                         setSettingsFeedback({ tone: "error", message: String(error) });
                       }
                     }}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm font-medium"
-                    style={{ background: "hsl(var(--brand))", color: "white" }}
                   >
                     {m.importSettings}
-                  </button>
+                  </Button>
                 </div>
               </SettingsSection>
 
@@ -2064,7 +2009,7 @@ function App() {
                 <p className="text-xs" style={{ color: settingsFeedback.tone === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>{settingsFeedback.message}</p>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -2083,14 +2028,22 @@ function App() {
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
         {Sidebar}
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
+          <motion.div
+            key="diagnostics"
+            variants={viewVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="p-6"
+          >
             <div className="mb-6">
               <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{m.diagnostics}</h1>
             </div>
 
             <div className="space-y-6">
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>}
+                icon={<BarChart3 size={14} />}
                 title={m.connectionStatus}
                 description=""
               >
@@ -2116,7 +2069,7 @@ function App() {
               </SettingsSection>
 
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v2a7 7 0 0 1-14 0v-2" /></svg>}
+                icon={<Mic size={14} />}
                 title={m.permissionsStatus}
                 description=""
               >
@@ -2143,7 +2096,7 @@ function App() {
               </SettingsSection>
 
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>}
+                icon={<Clock size={14} />}
                 title={m.lastTranscription}
                 description=""
               >
@@ -2170,7 +2123,7 @@ function App() {
               </SettingsSection>
 
               <SettingsSection
-                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="21" x2="9" y2="9" /></svg>}
+                icon={<Settings size={14} />}
                 title={m.appSettings}
                 description=""
               >
@@ -2194,18 +2147,18 @@ function App() {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--foreground))" }}>{m.runLogs}</h2>
                   <div className="flex gap-2">
-                    <button onClick={copyAllLogs} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>{m.copyAll}</button>
-                    <button onClick={clearLogs} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>{m.clearLogs}</button>
-                    <button onClick={() => setLogsAutoScroll(!logsAutoScroll)} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: logsAutoScroll ? "hsl(var(--brand))" : "hsl(var(--secondary))", color: logsAutoScroll ? "white" : "hsl(var(--muted-foreground))" }}>
+                    <Button variant="secondary" size="sm" onClick={copyAllLogs}>{m.copyAll}</Button>
+                    <Button variant="secondary" size="sm" onClick={clearLogs}>{m.clearLogs}</Button>
+                    <Button variant={logsAutoScroll ? "brand" : "secondary"} size="sm" onClick={() => setLogsAutoScroll(!logsAutoScroll)}>
                       {logsAutoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
-                    </button>
+                    </Button>
                   </div>
                 </div>
-                <div 
+                <div
                   ref={logContainerRef}
                   className="rounded-lg border overflow-y-auto font-mono text-xs leading-relaxed"
-                  style={{ 
-                    background: "hsl(var(--card))", 
+                  style={{
+                    background: "hsl(var(--card))",
                     borderColor: "hsl(var(--border))",
                     height: "320px",
                     userSelect: "text",
@@ -2219,16 +2172,17 @@ function App() {
                       {logs.map((entry, idx) => (
                         <div key={idx} className="flex gap-2 px-2 py-0.5 rounded hover:bg-black/5 group">
                           <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.timestamp}</span>
-                          <span className="shrink-0 font-semibold" style={{ 
+                          <span className="shrink-0 font-semibold" style={{
                             color: entry.level === "ERROR" ? "hsl(var(--destructive))" : entry.level === "WARN" ? "hsl(var(--warning))" : "hsl(var(--brand))"
                           }}>[{entry.level}]</span>
                           <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.target}:</span>
                           <span className="flex-1 break-all" style={{ color: "hsl(var(--foreground))", userSelect: "text", WebkitUserSelect: "text" }}>{entry.message}</span>
-                          <button 
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 opacity-0 group-hover:opacity-100 h-5 px-1 text-[10px]"
                             onClick={async () => { await writeText(`[${entry.timestamp}] [${entry.level}] ${entry.target}: ${entry.message}`); }}
-                            className="shrink-0 opacity-0 group-hover:opacity-100 text-[10px] px-1 rounded"
-                            style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}
-                          >copy</button>
+                          >copy</Button>
                         </div>
                       ))}
                     </div>
@@ -2236,7 +2190,7 @@ function App() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -2257,45 +2211,49 @@ function App() {
           </div>
           <div className="flex items-center gap-2">
             {selectedIds.size > 0 && (
-              <button onClick={deleteSelected} className="text-sm px-3 py-1.5 rounded-lg font-medium" style={{ color: "hsl(var(--destructive))", background: "hsl(var(--destructive) / 0.1)" }}>
+              <Button variant="danger" size="sm" onClick={deleteSelected}>
                 {m.deleteSelected} ({selectedIds.size})
-              </button>
+              </Button>
             )}
-            <button onClick={clearHistory} className="text-sm px-3 py-1.5 rounded-lg" style={{ color: confirmingClear ? "hsl(var(--destructive))" : "hsl(var(--muted-foreground))", background: confirmingClear ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--secondary))" }}>
+            <Button
+              variant={confirmingClear ? "danger" : "secondary"}
+              size="sm"
+              onClick={clearHistory}
+            >
               {confirmingClear ? m.clearConfirm : m.clear}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={async () => {
                 try { const csv = await invoke<string>("export_history"); await writeText(csv); }
                 catch (error) { console.error("Export failed:", error); }
               }}
-              className="text-sm px-3 py-1.5 rounded-lg"
-              style={{ color: "hsl(var(--muted-foreground))", background: "hsl(var(--secondary))" }}
             >
               {m.exportHistory}
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Stat cards */}
         <div className="px-6 pb-3 grid grid-cols-4 gap-3">
           <StatCard
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>}
+            icon={<FileAudio size={18} className="text-[hsl(var(--brand))]" />}
             label={m.statsTotal}
             value={String(stats.total)}
           />
           <StatCard
-            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
+            icon={<Clock size={18} className="text-[hsl(var(--brand))]" />}
             label={m.statsToday}
             value={String(todayCount)}
           />
           <StatCard
-            icon={SuccessIcon}
+            icon={<Check size={18} className="text-[hsl(var(--brand))]" />}
             label={m.statsSuccess}
             value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : "—"}
           />
           <StatCard
-            icon={AudioIcon}
+            icon={<Volume2 size={18} className="text-[hsl(var(--brand))]" />}
             label={m.audioSaved}
             value={String(stats.audioSaved)}
           />
@@ -2326,14 +2284,14 @@ function App() {
           )}
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(var(--muted-foreground))" }}>
-              {SearchIcon}
+              <Search size={14} />
             </span>
-            <input
+            <Input
               type="text"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder={m.searchPlaceholder}
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
+              className="pl-9"
             />
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -2346,33 +2304,39 @@ function App() {
         {/* History list */}
         <div className="flex-1 overflow-y-auto px-6 pb-4">
           {filteredHistory.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="mb-3" style={{ color: "hsl(var(--muted-foreground))" }}>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto">
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
-                </svg>
+            history.length === 0 ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center justify-center py-16 text-center"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--secondary))] flex items-center justify-center mb-4">
+                  <Mic size={28} className="text-[hsl(var(--muted-foreground))]" />
+                </div>
+                <h3 className="text-lg font-semibold mb-2">{m.noHistory}</h3>
+                <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-xs">
+                  {formatTemplate(m.startHint, { shortcut: translateShortcut(settings.shortcut || "") })}
+                </p>
+              </motion.div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>{m.noResults}</p>
               </div>
-              <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
-                {history.length === 0 ? m.noHistory : m.noResults}
-              </p>
-              <p className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>{startHint}</p>
-              <p className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.stopHint}</p>
-            </div>
+            )
           ) : (
-            <div className="space-y-2">
+            <motion.div
+              key="history-list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-2"
+            >
               {filteredHistory.map((entry) => {
                 const failed = entry.status === "failed";
                 const canRetry = Boolean(entry.audio_path);
                 return (
-                  <div
-                    key={entry.id}
-                    className="rounded-xl p-3"
-                    style={{
-                      background: "hsl(var(--card))",
-                      border: failed ? "1px solid hsl(var(--destructive) / 0.3)" : "1px solid hsl(var(--border))",
-                    }}
-                  >
+                  <Card key={entry.id} className="p-4 hover:shadow-md transition-shadow duration-200" style={{
+                    borderColor: failed ? "hsl(var(--destructive) / 0.3)" : undefined,
+                  }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2">
                         <input
@@ -2388,11 +2352,11 @@ function App() {
                           className="mt-0.5 shrink-0"
                         />
                         <div className="flex gap-2 flex-wrap">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: failed ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: failed ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
+                          <Badge variant={failed ? "danger" : "success"}>
                             {failed ? m.statusFailed : m.statusSuccess}
-                          </span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))" }}>{entry.provider}</span>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))" }}>{displaySpeechLanguage(entry.language, uiLanguage)}</span>
+                          </Badge>
+                          <Badge>{entry.provider}</Badge>
+                          <Badge>{displaySpeechLanguage(entry.language, uiLanguage)}</Badge>
                         </div>
                       </div>
                       <div className="text-xs shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{formatTime(entry.timestamp, uiLanguage)}</div>
@@ -2402,13 +2366,14 @@ function App() {
                       {failed ? (
                         <div>
                           <div className="text-sm" style={{ color: "hsl(var(--destructive))" }}>{entry.error_message ?? entry.text}</div>
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="mt-1 h-6 text-[11px]"
                             onClick={async () => { await writeText(entry.error_message ?? entry.text); setCopied(entry.id); window.setTimeout(() => setCopied(null), 1500); }}
-                            className="text-[11px] px-2 py-0.5 rounded mt-1 inline-flex items-center gap-1"
-                            style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}
                           >
                             {copied === entry.id ? m.copied : m.copyError}
-                          </button>
+                          </Button>
                         </div>
                       ) : (
                         <div className="text-sm cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ userSelect: "text", color: "hsl(var(--foreground))" }}>
@@ -2421,73 +2386,62 @@ function App() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.model}</span>
                         {entry.duration_ms ? (
-                          <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))" }}>{formatDuration(entry.duration_ms)}</span>
+                          <Badge>{formatDuration(entry.duration_ms)}</Badge>
                         ) : null}
                         {entry.estimated_cost && entry.estimated_cost > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded font-medium" style={{ background: "hsl(var(--warning) / 0.15)", color: "hsl(var(--warning))" }}>
+                          <Badge variant="warning">
                             ¥{entry.estimated_cost.toFixed(4)}
-                          </span>
+                          </Badge>
                         )}
                         {entry.polish_tokens && entry.polish_tokens > 0 && (
-                          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>
+                          <Badge variant="secondary">
                             {entry.polish_tokens} tokens
-                          </span>
+                          </Badge>
                         )}
                         <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{canRetry ? m.audioSavedLabel : m.noAudio}</span>
                       </div>
                       <div className="flex gap-0.5">
                         {!failed && (
                           <IconButton title={m.copy} onClick={() => copyText(entry.text, entry.id)} accent={copied === entry.id}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="9" y="9" width="13" height="13" rx="2" />
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                            </svg>
+                            <Copy size={14} />
                           </IconButton>
                         )}
                         {canRetry && (
                           <IconButton title={m.retry} onClick={() => retryEntry(entry.id)}>
                             {retrying === entry.id ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: "spin 1s linear infinite" }}>
-                                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                              </svg>
+                              <Loader2 size={14} className="animate-spin" />
                             ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="23 4 23 10 17 10" />
-                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                              </svg>
+                              <RefreshCw size={14} />
                             )}
                           </IconButton>
                         )}
                         {entry.audio_path && (
                           <IconButton title={playingAudioId === entry.id ? m.pauseAudio : m.playAudio} onClick={() => playAudio(entry.audio_path!, entry.id)}>
                             {playingAudioId === entry.id ? (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                              <Pause size={14} />
                             ) : (
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                              <Play size={14} />
                             )}
                           </IconButton>
                         )}
                         <IconButton title={m.delete} onClick={() => deleteEntry(entry.id)}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
+                          <Trash2 size={14} />
                         </IconButton>
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 );
               })}
               {hasMore && !searchQuery && statusFilter === "all" && (
-                <button
+                <Button
+                  variant="secondary"
+                  className="w-full py-2 rounded-xl"
                   onClick={() => loadHistory(false)}
-                  className="w-full py-2 text-sm rounded-xl"
-                  style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--muted-foreground))" }}
                 >
                   {m.loadMore}
-                </button>
+                </Button>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
