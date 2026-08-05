@@ -82,6 +82,7 @@ pub fn run() {
             commands::clear_logs,
             commands::read_audio_file,
             commands::get_default_polish_prompt,
+            commands::download_and_install_update,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

@@ -518,3 +518,109 @@ pub fn read_audio_file(path: String) -> Result<String, String> {
 pub fn get_default_polish_prompt() -> String {
     crate::polish::DEFAULT_SYSTEM_PROMPT.to_string()
 }
+
+#[tauri::command]
+pub async fn download_and_install_update(
+    app: AppHandle,
+    url: String,
+    filename: String,
+) -> Result<String, String> {
+    use std::io::Write;
+
+    let client = app
+        .try_state::<reqwest::Client>()
+        .map(|s| (*s).clone())
+        .unwrap_or_else(|| reqwest::Client::new());
+
+    log::info!("Downloading update from: {}", url);
+
+    let resp = client
+        .get(&url)
+        .timeout(std::time::Duration::from_secs(300))
+        .send()
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("Download failed with HTTP {}", resp.status()));
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read download: {}", e))?;
+
+    let temp_dir = std::env::temp_dir().join("whisp_update");
+    std::fs::create_dir_all(&temp_dir)
+        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+
+    let file_path = temp_dir.join(&filename);
+    let mut file = std::fs::File::create(&file_path)
+        .map_err(|e| format!("Failed to create file: {}", e))?;
+    file.write_all(&bytes)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    log::info!("Update downloaded to: {}", file_path.display());
+
+    #[cfg(target_os = "macos")]
+    {
+        if filename.ends_with(".dmg") {
+            let output = std::process::Command::new("hdiutil")
+                .args(["attach", "-nobrowse", &file_path.to_string_lossy()])
+                .output()
+                .map_err(|e| format!("Failed to mount DMG: {}", e))?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to mount DMG: {}", stderr));
+            }
+
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            // Find the .app in the mounted volume
+            let mount_output = std::process::Command::new("hdiutil")
+                .args(["info", "-plist"])
+                .output()
+                .map_err(|e| format!("Failed to get mount info: {}", e))?;
+
+            // Try to open the volume
+            let volume_name = filename.strip_suffix(".dmg").unwrap_or(&filename);
+            let volume_path = format!("/Volumes/{}", volume_name);
+            let _ = std::process::Command::new("open")
+                .arg(&volume_path)
+                .spawn();
+
+            return Ok(format!(
+                "Update downloaded and mounted. Please drag Whisp to Applications to complete the update."
+            ));
+        }
+
+        let _ = std::process::Command::new("open")
+            .arg(&file_path)
+            .spawn();
+        return Ok("Update downloaded and opened.".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("cmd")
+            .args([
+                "/C",
+                "start",
+                "",
+                &file_path.to_string_lossy().to_string(),
+            ])
+            .spawn();
+        return Ok(
+            "Update installer launched. Please follow the installation prompts.".to_string()
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        return Ok(format!(
+            "Update downloaded to: {}",
+            file_path.display()
+        ));
+    }
+}

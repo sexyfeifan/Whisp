@@ -157,35 +157,46 @@ pub async fn validate_polish_key(
         .await
         .context("Network error")?;
 
-    if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+    let status = resp.status();
+    if status == reqwest::StatusCode::UNAUTHORIZED {
         anyhow::bail!("Invalid API key");
     }
-    if resp.status() == reqwest::StatusCode::FORBIDDEN {
+    if status == reqwest::StatusCode::FORBIDDEN {
         anyhow::bail!("The server rejected this API key");
     }
-    if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
-        || resp.status().is_server_error()
-    {
-        let status = resp.status();
-        let body_text = resp.text().await.unwrap_or_default();
-        let shortened = if body_text.len() > 500 {
-            format!("{}…", &body_text[..body_text.floor_char_boundary(500)])
-        } else {
-            body_text
-        };
+
+    let body_text = if status.is_success() {
+        String::new()
+    } else {
+        resp.text().await.unwrap_or_default()
+    };
+    let shortened = if body_text.len() > 500 {
+        format!("{}…", &body_text[..body_text.floor_char_boundary(500)])
+    } else {
+        body_text
+    };
+
+    if status == reqwest::StatusCode::NOT_FOUND {
+        anyhow::bail!("Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}", shortened);
+    }
+    if matches!(
+        status,
+        reqwest::StatusCode::BAD_REQUEST | reqwest::StatusCode::UNPROCESSABLE_ENTITY
+    ) {
+        anyhow::bail!(
+            "Connection successful but request was rejected (HTTP {}). Your configuration is likely correct — save and try a real recording.\nDetails: {}",
+            status.as_u16(),
+            shortened
+        );
+    }
+    if status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error() {
         anyhow::bail!(
             "The upstream service is temporarily overloaded (HTTP {}). Your configuration is likely correct.\nDetails: {}",
             status.as_u16(),
             shortened
         );
     }
-    if !resp.status().is_success() {
-        let body_text = resp.text().await.unwrap_or_default();
-        let shortened = if body_text.len() > 500 {
-            format!("{}…", &body_text[..body_text.floor_char_boundary(500)])
-        } else {
-            body_text
-        };
+    if !status.is_success() {
         anyhow::bail!("{}", shortened);
     }
 

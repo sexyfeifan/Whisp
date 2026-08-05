@@ -138,7 +138,7 @@ const messages = {
     updateAvailable: "发现新版本",
     upToDate: "已是最新版本",
     updateError: "检查更新失败",
-    downloadUpdate: "前往下载",
+    downloadUpdate: "下载并安装",
     viewOnGitHub: "在 GitHub 查看",
     releaseNotes: "更新日志",
     publishedAt: "发布时间",
@@ -936,6 +936,8 @@ function App() {
   const autoSaveTimerRef = useRef<number>(0);
   const historyOffsetRef = useRef(0);
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "latest" | "error">("idle");
+  const [downloading, setDownloading] = useState(false);
+  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
   const [updateInfo, setUpdateInfo] = useState<{
     latestVersion: string; releaseUrl: string; releaseNotes: string;
     publishedAt: string; assets: { name: string; url: string; size: number }[];
@@ -967,6 +969,19 @@ function App() {
         });
       } else { setUpdateStatus("latest"); setTimeout(() => setUpdateStatus("idle"), 3000); }
     } catch { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); }
+  }
+
+  async function downloadAndInstall(url: string, filename: string) {
+    setDownloading(true);
+    setDownloadMsg(null);
+    try {
+      const msg = await invoke<string>("download_and_install_update", { url, filename });
+      setDownloadMsg(msg);
+    } catch (error) {
+      setDownloadMsg(`Download failed: ${error}`);
+    } finally {
+      setDownloading(false);
+    }
   }
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
@@ -1906,11 +1921,16 @@ function App() {
                       </details>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      {updateInfo.assets.filter(a => a.name.endsWith(".dmg") || a.name.endsWith(".app.tar.gz")).map(asset => (
-                        <button key={asset.name} onClick={() => window.open(asset.url)} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: "hsl(var(--brand))", color: "white" }}>
-                          {m.downloadUpdate} ({asset.name.includes("aarch64") || asset.name.includes("arm64") ? "Apple Silicon" : asset.name.includes("x64") ? "Intel" : asset.name.split(".").pop()})
+                      {updateInfo.assets.filter(a => a.name.endsWith(".dmg") || a.name.endsWith(".exe") || a.name.endsWith(".msi") || a.name.endsWith(".AppImage") || a.name.endsWith(".deb") || a.name.endsWith(".rpm")).map(asset => (
+                        <button key={asset.name} onClick={() => downloadAndInstall(asset.url, asset.name)} disabled={downloading} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: downloading ? "hsl(var(--muted))" : "hsl(var(--brand))", color: downloading ? "hsl(var(--muted-foreground))" : "white", opacity: downloading ? 0.7 : 1 }}>
+                          {downloading ? m.checkingUpdates : `${m.downloadUpdate} (${asset.name.includes("aarch64") || asset.name.includes("arm64") ? "Apple Silicon" : asset.name.includes("x64") ? "Intel" : asset.name.split(".").pop()})`}
                         </button>
                       ))}
+                      {downloadMsg && (
+                        <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
+                          {downloadMsg}
+                        </div>
+                      )}
                       {updateInfo.releaseUrl && (
                         <button onClick={() => window.open(updateInfo.releaseUrl)} className="px-3 py-1.5 rounded-lg text-xs" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))", border: "1px solid hsl(var(--border))" }}>
                           {m.viewOnGitHub}
