@@ -27,6 +27,9 @@ static MIGRATIONS: &[M] = &[
     M::up("ALTER TABLE transcriptions ADD COLUMN retry_of INTEGER;"),
     M::up("CREATE INDEX IF NOT EXISTS idx_transcriptions_timestamp ON transcriptions(timestamp DESC);"),
     M::up("CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);"),
+    M::up("ALTER TABLE transcriptions ADD COLUMN asr_duration_sec REAL;"),
+    M::up("ALTER TABLE transcriptions ADD COLUMN polish_tokens INTEGER;"),
+    M::up("ALTER TABLE transcriptions ADD COLUMN estimated_cost REAL;"),
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -43,6 +46,9 @@ pub struct HistoryEntry {
     pub api_base_url: String,
     pub language: String,
     pub retry_of: Option<i64>,
+    pub asr_duration_sec: Option<f64>,
+    pub polish_tokens: Option<i64>,
+    pub estimated_cost: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +63,9 @@ pub struct NewHistoryEntry {
     pub api_base_url: String,
     pub language: String,
     pub retry_of: Option<i64>,
+    pub asr_duration_sec: Option<f64>,
+    pub polish_tokens: Option<i64>,
+    pub estimated_cost: Option<f64>,
 }
 
 pub struct HistoryManager {
@@ -102,8 +111,11 @@ impl HistoryManager {
                 provider,
                 api_base_url,
                 language,
-                retry_of
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
             rusqlite::params![
                 entry.text,
                 entry.model,
@@ -116,6 +128,9 @@ impl HistoryManager {
                 entry.api_base_url,
                 entry.language,
                 entry.retry_of,
+                entry.asr_duration_sec,
+                entry.polish_tokens,
+                entry.estimated_cost,
             ],
         )?;
         let id = conn.last_insert_rowid();
@@ -132,6 +147,9 @@ impl HistoryManager {
             api_base_url: entry.api_base_url.clone(),
             language: entry.language.clone(),
             retry_of: entry.retry_of,
+            asr_duration_sec: entry.asr_duration_sec,
+            polish_tokens: entry.polish_tokens,
+            estimated_cost: entry.estimated_cost,
         })
     }
 
@@ -150,7 +168,10 @@ impl HistoryManager {
                 provider,
                 api_base_url,
                 language,
-                retry_of
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
              FROM transcriptions
              WHERE id = ?1",
         )?;
@@ -197,6 +218,25 @@ impl HistoryManager {
         Ok(())
     }
 
+    pub fn update_usage(
+        &self,
+        id: i64,
+        asr_duration_sec: Option<f64>,
+        polish_tokens: Option<i64>,
+        estimated_cost: Option<f64>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE transcriptions
+             SET asr_duration_sec = ?1,
+                 polish_tokens = ?2,
+                 estimated_cost = ?3
+             WHERE id = ?4",
+            rusqlite::params![asr_duration_sec, polish_tokens, estimated_cost, id],
+        )?;
+        Ok(())
+    }
+
     pub fn get_entries(&self) -> Result<Vec<HistoryEntry>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -212,7 +252,10 @@ impl HistoryManager {
                 provider,
                 api_base_url,
                 language,
-                retry_of
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
              FROM transcriptions
              ORDER BY timestamp DESC",
         )?;
@@ -237,7 +280,10 @@ impl HistoryManager {
                 provider,
                 api_base_url,
                 language,
-                retry_of
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
              FROM transcriptions
              ORDER BY timestamp DESC
              LIMIT ?1 OFFSET ?2",
@@ -354,5 +400,8 @@ fn row_to_history_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntr
         api_base_url: row.get(9)?,
         language: row.get(10)?,
         retry_of: row.get(11)?,
+        asr_duration_sec: row.get(12)?,
+        polish_tokens: row.get(13)?,
+        estimated_cost: row.get(14)?,
     })
 }

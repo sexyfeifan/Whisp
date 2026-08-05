@@ -1,7 +1,14 @@
 use anyhow::{Context, Result};
+use serde::Serialize;
 use std::time::Duration;
 
-const DEFAULT_SYSTEM_PROMPT: &str = "You are a text editor. Clean up the following speech-to-text output: fix any transcription errors, remove filler words (um, uh, like), convert casual speech to clean written form, keep the original meaning. Output ONLY the cleaned text, nothing else.";
+pub const DEFAULT_SYSTEM_PROMPT: &str = "你是一位专业的文本编辑助手。请对以下语音转写文本进行润色：\n1. 修正转写错误和错别字\n2. 去除口头禅和语气词（嗯、啊、那个、就是说等）\n3. 将口语化表达转换为规范的书面语\n4. 保持原文的核心意思不变\n5. 如果原文有明显的断句或分段，请适当整理\n\n请直接输出润色后的文本，不要添加任何解释或标注。";
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PolishResult {
+    pub text: String,
+    pub tokens_used: i64,
+}
 
 fn polish_endpoint(api_base_url: &str) -> Result<reqwest::Url> {
     let raw = api_base_url.trim();
@@ -9,12 +16,18 @@ fn polish_endpoint(api_base_url: &str) -> Result<reqwest::Url> {
         anyhow::bail!("API base URL is empty");
     }
 
-    let endpoint = if raw.ends_with("/chat/completions") {
-        raw.to_string()
+    if raw.ends_with("/chat/completions") {
+        return reqwest::Url::parse(raw).context("Invalid API base URL");
+    }
+
+    let base = raw.trim_end_matches('/');
+    let with_version = if base.contains("/v1") {
+        base.to_string()
     } else {
-        format!("{}/chat/completions", raw.trim_end_matches('/'))
+        format!("{}/v1", base)
     };
 
+    let endpoint = format!("{}/chat/completions", with_version.trim_end_matches('/'));
     reqwest::Url::parse(&endpoint).context("Invalid API base URL")
 }
 
@@ -26,7 +39,7 @@ pub async fn polish_text(
     raw_text: &str,
     custom_prompt: &str,
     timeout_secs: u64,
-) -> Result<String> {
+) -> Result<PolishResult> {
     let endpoint = polish_endpoint(api_base_url)?;
 
     let system_prompt = if custom_prompt.trim().is_empty() {
@@ -93,7 +106,16 @@ pub async fn polish_text(
         .and_then(serde_json::Value::as_str)
         .map(str::trim)
         .filter(|s| !s.is_empty())
-        .map(ToOwned::to_owned)
+        .map(|s| {
+            let tokens_used = json
+                .pointer("/usage/total_tokens")
+                .and_then(serde_json::Value::as_i64)
+                .unwrap_or(0);
+            PolishResult {
+                text: s.to_owned(),
+                tokens_used,
+            }
+        })
         .ok_or_else(|| anyhow::anyhow!("Missing content in polish API response"))
 }
 

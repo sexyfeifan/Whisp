@@ -81,6 +81,7 @@ pub fn run() {
             commands::get_logs,
             commands::clear_logs,
             commands::read_audio_file,
+            commands::get_default_polish_prompt,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -531,7 +532,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         close_overlay(app_handle);
         return;
     }
-    log::info!("Recording started");
+    log::info!("Recording started, model={}", saved.model);
 
     // Register Escape only while recording
     register_escape(app_handle);
@@ -676,6 +677,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let audio_retention_limit = settings.audio_retention_limit;
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
+    log::info!("Transcription requested, model={}, api_url={}, language={}", model, api_base_url, language);
     log::info!("Calling API with model={} via {}...", model, api_base_url);
 
     tauri::async_runtime::spawn(async move {
@@ -704,9 +706,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         .await
         {
             Ok(text) => {
-                log::info!("Transcription: {}", text);
+                log::info!("Transcription succeeded, text_length={}", text.len());
 
-                let text = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
+                let (text, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
                     log::info!("Polishing text with AI...");
                     match polish::polish_text(
                         &http_client,
@@ -719,19 +721,28 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     )
                     .await
                     {
-                        Ok(polished) => {
-                            log::info!("Polished: {}", polished);
-                            polished
+                        Ok(result) => {
+                            log::info!("AI polish succeeded, text_length={}", result.text.len());
+                            (result.text, result.tokens_used)
                         }
                         Err(e) => {
-                            log::warn!("Polish failed, using original text: {}", e);
+                            log::info!("AI polish failed: {}", e);
                             let _ = handle.emit("polish-error", e.to_string());
-                            text
+                            (text, 0i64)
                         }
                     }
                 } else {
-                    text
+                    (text, 0i64)
                 };
+
+                let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
+                let asr_cost = estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
+                let polish_cost = if polish_tokens > 0 {
+                    estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens)
+                } else {
+                    0.0
+                };
+                let estimated_cost = asr_cost + polish_cost;
 
                 // Copy to clipboard and auto-paste into active app
                 let _ = handle.clipboard().write_text(&text);
@@ -778,6 +789,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     api_base_url: api_base_url.clone(),
                     language: language.clone(),
                     retry_of: None,
+                    asr_duration_sec: Some(asr_duration_sec),
+                    polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
+                    estimated_cost: Some(estimated_cost),
                 };
                 let _ = history.add_entry(&entry);
                 let _ = history.cleanup_old_audio(audio_retention_limit);
@@ -797,6 +811,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     api_base_url: api_base_url.clone(),
                     language: language.clone(),
                     retry_of: None,
+                    asr_duration_sec: None,
+                    polish_tokens: None,
+                    estimated_cost: None,
                 };
                 let _ = history.add_entry(&entry);
                 let _ = history.cleanup_old_audio(audio_retention_limit);
@@ -822,7 +839,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 fn cancel_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
     if recorder.is_recording() {
-        log::info!("Cancelling recording...");
+        log::info!("Recording cancelled by user");
         unregister_escape(app_handle);
         recorder.cancel();
         // Notify overlay so it can show brief "cancelled" feedback before self-closing
@@ -839,5 +856,43 @@ fn cancel_recording(app_handle: &tauri::AppHandle) {
 fn close_overlay(app_handle: &tauri::AppHandle) {
     if let Some(w) = app_handle.get_webview_window("overlay") {
         let _ = w.close();
+    }
+}
+
+fn estimate_asr_cost(api_base_url: &str, _model: &str, duration_sec: f64) -> f64 {
+    let url = api_base_url.to_ascii_lowercase();
+    let minutes = duration_sec / 60.0;
+    if url.contains("openai.com") {
+        minutes * 0.006
+    } else if url.contains("groq.com") {
+        0.0
+    } else if url.contains("xiaomimimo.com") {
+        (duration_sec / 3600.0) * 0.5
+    } else if url.contains("deepseek.com") {
+        minutes * 0.002
+    } else {
+        0.0
+    }
+}
+
+fn estimate_polish_cost(api_base_url: &str, model: &str, tokens: i64) -> f64 {
+    let url = api_base_url.to_ascii_lowercase();
+    let million_tokens = tokens as f64 / 1_000_000.0;
+    if url.contains("deepseek.com") {
+        if model.contains("v4-flash") {
+            million_tokens * 0.5
+        } else {
+            million_tokens * 1.0
+        }
+    } else if url.contains("openai.com") {
+        if model.contains("mini") {
+            million_tokens * 0.15
+        } else {
+            million_tokens * 2.5
+        }
+    } else if url.contains("xiaomimimo.com") {
+        million_tokens * 1.0
+    } else {
+        0.0
     }
 }

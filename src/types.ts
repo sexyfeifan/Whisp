@@ -11,6 +11,9 @@ export interface HistoryEntry {
   api_base_url: string;
   language: string;
   retry_of: number | null;
+  asr_duration_sec: number | null;
+  polish_tokens: number | null;
+  estimated_cost: number | null;
 }
 
 export interface AppSettings {

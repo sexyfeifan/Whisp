@@ -184,6 +184,9 @@ const messages = {
     playAudio: "播放",
     pauseAudio: "暂停",
     newVersionAvailable: "新版本可用",
+    totalCost: "累计费用",
+    totalTokens: "累计 Token",
+    aiPolishPromptDesc: "留空使用上方默认提示词，修改后自动保存",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -332,6 +335,9 @@ const messages = {
     playAudio: "Play",
     pauseAudio: "Pause",
     newVersionAvailable: "New version available",
+    totalCost: "Total Cost",
+    totalTokens: "Total Tokens",
+    aiPolishPromptDesc: "Leave empty to use default prompt above, changes auto-save",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -480,6 +486,9 @@ const messages = {
     playAudio: "再生",
     pauseAudio: "一時停止",
     newVersionAvailable: "新しいバージョンあり",
+    totalCost: "合計費用",
+    totalTokens: "合計トークン",
+    aiPolishPromptDesc: "空欄で上記のデフォルトプロンプト使用、変更は自動保存",
   },
 } as const;
 
@@ -497,6 +506,15 @@ const endpointPresets = [
   { label: "Fireworks", value: "https://api.fireworks.ai/inference/v1" },
   { label: "MiMo", value: "https://api.xiaomimimo.com/v1" },
   { label: "DeepSeek", value: "https://api.deepseek.com/v1" },
+  { label: "MiMo Token Plan", value: "https://token-plan-cn.xiaomimimo.com/v1" },
+];
+
+const aiPolishPresets = [
+  { label: "DeepSeek V4 Flash", apiUrl: "https://api.deepseek.com/v1", model: "deepseek-v4-flash" },
+  { label: "DeepSeek Chat", apiUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+  { label: "OpenAI GPT-4o-mini", apiUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  { label: "OpenAI GPT-4o", apiUrl: "https://api.openai.com/v1", model: "gpt-4o" },
+  { label: "MiMo V2.5", apiUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.5" },
 ];
 
 const modelCatalog: ModelCatalogItem[] = [
@@ -599,6 +617,16 @@ const modelCatalog: ModelCatalogItem[] = [
       ja: "Xiaomi MiMo 音声認識、中国語・英語・方言・歌詞・騒音環境対応。",
     },
     baseUrlHint: "https://api.xiaomimimo.com/v1",
+  },
+  {
+    name: "mimo-v2.5-asr",
+    provider: "MiMo Token Plan",
+    description: {
+      "zh-CN": "小米 MiMo 语音识别，Token Plan 计费。",
+      en: "Xiaomi MiMo ASR, Token Plan billing.",
+      ja: "Xiaomi MiMo 音声認識、Token Plan 課金。",
+    },
+    baseUrlHint: "https://token-plan-cn.xiaomimimo.com/v1",
   },
 ];
 
@@ -920,6 +948,7 @@ function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logsAutoScroll, setLogsAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
+  const [defaultPolishPrompt, setDefaultPolishPrompt] = useState("");
 
   async function checkForUpdates() {
     setUpdateStatus("checking");
@@ -1017,6 +1046,10 @@ function App() {
     if (!accessibilityOk) return;
     invoke("initialize_enigo").catch((error) => { console.error("Failed to initialize auto-paste:", error); });
   }, [accessibilityOk]);
+
+  useEffect(() => {
+    invoke<string>("get_default_polish_prompt").then(setDefaultPolishPrompt).catch(() => {});
+  }, []);
 
   const handleEnableMicrophone = useCallback(async () => {
     await invoke("request_microphone");
@@ -1206,7 +1239,9 @@ function App() {
     const failed = history.filter((entry) => entry.status === "failed").length;
     const success = total - failed;
     const audioSaved = history.filter((entry) => Boolean(entry.audio_path)).length;
-    return { total, success, failed, audioSaved };
+    const totalCost = history.reduce((sum, entry) => sum + (entry.estimated_cost || 0), 0);
+    const totalTokens = history.reduce((sum, entry) => sum + (entry.polish_tokens || 0), 0);
+    return { total, success, failed, audioSaved, totalCost, totalTokens };
   }, [history]);
 
   const todayCount = useMemo(() => {
@@ -1631,8 +1666,8 @@ function App() {
                     <div>
                       <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishApiUrl}</label>
                       <div className="flex gap-2 flex-wrap mb-2">
-                        {endpointPresets.map((preset) => (
-                          <FilterChip key={`polish-${preset.value}`} active={settings.ai_polish_api_url === preset.value} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.value }); setPolishStatus("untested"); setPolishError(null); }} />
+                        {aiPolishPresets.map((preset) => (
+                          <FilterChip key={`polish-${preset.apiUrl}-${preset.model}`} active={settings.ai_polish_api_url === preset.apiUrl && settings.ai_polish_model === preset.model} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.apiUrl, ai_polish_model: preset.model }); setPolishStatus("untested"); setPolishError(null); }} />
                         ))}
                       </div>
                       <input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="https://api.openai.com/v1" className="w-full px-3 py-2 rounded-lg text-sm outline-none" />
@@ -1650,7 +1685,17 @@ function App() {
                     </div>
                     <div>
                       <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishPrompt}</label>
-                      <textarea value={settings.ai_polish_prompt} onChange={(event) => updateSettings({ ai_polish_prompt: event.target.value })} placeholder={m.aiPolishPromptPlaceholder} rows={3} className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none" />
+                      <textarea
+                        value={settings.ai_polish_prompt}
+                        onChange={(event) => updateSettings({ ai_polish_prompt: event.target.value })}
+                        placeholder={defaultPolishPrompt || m.aiPolishPromptPlaceholder}
+                        rows={5}
+                        className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+                        style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }}
+                      />
+                      <p className="text-[11px] mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+                        {m.aiPolishPromptDesc}
+                      </p>
                     </div>
                     <button
                       onClick={testPolishConnection}
@@ -2024,6 +2069,8 @@ function App() {
                     background: "hsl(var(--card))", 
                     borderColor: "hsl(var(--border))",
                     height: "320px",
+                    userSelect: "text",
+                    WebkitUserSelect: "text",
                   }}
                 >
                   {logs.length === 0 ? (
@@ -2037,7 +2084,7 @@ function App() {
                             color: entry.level === "ERROR" ? "hsl(var(--destructive))" : entry.level === "WARN" ? "hsl(var(--warning))" : "hsl(var(--brand))"
                           }}>[{entry.level}]</span>
                           <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.target}:</span>
-                          <span className="flex-1 break-all" style={{ color: "hsl(var(--foreground))" }}>{entry.message}</span>
+                          <span className="flex-1 break-all" style={{ color: "hsl(var(--foreground))", userSelect: "text", WebkitUserSelect: "text" }}>{entry.message}</span>
                           <button 
                             onClick={async () => { await writeText(`[${entry.timestamp}] [${entry.level}] ${entry.target}: ${entry.message}`); }}
                             className="shrink-0 opacity-0 group-hover:opacity-100 text-[10px] px-1 rounded"
@@ -2092,7 +2139,7 @@ function App() {
         </div>
 
         {/* Stat cards */}
-        <div className="px-6 pb-4 grid grid-cols-4 gap-3">
+        <div className="px-6 pb-3 grid grid-cols-4 gap-3">
           <StatCard
             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(var(--muted-foreground))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>}
             label={m.statsTotal}
@@ -2114,6 +2161,12 @@ function App() {
             value={String(stats.audioSaved)}
           />
         </div>
+        {(stats.totalCost > 0 || stats.totalTokens > 0) && (
+          <div className="px-6 pb-3 flex gap-4 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+            {stats.totalCost > 0 && <span>{m.totalCost}: <strong style={{ color: "hsl(var(--foreground))" }}>¥{stats.totalCost.toFixed(4)}</strong></span>}
+            {stats.totalTokens > 0 && <span>{m.totalTokens}: <strong style={{ color: "hsl(var(--foreground))" }}>{stats.totalTokens.toLocaleString()}</strong></span>}
+          </div>
+        )}
 
         {/* Search and filters */}
         <div className="px-6 pb-3 space-y-2">
@@ -2231,6 +2284,16 @@ function App() {
                         {entry.duration_ms ? (
                           <span className="text-xs font-medium px-1.5 py-0.5 rounded" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--foreground))" }}>{formatDuration(entry.duration_ms)}</span>
                         ) : null}
+                        {entry.estimated_cost && entry.estimated_cost > 0 && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded font-medium" style={{ background: "hsl(var(--warning) / 0.15)", color: "hsl(var(--warning))" }}>
+                            ¥{entry.estimated_cost.toFixed(4)}
+                          </span>
+                        )}
+                        {entry.polish_tokens && entry.polish_tokens > 0 && (
+                          <span className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>
+                            {entry.polish_tokens} tokens
+                          </span>
+                        )}
                         <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{canRetry ? m.audioSavedLabel : m.noAudio}</span>
                       </div>
                       <div className="flex gap-0.5">

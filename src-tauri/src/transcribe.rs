@@ -11,12 +11,18 @@ fn transcription_endpoint(api_base_url: &str) -> Result<Url> {
         anyhow::bail!("API base URL is empty");
     }
 
-    let endpoint = if raw.ends_with("/audio/transcriptions") {
-        raw.to_string()
+    if raw.ends_with("/audio/transcriptions") {
+        return Url::parse(raw).context("Invalid API base URL");
+    }
+
+    let base = raw.trim_end_matches('/');
+    let with_version = if base.contains("/v1") {
+        base.to_string()
     } else {
-        format!("{}/audio/transcriptions", raw.trim_end_matches('/'))
+        format!("{}/v1", base)
     };
 
+    let endpoint = format!("{}/audio/transcriptions", with_version.trim_end_matches('/'));
     Url::parse(&endpoint).context("Invalid API base URL")
 }
 

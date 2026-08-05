@@ -70,6 +70,7 @@ pub fn get_settings() -> AppSettings {
 
 #[tauri::command]
 pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
+    log::info!("Settings saved");
     let old_settings = settings::get_settings();
     settings::save_settings(&settings)?;
 
@@ -118,6 +119,7 @@ pub async fn validate_api_key(
     api_base_url: String,
     model: String,
 ) -> Result<(), String> {
+    log::info!("API key validation requested");
     let client = app
         .try_state::<reqwest::Client>()
         .ok_or("HTTP client not initialized")?;
@@ -209,6 +211,7 @@ pub async fn retry_transcription(
     history: State<'_, Arc<HistoryManager>>,
     id: i64,
 ) -> Result<String, String> {
+    log::info!("Retry transcription requested for entry id={}", id);
     use crate::transcribe;
 
     // Get the specific entry by ID
@@ -273,7 +276,7 @@ pub async fn retry_transcription(
         )
         .await
         {
-            Ok(polished) => polished,
+            Ok(result) => result.text,
             Err(e) => {
                 log::warn!("Polish failed during retry, using original: {}", e);
                 text.clone()
@@ -310,6 +313,12 @@ pub async fn retry_transcription(
     Ok(text)
 }
 
+#[derive(Serialize)]
+pub struct PolishOutput {
+    pub text: String,
+    pub tokens_used: i64,
+}
+
 #[tauri::command]
 pub async fn polish_text(
     app: AppHandle,
@@ -318,14 +327,19 @@ pub async fn polish_text(
     model: String,
     text: String,
     prompt: String,
-) -> Result<String, String> {
+) -> Result<PolishOutput, String> {
+    log::info!("AI polish requested via command");
     let client = app
         .try_state::<reqwest::Client>()
         .ok_or("HTTP client not initialized")?;
     let timeout = settings::get_settings().request_timeout_sec;
-    crate::polish::polish_text(&client, &api_key, &api_base_url, &model, &text, &prompt, timeout)
+    let result = crate::polish::polish_text(&client, &api_key, &api_base_url, &model, &text, &prompt, timeout)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(PolishOutput {
+        text: result.text,
+        tokens_used: result.tokens_used,
+    })
 }
 
 #[tauri::command]
@@ -360,6 +374,7 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
 
 #[tauri::command]
 pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
+    log::info!("Update check requested");
     let current_version = env!("CARGO_PKG_VERSION").to_string();
     let github_repo = "sexyfeifan/Whisp";
 
@@ -482,11 +497,13 @@ pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
 
 #[tauri::command]
 pub fn get_logs() -> Vec<crate::log_buffer::LogEntry> {
+    log::debug!("Logs requested by frontend");
     crate::log_buffer::get_logs()
 }
 
 #[tauri::command]
 pub fn clear_logs() {
+    log::info!("Logs cleared by user");
     crate::log_buffer::clear_logs()
 }
 
@@ -495,4 +512,9 @@ pub fn read_audio_file(path: String) -> Result<String, String> {
     std::fs::read(&path)
         .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes))
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_default_polish_prompt() -> String {
+    crate::polish::DEFAULT_SYSTEM_PROMPT.to_string()
 }
