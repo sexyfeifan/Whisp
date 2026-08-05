@@ -1012,35 +1012,38 @@ function App() {
     setDownloading(true);
     setDownloadMsg(null);
     try {
-      const update = await checkUpdaterUpdate();
-      if (update) {
-        await update.downloadAndInstall((progress) => {
-          if (progress.event === "Started" && progress.data.contentLength) {
-            setDownloadMsg(`Downloading... (${(progress.data.contentLength / 1024 / 1024).toFixed(1)} MB)`);
-          } else if (progress.event === "Progress") {
-            setDownloadMsg(`Downloading...`);
-          } else if (progress.event === "Finished") {
-            setDownloadMsg("Download complete. Restarting...");
-          }
-        });
-        setDownloadMsg("Update installed. Please restart the app.");
-      } else if (url && filename) {
-        const msg = await invoke<string>("download_and_install_update", { url, filename });
-        setDownloadMsg(msg);
-      } else {
-        setDownloadMsg("No update available.");
-      }
-    } catch (error) {
-      if (url && filename) {
-        try {
-          const msg = await invoke<string>("download_and_install_update", { url, filename });
-          setDownloadMsg(msg);
-        } catch (fallbackError) {
-          setDownloadMsg(`Download failed: ${fallbackError}`);
+      // Find the right asset from updateInfo if not provided
+      if (!url || !filename) {
+        const platform = navigator.platform.toLowerCase();
+        const isMac = platform.includes("mac");
+        const isWin = platform.includes("win");
+        const isArm = navigator.userAgent.includes("aarch64") || navigator.userAgent.includes("arm64");
+
+        const assets = updateInfo?.assets || [];
+        const asset = assets.find((a) => {
+          if (isMac && isArm) return a.name.includes("aarch64") && a.name.endsWith(".dmg");
+          if (isMac) return a.name.includes("x64") && a.name.endsWith(".dmg");
+          if (isWin) return a.name.endsWith("-setup.exe") || a.name.endsWith(".msi");
+          return a.name.endsWith(".AppImage") || a.name.endsWith(".deb");
+        }) || assets[0];
+
+        if (asset) {
+          url = asset.url;
+          filename = asset.name;
         }
-      } else {
-        setDownloadMsg(`Update failed: ${error}`);
       }
+
+      if (!url || !filename) {
+        setDownloadMsg("No downloadable asset found.");
+        setDownloading(false);
+        return;
+      }
+
+      setDownloadMsg(`Downloading ${filename}...`);
+      const msg = await invoke<string>("download_and_install_update", { url, filename });
+      setDownloadMsg(msg);
+    } catch (error) {
+      setDownloadMsg(`Download failed: ${error}`);
     } finally {
       setDownloading(false);
     }
