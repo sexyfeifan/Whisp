@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { check as checkUpdaterUpdate } from "@tauri-apps/plugin-updater";
 import type { AppSettings, HistoryEntry, LogEntry } from "./types";
 import logoUrl from "./assets/logo.png";
 
@@ -955,30 +956,73 @@ function App() {
   async function checkForUpdates() {
     setUpdateStatus("checking");
     try {
-      const result = await invoke<{
-        has_update: boolean; latest_version: string; release_url: string;
-        release_notes: string; published_at: string;
-        assets: { name: string; url: string; size: number }[]; error: string;
-      }>("check_for_updates");
-      if (result.error) { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); return; }
-      if (result.has_update) {
+      const update = await checkUpdaterUpdate();
+      if (update) {
         setUpdateStatus("available");
         setUpdateInfo({
-          latestVersion: result.latest_version, releaseUrl: result.release_url,
-          releaseNotes: result.release_notes, publishedAt: result.published_at, assets: result.assets,
+          latestVersion: update.version,
+          releaseUrl: `https://github.com/sexyfeifan/Whisp/releases/tag/v${update.version}`,
+          releaseNotes: update.body || "",
+          publishedAt: update.date || "",
+          assets: [],
         });
-      } else { setUpdateStatus("latest"); setTimeout(() => setUpdateStatus("idle"), 3000); }
-    } catch { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); }
+      } else {
+        setUpdateStatus("latest");
+        setTimeout(() => setUpdateStatus("idle"), 3000);
+      }
+    } catch (error) {
+      console.warn(`Updater check failed: ${error}, falling back to GitHub API`);
+      try {
+        const result = await invoke<{
+          has_update: boolean; latest_version: string; release_url: string;
+          release_notes: string; published_at: string;
+          assets: { name: string; url: string; size: number }[]; error: string;
+        }>("check_for_updates");
+        if (result.error) { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); return; }
+        if (result.has_update) {
+          setUpdateStatus("available");
+          setUpdateInfo({
+            latestVersion: result.latest_version, releaseUrl: result.release_url,
+            releaseNotes: result.release_notes, publishedAt: result.published_at, assets: result.assets,
+          });
+        } else { setUpdateStatus("latest"); setTimeout(() => setUpdateStatus("idle"), 3000); }
+      } catch { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); }
+    }
   }
 
-  async function downloadAndInstall(url: string, filename: string) {
+  async function downloadAndInstall(url?: string, filename?: string) {
     setDownloading(true);
     setDownloadMsg(null);
     try {
-      const msg = await invoke<string>("download_and_install_update", { url, filename });
-      setDownloadMsg(msg);
+      const update = await checkUpdaterUpdate();
+      if (update) {
+        await update.downloadAndInstall((progress) => {
+          if (progress.event === "Started" && progress.data.contentLength) {
+            setDownloadMsg(`Downloading... (${(progress.data.contentLength / 1024 / 1024).toFixed(1)} MB)`);
+          } else if (progress.event === "Progress") {
+            setDownloadMsg(`Downloading...`);
+          } else if (progress.event === "Finished") {
+            setDownloadMsg("Download complete. Restarting...");
+          }
+        });
+        setDownloadMsg("Update installed. Please restart the app.");
+      } else if (url && filename) {
+        const msg = await invoke<string>("download_and_install_update", { url, filename });
+        setDownloadMsg(msg);
+      } else {
+        setDownloadMsg("No update available.");
+      }
     } catch (error) {
-      setDownloadMsg(`Download failed: ${error}`);
+      if (url && filename) {
+        try {
+          const msg = await invoke<string>("download_and_install_update", { url, filename });
+          setDownloadMsg(msg);
+        } catch (fallbackError) {
+          setDownloadMsg(`Download failed: ${fallbackError}`);
+        }
+      } else {
+        setDownloadMsg(`Update failed: ${error}`);
+      }
     } finally {
       setDownloading(false);
     }
@@ -1921,13 +1965,11 @@ function App() {
                       </details>
                     )}
                     <div className="flex flex-wrap gap-1.5">
-                      {updateInfo.assets.filter(a => a.name.endsWith(".dmg") || a.name.endsWith(".exe") || a.name.endsWith(".msi") || a.name.endsWith(".AppImage") || a.name.endsWith(".deb") || a.name.endsWith(".rpm")).map(asset => (
-                        <button key={asset.name} onClick={() => downloadAndInstall(asset.url, asset.name)} disabled={downloading} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: downloading ? "hsl(var(--muted))" : "hsl(var(--brand))", color: downloading ? "hsl(var(--muted-foreground))" : "white", opacity: downloading ? 0.7 : 1 }}>
-                          {downloading ? m.checkingUpdates : `${m.downloadUpdate} (${asset.name.includes("aarch64") || asset.name.includes("arm64") ? "Apple Silicon" : asset.name.includes("x64") ? "Intel" : asset.name.split(".").pop()})`}
-                        </button>
-                      ))}
-                      {downloadMsg && (
-                        <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
+                      <button onClick={() => downloadAndInstall()} disabled={downloading} className="px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: downloading ? "hsl(var(--muted))" : "hsl(var(--brand))", color: downloading ? "hsl(var(--muted-foreground))" : "white", opacity: downloading ? 0.7 : 1 }}>
+                        {downloading ? (downloadMsg || m.checkingUpdates) : `${m.downloadUpdate} v${updateInfo.latestVersion}`}
+                      </button>
+                      {downloadMsg && !downloading && (
+                        <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
                           {downloadMsg}
                         </div>
                       )}
