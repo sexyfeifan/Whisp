@@ -310,7 +310,7 @@ pub async fn retry_transcription(
 
     let _ = app.emit("history-updated", ());
 
-    Ok(text)
+    Ok(polished_text)
 }
 
 #[derive(Serialize)]
@@ -650,12 +650,6 @@ pub async fn download_and_install_update(
             }
 
             std::thread::sleep(std::time::Duration::from_secs(2));
-
-            // Find the .app in the mounted volume
-            let mount_output = std::process::Command::new("hdiutil")
-                .args(["info", "-plist"])
-                .output()
-                .map_err(|e| format!("Failed to get mount info: {}", e))?;
 
             // Try to open the volume
             let volume_name = filename.strip_suffix(".dmg").unwrap_or(&filename);

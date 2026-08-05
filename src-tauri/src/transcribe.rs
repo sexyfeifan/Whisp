@@ -216,37 +216,55 @@ pub async fn validate_api_key(
             .context("Network error")?
     };
 
-    if resp.status() == StatusCode::UNAUTHORIZED {
+    let status = resp.status();
+    if status == StatusCode::UNAUTHORIZED {
         anyhow::bail!("Invalid API key");
     }
-    if resp.status() == StatusCode::FORBIDDEN {
+    if status == StatusCode::FORBIDDEN {
         anyhow::bail!("The server rejected this API key");
     }
+
+    let body_text = if status.is_success() {
+        String::new()
+    } else {
+        resp.text().await.unwrap_or_default()
+    };
+    let body = shorten_error_body(body_text);
+
+    // 404 = endpoint not found (real error)
+    if status == StatusCode::NOT_FOUND {
+        anyhow::bail!("Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}", body);
+    }
+    // 405/415 = method or media type not supported (real error)
     if matches!(
-        resp.status(),
-        StatusCode::BAD_REQUEST
-            | StatusCode::NOT_FOUND
-            | StatusCode::METHOD_NOT_ALLOWED
-            | StatusCode::UNSUPPORTED_MEDIA_TYPE
-            | StatusCode::UNPROCESSABLE_ENTITY
+        status,
+        StatusCode::METHOD_NOT_ALLOWED | StatusCode::UNSUPPORTED_MEDIA_TYPE
     ) {
-        let body = shorten_error_body(resp.text().await.unwrap_or_default());
         anyhow::bail!(
-            "The relay rejected the validation probe. Your configuration may still work for real transcription. Details: {}",
+            "The server rejected the request format (HTTP {}). Your API URL may be incorrect.\nDetails: {}",
+            status.as_u16(),
             body
         );
     }
-    let status = resp.status();
+    // 400/422 = server recognized the request but rejected the probe audio (likely config is OK)
+    if matches!(
+        status,
+        StatusCode::BAD_REQUEST | StatusCode::UNPROCESSABLE_ENTITY
+    ) {
+        anyhow::bail!(
+            "Connection successful but probe was rejected (HTTP {}). Your configuration is likely correct — save and try a real recording.\nDetails: {}",
+            status.as_u16(),
+            body
+        );
+    }
     if matches!(status, StatusCode::TOO_MANY_REQUESTS | StatusCode::SERVICE_UNAVAILABLE) {
-        let body = shorten_error_body(resp.text().await.unwrap_or_default());
         anyhow::bail!(
             "The upstream service is temporarily overloaded (HTTP {}). Your configuration is likely correct. Save your settings and try a real recording.\nDetails: {}",
             status.as_u16(),
             body
         );
     }
-    if !resp.status().is_success() {
-        let body = shorten_error_body(resp.text().await.unwrap_or_default());
+    if !status.is_success() {
         anyhow::bail!("{}", body);
     }
     Ok(())

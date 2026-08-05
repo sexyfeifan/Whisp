@@ -55,7 +55,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_updater::Builder::new().pubkey("RWSMQDXV/UKkliWsab83mjjMVZhv6rM3QpsFf3wZoiXip0vLS3h3YMsA").build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::get_history,
             commands::get_history_page,
