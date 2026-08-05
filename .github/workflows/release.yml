@@ -59,8 +59,8 @@ jobs:
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: "whisp2024"
+      TAURI_SIGNING_PRIVATE_KEY: ""
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
       - name: Checkout
