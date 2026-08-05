@@ -4,6 +4,8 @@ use std::path::PathBuf;
 
 const KEYCHAIN_SERVICE: &str = "com.whisp.desktop";
 const KEYCHAIN_ACCOUNT: &str = "api_key";
+const KEYCHAIN_SERVICE_POLISH: &str = "com.whisp.desktop.polish";
+const KEYCHAIN_ACCOUNT_POLISH: &str = "polish_api_key";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -55,6 +57,8 @@ pub struct AppSettings {
     pub ai_polish_model: String,
     #[serde(default)]
     pub ai_polish_prompt: String,
+    #[serde(default = "default_audio_retention_limit")]
+    pub audio_retention_limit: usize,
 }
 
 /// Stored on disk — no api_key field (stored in keychain instead)
@@ -106,6 +110,8 @@ struct DiskSettings {
     pub ai_polish_model: String,
     #[serde(default)]
     pub ai_polish_prompt: String,
+    #[serde(default = "default_audio_retention_limit")]
+    pub audio_retention_limit: usize,
     /// api_key is normally empty here (stored in keychain).
     /// Written as fallback when keychain is unavailable (e.g. ad-hoc signed builds).
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -188,6 +194,10 @@ fn default_ai_polish_model() -> String {
     "gpt-4o-mini".to_string()
 }
 
+fn default_audio_retention_limit() -> usize {
+    100
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -215,6 +225,7 @@ impl Default for AppSettings {
             ai_polish_api_url: default_ai_polish_api_url(),
             ai_polish_model: default_ai_polish_model(),
             ai_polish_prompt: String::new(),
+            audio_retention_limit: default_audio_retention_limit(),
         }
     }
 }
@@ -239,6 +250,32 @@ fn load_api_key() -> Result<Option<String>, String> {
 fn store_api_key(api_key: &str) -> Result<(), String> {
     let entry = credential_entry().map_err(|e| e.to_string())?;
     let normalized = api_key.trim();
+    if normalized.is_empty() {
+        match entry.delete_credential() {
+            Ok(_) | Err(KeyringError::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    } else {
+        entry.set_password(normalized).map_err(|e| e.to_string())
+    }
+}
+
+fn polish_credential_entry() -> Result<Entry, KeyringError> {
+    Entry::new(KEYCHAIN_SERVICE_POLISH, KEYCHAIN_ACCOUNT_POLISH)
+}
+
+fn load_polish_api_key() -> Result<Option<String>, String> {
+    let entry = polish_credential_entry().map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(key) => Ok(Some(key)),
+        Err(KeyringError::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn store_polish_api_key(key: &str) -> Result<(), String> {
+    let entry = polish_credential_entry().map_err(|e| e.to_string())?;
+    let normalized = key.trim();
     if normalized.is_empty() {
         match entry.delete_credential() {
             Ok(_) | Err(KeyringError::NoEntry) => Ok(()),
@@ -291,6 +328,7 @@ fn save_disk_settings(settings: &AppSettings) -> Result<(), String> {
         ai_polish_api_url: settings.ai_polish_api_url.clone(),
         ai_polish_model: settings.ai_polish_model.clone(),
         ai_polish_prompt: settings.ai_polish_prompt.clone(),
+        audio_retention_limit: settings.audio_retention_limit,
         api_key: settings.api_key.clone(), // always persist to disk; keychain is best-effort only
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
@@ -324,6 +362,7 @@ pub fn get_settings() -> AppSettings {
         ai_polish_api_url: disk.ai_polish_api_url,
         ai_polish_model: disk.ai_polish_model,
         ai_polish_prompt: disk.ai_polish_prompt,
+        audio_retention_limit: disk.audio_retention_limit,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
@@ -338,6 +377,12 @@ pub fn get_settings() -> AppSettings {
         }
     }
 
+    // Load polish API key from keychain (best-effort)
+    match load_polish_api_key() {
+        Ok(Some(key)) if !key.is_empty() => settings.ai_polish_api_key = key,
+        _ => {}
+    }
+
     settings
 }
 
@@ -345,6 +390,9 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     // Best-effort keychain store (may fail on ad-hoc signed builds)
     if let Err(e) = store_api_key(&settings.api_key) {
         log::warn!("Failed to store API key in system keychain: {}", e);
+    }
+    if let Err(e) = store_polish_api_key(&settings.ai_polish_api_key) {
+        log::warn!("Failed to store polish API key in system keychain: {}", e);
     }
     // Always persist to disk as the reliable source of truth
     save_disk_settings(settings)

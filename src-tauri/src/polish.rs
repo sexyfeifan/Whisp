@@ -25,6 +25,7 @@ pub async fn polish_text(
     model: &str,
     raw_text: &str,
     custom_prompt: &str,
+    timeout_secs: u64,
 ) -> Result<String> {
     let endpoint = polish_endpoint(api_base_url)?;
 
@@ -58,7 +59,7 @@ pub async fn polish_text(
     let resp = client
         .post(endpoint)
         .bearer_auth(api_key)
-        .timeout(Duration::from_secs(90))
+        .timeout(Duration::from_secs(timeout_secs.max(10)))
         .json(&body)
         .send()
         .await

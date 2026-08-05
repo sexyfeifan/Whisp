@@ -1,6 +1,7 @@
 mod commands;
 mod history;
 mod hotkey;
+pub mod log_buffer;
 pub mod paste;
 mod permissions;
 mod polish;
@@ -45,6 +46,7 @@ fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
 
 
 pub fn run() {
+    log_buffer::init();
     // Load .env file if present (for development)
     let _ = dotenvy::dotenv();
 
@@ -76,6 +78,9 @@ pub fn run() {
             commands::check_for_updates,
             commands::polish_text,
             commands::test_polish_connection,
+            commands::get_logs,
+            commands::clear_logs,
+            commands::read_audio_file,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -90,7 +95,10 @@ pub fn run() {
             app.manage(recorder.clone());
 
             // Initialize shared HTTP client
-            let http_client = reqwest::Client::new();
+            let http_client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(300))
+                .build()
+                .expect("Failed to build HTTP client");
             app.manage(http_client);
 
             // Initialize enigo if accessibility is already granted
@@ -105,7 +113,7 @@ pub fn run() {
                 tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
                     .title("Whisp")
                     .inner_size(960.0, 640.0)
-                    .resizable(false)
+                    .resizable(true)
                     .maximizable(false)
                     .visible(false)
                     .build()?;
@@ -148,6 +156,7 @@ pub fn run() {
                 } else {
                     label
                 };
+                let label = label.replace('&', "&amp;").replace('<', "&lt;");
                 let item = tauri::menu::MenuItem::with_id(
                     app,
                     format!("history_{}", i),
@@ -323,6 +332,7 @@ fn rebuild_tray_menu(app_handle: &tauri::AppHandle) {
         } else {
             label
         };
+        let label = label.replace('&', "&amp;").replace('<', "&lt;");
         if let Ok(item) = tauri::menu::MenuItem::with_id(
             app_handle,
             format!("history_{}", i),
@@ -663,6 +673,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let ai_polish_api_url = settings.ai_polish_api_url.clone();
     let ai_polish_model = settings.ai_polish_model.clone();
     let ai_polish_prompt = settings.ai_polish_prompt.clone();
+    let audio_retention_limit = settings.audio_retention_limit;
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!("Calling API with model={} via {}...", model, api_base_url);
@@ -704,6 +715,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                         &ai_polish_model,
                         &text,
                         &ai_polish_prompt,
+                        settings.request_timeout_sec,
                     )
                     .await
                     {
@@ -713,6 +725,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                         }
                         Err(e) => {
                             log::warn!("Polish failed, using original text: {}", e);
+                            let _ = handle.emit("polish-error", e.to_string());
                             text
                         }
                     }
@@ -767,14 +780,14 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     retry_of: None,
                 };
                 let _ = history.add_entry(&entry);
-                let _ = history.cleanup_old_audio(50);
+                let _ = history.cleanup_old_audio(audio_retention_limit);
             }
             Err(e) => {
                 log::error!("Transcription failed: {}", e);
 
                 let error_message = e.to_string();
                 let entry = NewHistoryEntry {
-                    text: "Transcription failed".to_string(),
+                    text: format!("转写失败: {}", &error_message.chars().take(100).collect::<String>()),
                     model: model.clone(),
                     duration_ms,
                     audio_path: audio_path_str.clone(),
@@ -786,7 +799,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     retry_of: None,
                 };
                 let _ = history.add_entry(&entry);
-                let _ = history.cleanup_old_audio(50);
+                let _ = history.cleanup_old_audio(audio_retention_limit);
 
                 // Emit error to overlay — overlay will show it and self-close after 2.5s
                 let _ = handle.emit("transcription-error", &error_message);

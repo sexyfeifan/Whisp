@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import type { AppSettings, HistoryEntry } from "./types";
+import type { AppSettings, HistoryEntry, LogEntry } from "./types";
 import logoUrl from "./assets/logo.png";
 
 type View = "onboarding" | "history" | "settingsApi" | "settingsPolish" | "settingsRecording" | "settingsBehavior" | "settingsApp" | "diagnostics";
@@ -172,6 +172,18 @@ const messages = {
     lastTranscription: "最近转写",
     apiConfigured: "已配置",
     apiNotConfigured: "未配置",
+    runLogs: "运行日志",
+    runLogsDesc: "应用运行时的详细日志记录",
+    copyAll: "复制全部",
+    clearLogs: "清空日志",
+    copied: "已复制",
+    copyError: "复制错误",
+    polishFailed: "AI 润色失败，使用原文",
+    audioRetentionLimit: "音频保留数量",
+    audioRetentionLimitDesc: "保留最近的音频文件数量，超出自动清理",
+    playAudio: "播放",
+    pauseAudio: "暂停",
+    newVersionAvailable: "新版本可用",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -308,6 +320,18 @@ const messages = {
     lastTranscription: "Last Transcription",
     apiConfigured: "Configured",
     apiNotConfigured: "Not Configured",
+    runLogs: "Run Logs",
+    runLogsDesc: "Detailed runtime logs of the application",
+    copyAll: "Copy All",
+    clearLogs: "Clear Logs",
+    copied: "Copied",
+    copyError: "Copy Error",
+    polishFailed: "AI Polish failed, using original",
+    audioRetentionLimit: "Audio Retention Limit",
+    audioRetentionLimitDesc: "Number of recent audio files to keep, older ones are auto-cleaned",
+    playAudio: "Play",
+    pauseAudio: "Pause",
+    newVersionAvailable: "New version available",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -444,6 +468,18 @@ const messages = {
     lastTranscription: "最新の転写",
     apiConfigured: "設定済み",
     apiNotConfigured: "未設定",
+    runLogs: "実行ログ",
+    runLogsDesc: "アプリケーションの実行時ログ",
+    copyAll: "すべてコピー",
+    clearLogs: "ログ消去",
+    copied: "コピー済み",
+    copyError: "エラーコピー",
+    polishFailed: "AI修正失敗、原文を使用",
+    audioRetentionLimit: "音声保持数",
+    audioRetentionLimitDesc: "最近の音声ファイル保持数、古いファイルは自動削除",
+    playAudio: "再生",
+    pauseAudio: "一時停止",
+    newVersionAvailable: "新しいバージョンあり",
   },
 } as const;
 
@@ -878,6 +914,12 @@ function App() {
   } | null>(null);
   const [polishStatus, setPolishStatus] = useState<"untested" | "testing" | "ok" | "error">("untested");
   const [polishError, setPolishError] = useState<string | null>(null);
+  const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logsAutoScroll, setLogsAutoScroll] = useState(true);
+  const logContainerRef = useRef<HTMLDivElement>(null);
 
   async function checkForUpdates() {
     setUpdateStatus("checking");
@@ -899,6 +941,11 @@ function App() {
   }
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { checkForUpdates(); }, 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const HISTORY_PAGE_SIZE = 50;
 
@@ -945,11 +992,16 @@ function App() {
       setErrorMsg(event.payload); window.setTimeout(() => setErrorMsg(null), 5000);
     });
     const unlistenShortcutConflict = listen<string>("shortcut-conflict", (event) => { setShortcutConflictMsg(event.payload); });
+    const unlistenPolishError = listen<string>("polish-error", (event) => {
+      setPolishErrorMsg(event.payload);
+      window.setTimeout(() => setPolishErrorMsg(null), 5000);
+    });
     return () => {
       unlistenHistory.then((dispose) => dispose());
       unlistenError.then((dispose) => dispose());
       unlistenFailed.then((dispose) => dispose());
       unlistenShortcutConflict.then((dispose) => dispose());
+      unlistenPolishError.then((dispose) => dispose());
     };
   }, [checkPermissions, loadHistory, loadSettings]);
 
@@ -1037,6 +1089,67 @@ function App() {
     await writeText(text); setCopied(id);
     window.setTimeout(() => setCopied(null), 1500);
   };
+
+  const playAudio = async (path: string, id: number) => {
+    if (playingAudioId === id) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingAudioId(null);
+      return;
+    }
+    try {
+      const base64 = await invoke<string>("read_audio_file", { path });
+      const audioUrl = `data:audio/wav;base64,${base64}`;
+      if (audioRef.current) { audioRef.current.pause(); }
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.onended = () => { setPlayingAudioId(null); audioRef.current = null; };
+      audio.onerror = () => { setPlayingAudioId(null); audioRef.current = null; };
+      await audio.play();
+      setPlayingAudioId(id);
+    } catch (error) {
+      console.error("Failed to play audio:", error);
+    }
+  };
+
+  const loadLogs = useCallback(async () => {
+    try {
+      const entries = await invoke<LogEntry[]>("get_logs");
+      setLogs(entries);
+    } catch {}
+  }, []);
+
+  const clearLogs = async () => {
+    await invoke("clear_logs");
+    setLogs([]);
+  };
+
+  const copyAllLogs = async () => {
+    const text = logs.map(l => `[${l.timestamp}] [${l.level}] ${l.target}: ${l.message}`).join('\n');
+    await writeText(text);
+  };
+
+  const flushAutoSave = useCallback(() => {
+    window.clearTimeout(autoSaveTimerRef.current);
+    setSettings((current) => {
+      if (current) { invoke("save_settings", { settings: current }).catch(() => {}); }
+      return current;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (view === "diagnostics") {
+      loadLogs();
+      const interval = window.setInterval(loadLogs, 2000);
+      return () => window.clearInterval(interval);
+    }
+  }, [view, loadLogs]);
+
+  useEffect(() => {
+    if (logsAutoScroll && logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [logs, logsAutoScroll]);
 
   const deleteEntry = async (id: number) => {
     await invoke("delete_history_entry", { id });
@@ -1351,7 +1464,7 @@ function App() {
             <React.Fragment key={item.id}>
               {showSeparator && <div className="mx-3 my-2 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />}
               <button
-                onClick={() => setView(item.id)}
+                onClick={() => { flushAutoSave(); setView(item.id); }}
                 className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-colors"
                 style={{
                   background: view === item.id ? "hsl(var(--sidebar-item-active-bg))" : "transparent",
@@ -1377,8 +1490,16 @@ function App() {
           {DownloadIcon}
           {updateStatus === "checking" ? m.checkingUpdates : updateStatus === "available" ? m.updateAvailable : m.checkForUpdates}
         </button>
-        <div className="px-3 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
-          {appVersion ? `v${appVersion}` : ""}
+        <div className="px-3 flex items-center gap-2">
+          <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+            {appVersion ? `v${appVersion}` : ""}
+          </span>
+          {updateStatus === "available" && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium" 
+                  style={{ background: "hsl(var(--success) / 0.15)", color: "hsl(var(--success))" }}>
+              {m.newVersionAvailable}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -1583,6 +1704,21 @@ function App() {
                   <textarea value={settings.whisper_prompt} onChange={(event) => updateSettings({ whisper_prompt: event.target.value })} placeholder={m.whisperPromptPlaceholder} rows={3} className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none" />
                 </div>
                 <ToggleRow label={m.trimSilence} description={m.trimSilenceDesc} value={settings.trim_silence_enabled} onChange={(value) => updateSettings({ trim_silence_enabled: value })} />
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+                    {m.audioRetentionLimit}
+                  </label>
+                  <p className="text-[11px] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{m.audioRetentionLimitDesc}</p>
+                  <input
+                    type="number"
+                    min={10}
+                    max={1000}
+                    step={10}
+                    value={settings.audio_retention_limit}
+                    onChange={(event) => updateSettings({ audio_retention_limit: Math.max(10, Number(event.target.value) || 10) })}
+                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  />
+                </div>
               </SettingsSection>
             </div>
           </div>
@@ -1869,6 +2005,50 @@ function App() {
                   </div>
                 </div>
               </SettingsSection>
+
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--foreground))" }}>{m.runLogs}</h2>
+                  <div className="flex gap-2">
+                    <button onClick={copyAllLogs} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>{m.copyAll}</button>
+                    <button onClick={clearLogs} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}>{m.clearLogs}</button>
+                    <button onClick={() => setLogsAutoScroll(!logsAutoScroll)} className="text-xs px-3 py-1.5 rounded-lg" style={{ background: logsAutoScroll ? "hsl(var(--brand))" : "hsl(var(--secondary))", color: logsAutoScroll ? "white" : "hsl(var(--muted-foreground))" }}>
+                      {logsAutoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
+                    </button>
+                  </div>
+                </div>
+                <div 
+                  ref={logContainerRef}
+                  className="rounded-lg border overflow-y-auto font-mono text-xs leading-relaxed"
+                  style={{ 
+                    background: "hsl(var(--card))", 
+                    borderColor: "hsl(var(--border))",
+                    height: "320px",
+                  }}
+                >
+                  {logs.length === 0 ? (
+                    <div className="p-4 text-center" style={{ color: "hsl(var(--muted-foreground))" }}>暂无日志</div>
+                  ) : (
+                    <div className="p-2 space-y-0.5">
+                      {logs.map((entry, idx) => (
+                        <div key={idx} className="flex gap-2 px-2 py-0.5 rounded hover:bg-black/5 group">
+                          <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.timestamp}</span>
+                          <span className="shrink-0 font-semibold" style={{ 
+                            color: entry.level === "ERROR" ? "hsl(var(--destructive))" : entry.level === "WARN" ? "hsl(var(--warning))" : "hsl(var(--brand))"
+                          }}>[{entry.level}]</span>
+                          <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.target}:</span>
+                          <span className="flex-1 break-all" style={{ color: "hsl(var(--foreground))" }}>{entry.message}</span>
+                          <button 
+                            onClick={async () => { await writeText(`[${entry.timestamp}] [${entry.level}] ${entry.target}: ${entry.message}`); }}
+                            className="shrink-0 opacity-0 group-hover:opacity-100 text-[10px] px-1 rounded"
+                            style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}
+                          >copy</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1940,6 +2120,11 @@ function App() {
           {errorMsg && (
             <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
               {errorMsg}
+            </div>
+          )}
+          {polishErrorMsg && (
+            <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--warning) / 0.1)", border: "1px solid hsl(var(--warning) / 0.2)", color: "hsl(var(--warning))" }}>
+              {polishErrorMsg}
             </div>
           )}
           {settingsFeedback && (
@@ -2023,7 +2208,16 @@ function App() {
 
                     <div className="mt-2">
                       {failed ? (
-                        <div className="text-sm" style={{ color: "hsl(var(--destructive))" }}>{entry.error_message ?? entry.text}</div>
+                        <div>
+                          <div className="text-sm" style={{ color: "hsl(var(--destructive))" }}>{entry.error_message ?? entry.text}</div>
+                          <button
+                            onClick={async () => { await writeText(entry.error_message ?? entry.text); setCopied(entry.id); window.setTimeout(() => setCopied(null), 1500); }}
+                            className="text-[11px] px-2 py-0.5 rounded mt-1 inline-flex items-center gap-1"
+                            style={{ background: "hsl(var(--secondary))", color: "hsl(var(--muted-foreground))" }}
+                          >
+                            {copied === entry.id ? m.copied : m.copyError}
+                          </button>
+                        </div>
                       ) : (
                         <div className="text-sm cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ userSelect: "text", color: "hsl(var(--foreground))" }}>
                           {expandedId === entry.id || entry.text.length <= 120 ? `${entry.text}` : `${entry.text.slice(0, 120)}...`}
@@ -2059,6 +2253,15 @@ function App() {
                                 <polyline points="23 4 23 10 17 10" />
                                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                               </svg>
+                            )}
+                          </IconButton>
+                        )}
+                        {entry.audio_path && (
+                          <IconButton title={playingAudioId === entry.id ? m.pauseAudio : m.playAudio} onClick={() => playAudio(entry.audio_path!, entry.id)}>
+                            {playingAudioId === entry.id ? (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
+                            ) : (
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                             )}
                           </IconButton>
                         )}

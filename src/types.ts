@@ -38,4 +38,12 @@ export interface AppSettings {
   ai_polish_api_url: string;
   ai_polish_model: string;
   ai_polish_prompt: string;
+  audio_retention_limit: number;
+}
+
+export interface LogEntry {
+  timestamp: string;
+  level: string;
+  target: string;
+  message: string;
 }

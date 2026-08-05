@@ -1,6 +1,7 @@
 use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
+use base64::Engine;
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -260,13 +261,35 @@ pub async fn retry_transcription(
     .await
     .map_err(|e| e.to_string())?;
 
+    let polished_text = if settings.ai_polish_enabled && !settings.ai_polish_api_key.is_empty() {
+        match crate::polish::polish_text(
+            &client,
+            &settings.ai_polish_api_key,
+            &settings.ai_polish_api_url,
+            &settings.ai_polish_model,
+            &text,
+            &settings.ai_polish_prompt,
+            settings.request_timeout_sec,
+        )
+        .await
+        {
+            Ok(polished) => polished,
+            Err(e) => {
+                log::warn!("Polish failed during retry, using original: {}", e);
+                text.clone()
+            }
+        }
+    } else {
+        text.clone()
+    };
+
     let provider = transcribe::provider_name(&settings.api_base_url);
 
     // Update entry in place (preserves ID and audio_path)
     history
         .update_entry(
             id,
-            &text,
+            &polished_text,
             &settings.model,
             STATUS_SUCCESS,
             None,
@@ -277,7 +300,7 @@ pub async fn retry_transcription(
         .map_err(|e| e.to_string())?;
 
     // Copy + paste
-    let _ = app.clipboard().write_text(&text);
+    let _ = app.clipboard().write_text(&polished_text);
     if settings.auto_paste_enabled {
         crate::paste::simulate_paste(&app).ok();
     }
@@ -299,7 +322,8 @@ pub async fn polish_text(
     let client = app
         .try_state::<reqwest::Client>()
         .ok_or("HTTP client not initialized")?;
-    crate::polish::polish_text(&client, &api_key, &api_base_url, &model, &text, &prompt)
+    let timeout = settings::get_settings().request_timeout_sec;
+    crate::polish::polish_text(&client, &api_key, &api_base_url, &model, &text, &prompt, timeout)
         .await
         .map_err(|e| e.to_string())
 }
@@ -322,6 +346,9 @@ pub async fn test_polish_connection(
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
     let parse = |v: &str| -> Vec<u32> {
         v.trim_start_matches('v')
+            .split('-')
+            .next()
+            .unwrap_or(v)
             .split('.')
             .filter_map(|s| s.parse().ok())
             .collect()
@@ -451,4 +478,21 @@ pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
         assets: vec![],
         error: "No releases found".to_string(),
     }
+}
+
+#[tauri::command]
+pub fn get_logs() -> Vec<crate::log_buffer::LogEntry> {
+    crate::log_buffer::get_logs()
+}
+
+#[tauri::command]
+pub fn clear_logs() {
+    crate::log_buffer::clear_logs()
+}
+
+#[tauri::command]
+pub fn read_audio_file(path: String) -> Result<String, String> {
+    std::fs::read(&path)
+        .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes))
+        .map_err(|e| e.to_string())
 }
