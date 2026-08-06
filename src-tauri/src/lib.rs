@@ -34,7 +34,7 @@ const OVERLAY_HEIGHT: f64 = 48.0;
 const OVERLAY_BOTTOM_OFFSET: f64 = 80.0;
 const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
 const SILENCE_TRIM_PADDING_MS: u32 = 120;
-const MIN_TRANSCRIBE_MS: i64 = 300;
+const MIN_TRANSCRIBE_MS: i64 = 100;
 
 fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     match ui_language {

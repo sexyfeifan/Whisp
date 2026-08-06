@@ -109,6 +109,7 @@ impl AudioRecorder {
             }
 
             let mut buffer: Vec<f32> = Vec::new();
+            let mut total_chunks: u64 = 0;
 
             // Silence auto-stop tracking: count consecutive silent 512-sample chunks
             let silence_chunks_limit = if silence_timeout_sec == 0 {
@@ -118,25 +119,32 @@ impl AudioRecorder {
                 (silence_timeout_sec as u64 * sample_rate as u64) / 512
             };
             let mut silent_chunks: u64 = 0;
+            // Don't start silence detection until at least 1 second of audio
+            let min_chunks_before_silence = sample_rate as u64 / 512;
 
             let drain_audio =
                 |audio_rx: &mpsc::Receiver<Vec<f32>>,
                  buffer: &mut Vec<f32>,
                  app_handle: &AppHandle,
-                 silent_chunks: &mut u64| {
+                 silent_chunks: &mut u64,
+                 total_chunks: &mut u64| {
                     while let Ok(chunk) = audio_rx.try_recv() {
                         buffer.extend_from_slice(&chunk);
 
                         if buffer.len() % 512 < chunk.len() {
+                            *total_chunks += 1;
                             let recent = &buffer[buffer.len().saturating_sub(512)..];
                             let rms = (recent.iter().map(|s| s * s).sum::<f32>()
                                 / recent.len() as f32)
                                 .sqrt();
                             let _ = app_handle.emit("audio-level", rms.min(1.0));
-                            if rms < silence_threshold {
-                                *silent_chunks += 1;
-                            } else {
-                                *silent_chunks = 0;
+                            // Only count silence after minimum recording duration
+                            if *total_chunks > min_chunks_before_silence {
+                                if rms < silence_threshold {
+                                    *silent_chunks += 1;
+                                } else {
+                                    *silent_chunks = 0;
+                                }
                             }
                         }
                     }
@@ -144,12 +152,12 @@ impl AudioRecorder {
 
             loop {
                 // Drain audio data
-                drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
+                drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
 
                 // Silence auto-stop
                 if silent_chunks >= silence_chunks_limit {
                     log::info!("Silence timeout reached, auto-stopping recording");
-                    drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
+                    drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
                     *is_recording.lock().unwrap() = false;
                     let audio = RecordedAudio {
                         samples: std::mem::take(&mut buffer),
@@ -164,7 +172,7 @@ impl AudioRecorder {
                 match cmd_rx.recv_timeout(std::time::Duration::from_millis(5)) {
                     Ok(Cmd::Stop(reply)) => {
                         // Drain remaining audio before returning
-                        drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks);
+                        drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
                         *is_recording.lock().unwrap() = false;
                         let audio = RecordedAudio {
                             samples: std::mem::take(&mut buffer),
@@ -315,8 +323,16 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
     let trimmed_start = start.saturating_sub(padding);
     let trimmed_end = (end + padding + 1).min(audio.samples.len());
 
-    RecordedAudio {
+    let trimmed = RecordedAudio {
         samples: audio.samples[trimmed_start..trimmed_end].to_vec(),
         sample_rate: audio.sample_rate,
+    };
+
+    // If trimming made the audio too short (< 200ms), return the original
+    let min_samples = (audio.sample_rate as u64 * 200 / 1000) as usize;
+    if trimmed.samples.len() < min_samples {
+        return audio.clone();
     }
+
+    trimmed
 }
