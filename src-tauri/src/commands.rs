@@ -610,7 +610,7 @@ pub async fn download_and_install_update(
 
     let resp = client
         .get(&url)
-        .timeout(std::time::Duration::from_secs(300))
+        .timeout(std::time::Duration::from_secs(600))
         .send()
         .await
         .map_err(|e| format!("Download failed: {}", e))?;
@@ -624,11 +624,12 @@ pub async fn download_and_install_update(
         .await
         .map_err(|e| format!("Failed to read download: {}", e))?;
 
-    let temp_dir = std::env::temp_dir().join("whisp_update");
-    std::fs::create_dir_all(&temp_dir)
-        .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+    // Save to user's Downloads folder
+    let downloads_dir = dirs::download_dir()
+        .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
+        .unwrap_or_else(|| std::env::temp_dir());
 
-    let file_path = temp_dir.join(&filename);
+    let file_path = downloads_dir.join(&filename);
     let mut file = std::fs::File::create(&file_path)
         .map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(&bytes)
@@ -636,59 +637,37 @@ pub async fn download_and_install_update(
 
     log::info!("Update downloaded to: {}", file_path.display());
 
+    // Auto-open the installer
     #[cfg(target_os = "macos")]
     {
         if filename.ends_with(".dmg") {
-            let output = std::process::Command::new("hdiutil")
-                .args(["attach", "-nobrowse", &file_path.to_string_lossy()])
-                .output()
-                .map_err(|e| format!("Failed to mount DMG: {}", e))?;
-
-            if !output.status.success() {
-                let stderr = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to mount DMG: {}", stderr));
-            }
-
-            std::thread::sleep(std::time::Duration::from_secs(2));
-
-            // Try to open the volume
-            let volume_name = filename.strip_suffix(".dmg").unwrap_or(&filename);
-            let volume_path = format!("/Volumes/{}", volume_name);
             let _ = std::process::Command::new("open")
-                .arg(&volume_path)
+                .arg(&file_path)
                 .spawn();
-
             return Ok(format!(
-                "Update downloaded and mounted. Please drag Whisp to Applications to complete the update."
+                "已下载到 {}，安装窗口即将打开。请将 Whisp 拖入 Applications 完成更新。",
+                file_path.display()
             ));
         }
-
         let _ = std::process::Command::new("open")
             .arg(&file_path)
             .spawn();
-        return Ok("Update downloaded and opened.".to_string());
+        return Ok(format!("已下载并打开: {}", file_path.display()));
     }
 
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("cmd")
-            .args([
-                "/C",
-                "start",
-                "",
-                &file_path.to_string_lossy().to_string(),
-            ])
+            .args(["/C", "start", "", &file_path.to_string_lossy().to_string()])
             .spawn();
-        return Ok(
-            "Update installer launched. Please follow the installation prompts.".to_string()
-        );
+        return Ok(format!(
+            "已下载到 {}，安装程序即将启动。",
+            file_path.display()
+        ));
     }
 
     #[cfg(target_os = "linux")]
     {
-        return Ok(format!(
-            "Update downloaded to: {}",
-            file_path.display()
-        ));
+        return Ok(format!("已下载到: {}", file_path.display()));
     }
 }
