@@ -740,7 +740,7 @@ function FilterChip({
       className="px-2.5 py-1 rounded-full text-xs transition-colors"
       style={{
         background: active ? "hsl(var(--primary))" : "hsl(var(--surface))",
-        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--ink))",
+        color: active ? "hsl(var(--on-primary))" : "hsl(var(--ink))",
         border: active ? "1px solid hsl(var(--primary))" : "1px solid hsl(var(--hairline))",
       }}
     >
@@ -1500,13 +1500,13 @@ function App() {
               {showSeparator && <div className="mx-3 my-2 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />}
               <button
                 onClick={() => { flushAutoSave(); setView(item.id); }}
-                className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 border-l-2 ${
+                className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? "border-[hsl(var(--primary))] bg-[hsl(var(--sidebar-item-active-bg))]"
-                    : "border-transparent hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
+                    ? "bg-[hsl(var(--primary))]"
+                    : "hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
                 }`}
                 style={{
-                  color: isActive ? "hsl(var(--sidebar-text-active))" : "hsl(var(--sidebar-text))",
+                  color: isActive ? "hsl(var(--on-primary))" : "hsl(var(--sidebar-text))",
                   fontWeight: isActive ? 500 : 400,
                 }}
               >

@@ -119,8 +119,9 @@ impl AudioRecorder {
                 (silence_timeout_sec as u64 * sample_rate as u64) / 512
             };
             let mut silent_chunks: u64 = 0;
-            // Don't start silence detection until at least 1 second of audio
-            let min_chunks_before_silence = sample_rate as u64 / 512;
+            // Don't start silence detection until at least 3 seconds of audio
+            // This prevents brief pauses during speech from triggering auto-stop
+            let min_chunks_before_silence = (sample_rate as u64 * 3) / 512;
 
             let drain_audio =
                 |audio_rx: &mpsc::Receiver<Vec<f32>>,
