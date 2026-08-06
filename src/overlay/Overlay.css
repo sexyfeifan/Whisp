@@ -1,17 +1,15 @@
 :root {
   --overlay-bg: rgba(255, 255, 255, 0.88);
-  --overlay-fg: rgba(0, 0, 0, 0.75);
-  --overlay-dim: rgba(0, 0, 0, 0.4);
-  --overlay-accent: #6e56cf;
-  --overlay-border: rgba(0, 0, 0, 0.06);
+  --overlay-fg: rgba(26, 26, 26, 0.85);
+  --overlay-dim: rgba(87, 83, 78, 0.6);
+  --overlay-border: rgba(200, 196, 190, 0.6);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --overlay-bg: rgba(20, 20, 22, 0.92);
-    --overlay-fg: rgba(255, 255, 255, 0.85);
-    --overlay-dim: rgba(255, 255, 255, 0.4);
-    --overlay-accent: #9b8afe;
+    --overlay-bg: rgba(10, 10, 10, 0.92);
+    --overlay-fg: rgba(240, 238, 234, 0.9);
+    --overlay-dim: rgba(164, 160, 151, 0.6);
     --overlay-border: rgba(255, 255, 255, 0.08);
   }
 }
@@ -32,14 +30,15 @@ html, body {
   align-items: center;
   justify-content: center;
   background: var(--overlay-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
   border: 0.5px solid var(--overlay-border);
-  border-radius: 16px;
-  box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: rgba(15, 15, 15, 0.06) 0px 2px 8px;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
 }
 
 .overlay-body:active {
@@ -57,8 +56,7 @@ html, body {
   font-size: 13px;
   font-weight: 500;
   color: var(--overlay-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.011em;
 }
 
 .orb-label.dim {
@@ -69,7 +67,7 @@ html, body {
   font-size: 12px;
   font-weight: 500;
   color: var(--overlay-dim);
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   font-variant-numeric: tabular-nums;
   min-width: 28px;
   text-align: right;
@@ -92,27 +90,16 @@ html, body {
 }
 
 .status-text {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--overlay-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.011em;
 }
 
-.error-message .status-icon {
-  color: #ef4444;
-}
-
-.error-message .status-text {
-  color: #ef4444;
-}
-
-.cancelled-message .status-icon {
-  color: var(--overlay-dim);
-}
-
-.cancelled-message .status-text {
-  color: var(--overlay-dim);
-}
+.error-message .status-icon { color: #e03131; }
+.error-message .status-text { color: #e03131; }
+.cancelled-message .status-icon { color: var(--overlay-dim); }
+.cancelled-message .status-text { color: var(--overlay-dim); }

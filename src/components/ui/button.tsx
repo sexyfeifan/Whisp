@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "../../lib/utils";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "ghost" | "danger" | "brand";
+  variant?: "default" | "primary" | "secondary" | "ghost" | "danger" | "dark";
   size?: "default" | "sm" | "lg" | "icon";
 }
 
@@ -11,18 +11,27 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         className={cn(
-          "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]",
+          "inline-flex items-center justify-center whitespace-nowrap font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))] disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
+          /* Notion: 8px rounded rectangles, NOT pills */
+          "rounded-[8px]",
           {
-            "bg-[hsl(var(--foreground))] text-[hsl(var(--background))] hover:opacity-90": variant === "default",
-            "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:bg-[hsl(var(--accent))]": variant === "secondary",
-            "hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]": variant === "ghost",
+            /* Primary — Notion purple CTA */
+            "bg-[hsl(var(--primary))] text-[hsl(var(--on-primary))] hover:bg-[hsl(var(--primary-pressed))]": variant === "primary",
+            /* Default — dark ink CTA */
+            "bg-[hsl(var(--ink-deep))] text-[hsl(var(--on-primary))] hover:opacity-90": variant === "default",
+            /* Secondary — outlined */
+            "bg-transparent text-[hsl(var(--ink))] border border-[hsl(var(--hairline-strong))] hover:bg-[hsl(var(--surface))]": variant === "secondary",
+            /* Ghost */
+            "bg-transparent text-[hsl(var(--slate))] hover:bg-[hsl(var(--surface))] hover:text-[hsl(var(--ink))] rounded-[6px]": variant === "ghost",
+            /* Danger */
             "bg-[hsl(var(--destructive))] text-[hsl(var(--destructive-foreground))] hover:opacity-90": variant === "danger",
-            "bg-[hsl(var(--brand))] text-white hover:opacity-90": variant === "brand",
+            /* Dark — for dark surfaces */
+            "bg-[hsl(var(--on-primary))] text-[hsl(var(--ink-deep))] hover:opacity-90": variant === "dark",
           },
           {
-            "h-9 px-4 py-2": size === "default",
-            "h-8 px-3 text-xs": size === "sm",
-            "h-11 px-6": size === "lg",
+            "h-9 px-4 py-2 text-[14px] font-medium leading-[1.30]": size === "default",
+            "h-8 px-3 text-[13px] font-medium leading-[1.30]": size === "sm",
+            "h-11 px-6 text-[14px] font-medium leading-[1.30]": size === "lg",
             "h-9 w-9 p-0": size === "icon",
           },
           className

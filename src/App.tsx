@@ -739,9 +739,9 @@ function FilterChip({
       onClick={onClick}
       className="px-2.5 py-1 rounded-full text-xs transition-colors"
       style={{
-        background: active ? "hsl(var(--primary))" : "hsl(var(--secondary))",
-        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--foreground))",
-        border: active ? "1px solid hsl(var(--primary))" : "1px solid hsl(var(--border))",
+        background: active ? "hsl(var(--primary))" : "hsl(var(--surface))",
+        color: active ? "hsl(var(--primary-foreground))" : "hsl(var(--ink))",
+        border: active ? "1px solid hsl(var(--primary))" : "1px solid hsl(var(--hairline))",
       }}
     >
       {label}
@@ -753,11 +753,11 @@ function ToggleRow({
   label, description, value, onChange,
 }: { label: string; description: string; value: boolean; onChange: (next: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between gap-3 p-3 rounded-lg" style={{ border: "1px solid hsl(var(--border))" }}>
+    <div className="flex items-center justify-between gap-3 p-3 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
       <div className="min-w-0">
-        <div className="text-sm font-medium" style={{ color: "hsl(var(--foreground))" }}>{label}</div>
+        <div className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{label}</div>
         {description && (
-          <div className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{description}</div>
+          <div className="text-xs mt-0.5" style={{ color: "hsl(var(--steel))" }}>{description}</div>
         )}
       </div>
       <Switch checked={value} onCheckedChange={onChange} />
@@ -767,14 +767,14 @@ function ToggleRow({
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4 bg-[hsl(var(--surface))]">
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-[hsl(var(--brand)/0.1)] flex items-center justify-center">
+        <div className="w-9 h-9 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center">
           {icon}
         </div>
         <div>
-          <p className="text-[11px]" style={{ color: "hsl(var(--muted-foreground))" }}>{label}</p>
-          <p className="text-xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{value}</p>
+          <p className="text-[11px]" style={{ color: "hsl(var(--steel))" }}>{label}</p>
+          <p className="text-xl font-bold" style={{ color: "hsl(var(--ink))" }}>{value}</p>
         </div>
       </div>
     </Card>
@@ -788,7 +788,7 @@ function SettingsSection({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span style={{ color: "hsl(var(--muted-foreground))" }}>{icon}</span>
+          <span style={{ color: "hsl(var(--steel))" }}>{icon}</span>
           {title}
         </CardTitle>
         {description && <CardDescription>{description}</CardDescription>}
@@ -849,15 +849,15 @@ function ShortcutInput({
         tabIndex={0}
         className="w-full px-3 py-2 rounded-lg text-sm outline-none text-center cursor-pointer"
         style={{
-          background: "hsl(var(--card))",
-          border: recording ? "1px solid hsl(var(--brand))" : error ? "1px solid hsl(var(--destructive))" : "1px solid hsl(var(--border))",
-          color: "hsl(var(--foreground))",
+          background: "hsl(var(--canvas))",
+          border: recording ? "1px solid hsl(var(--primary))" : error ? "1px solid hsl(var(--destructive))" : "1px solid hsl(var(--hairline))",
+          color: "hsl(var(--ink))",
         }}
         onClick={handleClick}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       >
-        {recording ? <span style={{ color: "hsl(var(--brand))" }}>{promptText}</span> : translateShortcut(shortcut)}
+        {recording ? <span style={{ color: "hsl(var(--primary))" }}>{promptText}</span> : translateShortcut(shortcut)}
       </div>
       {error && (
         <p className="text-xs mt-1" style={{ color: "hsl(var(--destructive))" }}>{error}</p>
@@ -881,25 +881,25 @@ function ModelGuide({
             key={item.name}
             className="rounded-lg p-3"
             style={{
-              background: "hsl(var(--card))",
-              border: selected ? "1px solid hsl(var(--brand))" : "1px solid hsl(var(--border))",
+              background: "hsl(var(--canvas))",
+              border: selected ? "1px solid hsl(var(--primary))" : "1px solid hsl(var(--hairline))",
             }}
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-medium" style={{ color: "hsl(var(--foreground))" }}>{item.name}</p>
-                <p className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{item.provider}</p>
+                <p className="text-xs font-medium" style={{ color: "hsl(var(--ink))" }}>{item.name}</p>
+                <p className="text-xs mt-0.5" style={{ color: "hsl(var(--steel))" }}>{item.provider}</p>
               </div>
               <Button
-                variant={selected ? "brand" : "secondary"}
+                variant={selected ? "primary" : "secondary"}
                 size="sm"
                 onClick={() => onSelectModel(item.name)}
               >
                 {selected ? selectedText : chooseText}
               </Button>
             </div>
-            <p className="text-xs mt-2" style={{ color: "hsl(var(--muted-foreground))" }}>{item.description[uiLanguage]}</p>
-            <p className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>{toggleText}: {item.baseUrlHint}</p>
+            <p className="text-xs mt-2" style={{ color: "hsl(var(--steel))" }}>{item.description[uiLanguage]}</p>
+            <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>{toggleText}: {item.baseUrlHint}</p>
             {item.note && (
               <p className="text-xs mt-1" style={{ color: "hsl(var(--warning))" }}>{item.note[uiLanguage]}</p>
             )}
@@ -915,7 +915,7 @@ function IconButton({
 }: { title: string; onClick: () => void; children: React.ReactNode; accent?: boolean }) {
   return (
     <Button
-      variant={accent ? "brand" : "ghost"}
+      variant={accent ? "primary" : "ghost"}
       size="icon"
       onClick={onClick}
       title={title}
@@ -1344,7 +1344,7 @@ function App() {
 
   if (!settings) {
     return (
-      <div className="h-screen flex items-center justify-center text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>
+      <div className="h-screen flex items-center justify-center text-sm" style={{ color: "hsl(var(--steel))" }}>
         {m.loading}
       </div>
     );
@@ -1371,7 +1371,7 @@ function App() {
         <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
           <div className="flex items-center gap-2 px-4 py-4">
             <img src={logoUrl} alt="" width={24} height={24} />
-            <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Whisp</span>
+            <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
@@ -1386,13 +1386,13 @@ function App() {
                 <img src={logoUrl} alt="" width={28} height={28} />
                 <h1 className="text-xl font-semibold">{m.onboardingTitle}</h1>
               </div>
-              <p className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{m.appSubtitle}</p>
+              <p className="text-xs" style={{ color: "hsl(var(--steel))" }}>{m.appSubtitle}</p>
             </div>
 
             <div className="space-y-5">
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>1</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--primary))", color: "white" }}>1</span>
                   <span className="text-sm font-medium">{m.onboardingStep1}</span>
                   {apiKeyStatus === "ok" && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
                   {apiKeyStatus === "warn" && <AlertCircle size={14} style={{ color: "hsl(var(--warning))" }} />}
@@ -1409,7 +1409,7 @@ function App() {
                   {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                 </datalist>
                 <div className="flex items-center justify-end mt-2">
-                  <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "hsl(var(--brand))" }}>
+                  <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "hsl(var(--primary))" }}>
                     {showModelGuide ? m.collapseModelGuide : m.modelGuide}
                   </button>
                 </div>
@@ -1417,7 +1417,7 @@ function App() {
                   <ModelGuide currentModel={settings.model} onSelectModel={(modelName) => updateSettings({ model: modelName })} uiLanguage={uiLanguage} toggleText={m.apiBaseUrl} selectedText={m.connected} chooseText={m.save} />
                 )}
                 <Button
-                  variant="brand"
+                  variant="primary"
                   className="w-full mt-2"
                   onClick={() => testApiKey(settings.api_key, settings.api_base_url, settings.model)}
                   disabled={!settings.api_key || !settings.api_base_url || apiKeyStatus === "testing"}
@@ -1431,33 +1431,33 @@ function App() {
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>2</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--primary))", color: "white" }}>2</span>
                   <span className="text-sm font-medium">{m.onboardingStep2}</span>
                   {microphoneOk && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
                 </div>
                 {microphoneOk ? (
-                  <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--success))" }}>{m.enabled}</div>
+                  <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--canvas))", border: "1px solid hsl(var(--hairline))", color: "hsl(var(--success))" }}>{m.enabled}</div>
                 ) : (
-                  <Button variant="brand" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
+                  <Button variant="primary" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--brand))", color: "white" }}>3</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--primary))", color: "white" }}>3</span>
                   <span className="text-sm font-medium">{m.onboardingStep3}</span>
                   {accessibilityOk && <Check size={14} style={{ color: "hsl(var(--success))" }} />}
                 </div>
                 {accessibilityOk ? (
-                  <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", color: "hsl(var(--success))" }}>{m.enabled}</div>
+                  <div className="px-3 py-2 rounded-lg text-sm" style={{ background: "hsl(var(--canvas))", border: "1px solid hsl(var(--hairline))", color: "hsl(var(--success))" }}>{m.enabled}</div>
                 ) : (
-                  <Button variant="brand" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
+                  <Button variant="primary" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}>4</span>
+                  <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: "hsl(var(--muted))", color: "hsl(var(--steel))" }}>4</span>
                   <span className="text-sm font-medium">{m.onboardingStep4}</span>
                 </div>
                 <ShortcutInput shortcut={settings.shortcut} onCapture={(shortcut) => updateSettings({ shortcut })} invalidModifierText={m.invalidModifier} promptText={m.pressShortcut} />
@@ -1469,7 +1469,7 @@ function App() {
             )}
 
             <Button
-              variant="brand"
+              variant="primary"
               className="w-full mt-6 py-2.5"
               onClick={async () => { const ok = await persistSettings(); if (ok) setView("history"); }}
               disabled={!canProceed || savingSettings}
@@ -1487,7 +1487,7 @@ function App() {
     <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <img src={logoUrl} alt="" width={22} height={22} />
-        <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground))" }}>Whisp</span>
+        <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
       </div>
 
       <div className="flex-1 px-3 space-y-0.5">
@@ -1502,7 +1502,7 @@ function App() {
                 onClick={() => { flushAutoSave(); setView(item.id); }}
                 className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 border-l-2 ${
                   isActive
-                    ? "border-[hsl(var(--brand))] bg-[hsl(var(--sidebar-item-active-bg))]"
+                    ? "border-[hsl(var(--primary))] bg-[hsl(var(--sidebar-item-active-bg))]"
                     : "border-transparent hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
                 }`}
                 style={{
@@ -1529,7 +1529,7 @@ function App() {
           {updateStatus === "checking" ? m.checkingUpdates : updateStatus === "available" ? m.updateAvailable : m.checkForUpdates}
         </button>
         <div className="px-3 flex items-center gap-2">
-          <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+          <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>
             {appVersion ? `v${appVersion}` : ""}
           </span>
           {updateStatus === "available" && (
@@ -1543,13 +1543,13 @@ function App() {
   const settingsPageHeader = (title: string) => (
     <div className="flex items-center justify-between mb-6">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{title}</h1>
-        <p className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+        <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{title}</h1>
+        <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
           {savingSettings ? m.saving : settingsFeedback?.message ?? ""}
         </p>
       </div>
       <Button
-        variant="brand"
+        variant="primary"
         size="sm"
         onClick={async () => { const ok = await persistSettings(); if (ok) setView("history"); }}
       >
@@ -1581,7 +1581,7 @@ function App() {
                 description={m.apiConfigurationDesc}
               >
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.endpointPresets}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.endpointPresets}</label>
                   <div className="flex gap-2 flex-wrap">
                     {endpointPresets.map((preset) => (
                       <FilterChip key={preset.value} active={settings.api_base_url === preset.value} label={preset.label} onClick={() => updateSettings({ api_base_url: preset.value })} />
@@ -1589,11 +1589,11 @@ function App() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.apiBaseUrl}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.apiBaseUrl}</label>
                   <Input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} />
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.apiKey}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.apiKey}</label>
                   <Input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-..." />
                   <Button
                     variant="secondary"
@@ -1608,13 +1608,13 @@ function App() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.model}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.model}</label>
                   <Input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
                   <datalist id="model-options">
                     {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                   </datalist>
                   <div className="flex items-center justify-end mt-1">
-                    <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "hsl(var(--brand))" }}>
+                    <button onClick={() => setShowModelGuide((value) => !value)} className="text-xs" style={{ color: "hsl(var(--primary))" }}>
                       {showModelGuide ? m.collapseModelGuide : m.modelGuide}
                     </button>
                   </div>
@@ -1623,7 +1623,7 @@ function App() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.language}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.language}</label>
                   <select value={settings.language} onChange={(event) => updateSettings({ language: event.target.value })} className="w-full px-3 py-2 rounded-lg text-sm outline-none">
                     {["auto", "zh", "en", "ja", "ko", "es", "fr", "de"].map((language) => (
                       <option key={language} value={language}>{displaySpeechLanguage(language, uiLanguage)}</option>
@@ -1632,11 +1632,11 @@ function App() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.timeout}</label>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.timeout}</label>
                     <Input type="number" min={10} max={300} value={settings.request_timeout_sec} onChange={(event) => updateSettings({ request_timeout_sec: Math.max(10, Number(event.target.value) || 10) })} />
                   </div>
                   <div>
-                    <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.retryCount}</label>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.retryCount}</label>
                     <select value={settings.retry_count} onChange={(event) => updateSettings({ retry_count: Number(event.target.value) })} className="w-full px-3 py-2 rounded-lg text-sm outline-none">
                       <option value={0}>0</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
                     </select>
@@ -1676,7 +1676,7 @@ function App() {
                 {settings.ai_polish_enabled && (
                   <div className="space-y-3 pt-2">
                     <div>
-                      <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishApiUrl}</label>
+                      <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishApiUrl}</label>
                       <div className="flex gap-2 flex-wrap mb-2">
                         {aiPolishPresets.map((preset) => (
                           <FilterChip key={`polish-${preset.apiUrl}-${preset.model}`} active={settings.ai_polish_api_url === preset.apiUrl && settings.ai_polish_model === preset.model} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.apiUrl, ai_polish_model: preset.model }); setPolishStatus("untested"); setPolishError(null); }} />
@@ -1685,18 +1685,18 @@ function App() {
                       <Input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="https://api.openai.com/v1" />
                     </div>
                     <div>
-                      <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishApiKey}</label>
+                      <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishApiKey}</label>
                       <Input type="password" value={settings.ai_polish_api_key} onChange={(event) => { updateSettings({ ai_polish_api_key: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="sk-..." />
                     </div>
                     <div>
-                      <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishModel}</label>
+                      <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishModel}</label>
                       <Input list="polish-model-options" value={settings.ai_polish_model} onChange={(event) => updateSettings({ ai_polish_model: event.target.value })} placeholder="gpt-4o-mini" />
                       <datalist id="polish-model-options">
                         <option value="gpt-4o-mini" /><option value="gpt-4o" /><option value="deepseek-chat" /><option value="deepseek-reasoner" />
                       </datalist>
                     </div>
                     <div>
-                      <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.aiPolishPrompt}</label>
+                      <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishPrompt}</label>
                       <textarea
                         value={settings.ai_polish_prompt}
                         onChange={(event) => updateSettings({ ai_polish_prompt: event.target.value })}
@@ -1705,7 +1705,7 @@ function App() {
                         className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
                         style={{ fontFamily: "monospace", fontSize: "12px", lineHeight: "1.5" }}
                       />
-                      <p className="text-[11px] mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+                      <p className="text-[11px] mt-1" style={{ color: "hsl(var(--steel))" }}>
                         {m.aiPolishPromptDesc}
                       </p>
                     </div>
@@ -1753,23 +1753,23 @@ function App() {
                 description={m.recordingSettingsDesc}
               >
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.silenceTimeout}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.silenceTimeout}</label>
                   <Input type="number" min={0} max={3600} step={10} value={settings.silence_timeout_sec} onChange={(event) => updateSettings({ silence_timeout_sec: Math.max(0, Number(event.target.value) || 0) })} />
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.silenceThreshold}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.silenceThreshold}</label>
                   <Input type="number" min={0} max={1} step={0.005} value={settings.silence_threshold} onChange={(event) => updateSettings({ silence_threshold: Math.min(1, Math.max(0, Number(event.target.value) || 0)) })} />
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.whisperPrompt}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.whisperPrompt}</label>
                   <textarea value={settings.whisper_prompt} onChange={(event) => updateSettings({ whisper_prompt: event.target.value })} placeholder={m.whisperPromptPlaceholder} rows={3} className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none" />
                 </div>
                 <ToggleRow label={m.trimSilence} description={m.trimSilenceDesc} value={settings.trim_silence_enabled} onChange={(value) => updateSettings({ trim_silence_enabled: value })} />
                 <div>
-                  <label className="block text-xs mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+                  <label className="block text-xs mb-1" style={{ color: "hsl(var(--steel))" }}>
                     {m.audioRetentionLimit}
                   </label>
-                  <p className="text-[11px] mb-1" style={{ color: "hsl(var(--muted-foreground))" }}>{m.audioRetentionLimitDesc}</p>
+                  <p className="text-[11px] mb-1" style={{ color: "hsl(var(--steel))" }}>{m.audioRetentionLimitDesc}</p>
                   <Input
                     type="number"
                     min={10}
@@ -1811,7 +1811,7 @@ function App() {
               >
                 <ToggleRow label={m.autoPaste} description={m.autoPasteDesc} value={settings.auto_paste_enabled} onChange={(value) => updateSettings({ auto_paste_enabled: value })} />
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.pasteDelay}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.pasteDelay}</label>
                   <Input type="number" min={50} max={2000} step={50} value={settings.paste_delay_ms} onChange={(event) => updateSettings({ paste_delay_ms: Math.max(50, Number(event.target.value) || 50) })} />
                 </div>
                 <ToggleRow label={m.saveAudioFiles} description={m.saveAudioFilesDesc} value={settings.save_audio_files} onChange={(value) => updateSettings({ save_audio_files: value })} />
@@ -1856,16 +1856,16 @@ function App() {
                 description={m.shortcutsPermissionsDesc}
               >
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.uiLanguage}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.uiLanguage}</label>
                   <select value={settings.ui_language} onChange={(event) => updateSettings({ ui_language: event.target.value as UiLanguage })} className="w-full px-3 py-2 rounded-lg text-sm outline-none">
                     {uiLanguageOptions.map((option) => (<option key={option.value} value={option.value}>{option.label[uiLanguage]}</option>))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.shortcut}</label>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.shortcut}</label>
                   <ShortcutInput shortcut={settings.shortcut} onCapture={(shortcut) => updateSettings({ shortcut })} invalidModifierText={m.invalidModifier} promptText={m.pressShortcut} />
                   {settings.shortcut && (
-                    <button onClick={() => updateSettings({ shortcut: "" })} className="text-xs mt-1" style={{ color: "hsl(var(--brand))" }}>{m.resetToDefault}</button>
+                    <button onClick={() => updateSettings({ shortcut: "" })} className="text-xs mt-1" style={{ color: "hsl(var(--primary))" }}>{m.resetToDefault}</button>
                   )}
                   {shortcutConflictMsg && (
                     <p className="text-xs mt-1" style={{ color: "hsl(var(--destructive))" }}>{m.shortcutConflict}: {shortcutConflictMsg}</p>
@@ -1873,19 +1873,19 @@ function App() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.microphone}</label>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.microphone}</label>
                     {microphoneOk ? (
                       <StatusIcon ok={true} label={m.enabled} />
                     ) : (
-                      <Button variant="brand" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
+                      <Button variant="primary" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
                     )}
                   </div>
                   <div>
-                    <label className="block text-xs mb-1.5" style={{ color: "hsl(var(--muted-foreground))" }}>{m.accessibility}</label>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.accessibility}</label>
                     {accessibilityOk ? (
                       <StatusIcon ok={true} label={m.enabled} />
                     ) : (
-                      <Button variant="brand" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
+                      <Button variant="primary" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
                     )}
                   </div>
                 </div>
@@ -1897,10 +1897,10 @@ function App() {
                 description={m.appSettingsDesc}
               >
                 <ToggleRow label={m.launchAtStartup} description={m.launchAtStartupDesc} value={settings.launch_at_startup} onChange={(value) => updateSettings({ launch_at_startup: value })} />
-                <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid hsl(var(--border))" }}>
+                <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
                   <div>
-                    <div className="text-sm font-medium" style={{ color: "hsl(var(--foreground))" }}>{m.checkForUpdates}</div>
-                    <div className="text-xs mt-0.5" style={{ color: "hsl(var(--muted-foreground))" }}>{appVersion ? `v${appVersion}` : ""}</div>
+                    <div className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.checkForUpdates}</div>
+                    <div className="text-xs mt-0.5" style={{ color: "hsl(var(--steel))" }}>{appVersion ? `v${appVersion}` : ""}</div>
                   </div>
                   <Button
                     variant="secondary"
@@ -1922,21 +1922,21 @@ function App() {
                 {updateStatus === "available" && updateInfo && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant="brand">{m.updateAvailable}</Badge>
-                      <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>v{updateInfo.latestVersion}</span>
+                      <Badge variant="purple">{m.updateAvailable}</Badge>
+                      <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>v{updateInfo.latestVersion}</span>
                     </div>
                     {updateInfo.publishedAt && (
-                      <div className="text-[11px]" style={{ color: "hsl(var(--muted-foreground))" }}>{m.publishedAt}: {new Date(updateInfo.publishedAt).toLocaleDateString()}</div>
+                      <div className="text-[11px]" style={{ color: "hsl(var(--steel))" }}>{m.publishedAt}: {new Date(updateInfo.publishedAt).toLocaleDateString()}</div>
                     )}
                     {updateInfo.releaseNotes && (
                       <details className="group">
-                        <summary className="text-xs cursor-pointer" style={{ color: "hsl(var(--brand))" }}>{m.releaseNotes}</summary>
-                        <div className="mt-1.5 text-xs whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto rounded-lg p-2.5" style={{ background: "hsl(var(--muted))", color: "hsl(var(--muted-foreground))" }}>{updateInfo.releaseNotes}</div>
+                        <summary className="text-xs cursor-pointer" style={{ color: "hsl(var(--primary))" }}>{m.releaseNotes}</summary>
+                        <div className="mt-1.5 text-xs whitespace-pre-wrap leading-relaxed max-h-32 overflow-y-auto rounded-lg p-2.5" style={{ background: "hsl(var(--muted))", color: "hsl(var(--steel))" }}>{updateInfo.releaseNotes}</div>
                       </details>
                     )}
                     <div className="flex flex-wrap gap-1.5">
                       <Button
-                        variant="brand"
+                        variant="primary"
                         size="sm"
                         onClick={() => downloadAndInstall()}
                         disabled={downloading}
@@ -1982,7 +1982,7 @@ function App() {
                     {m.exportSettings}
                   </Button>
                   <Button
-                    variant="brand"
+                    variant="primary"
                     className="flex-1"
                     onClick={async () => {
                       try {
@@ -2038,7 +2038,7 @@ function App() {
             className="p-6"
           >
             <div className="mb-6">
-              <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{m.diagnostics}</h1>
+              <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{m.diagnostics}</h1>
             </div>
 
             <div className="space-y-6">
@@ -2048,12 +2048,12 @@ function App() {
                 description=""
               >
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.apiBaseUrl}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{settings.api_base_url || "—"}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.apiBaseUrl}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{settings.api_base_url || "—"}</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.apiKey}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.apiKey}</span>
                     <div className="flex items-center gap-2">
                       <StatusDot ok={Boolean(settings.api_key.trim())} />
                       <span className="text-xs" style={{ color: settings.api_key.trim() ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
@@ -2061,9 +2061,9 @@ function App() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.model}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{settings.model || "—"}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.model}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{settings.model || "—"}</span>
                   </div>
                 </div>
               </SettingsSection>
@@ -2074,8 +2074,8 @@ function App() {
                 description=""
               >
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.microphone}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.microphone}</span>
                     <div className="flex items-center gap-2">
                       <StatusDot ok={microphoneOk} />
                       <span className="text-xs" style={{ color: microphoneOk ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
@@ -2083,8 +2083,8 @@ function App() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.accessibility}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.accessibility}</span>
                     <div className="flex items-center gap-2">
                       <StatusDot ok={accessibilityOk} />
                       <span className="text-xs" style={{ color: accessibilityOk ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
@@ -2102,23 +2102,23 @@ function App() {
               >
                 {lastEntry ? (
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                      <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.model}</span>
-                      <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{lastEntry.model}</span>
+                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                      <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.model}</span>
+                      <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{lastEntry.model}</span>
                     </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                      <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.providerLabel}</span>
-                      <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{lastEntry.provider}</span>
+                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                      <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.providerLabel}</span>
+                      <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>{lastEntry.provider}</span>
                     </div>
-                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                      <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.total}</span>
+                    <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                      <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.total}</span>
                       <span className="text-xs" style={{ color: lastEntry.status === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
                         {lastEntry.status === "success" ? m.statusSuccess : m.statusFailed}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>{m.noHistory}</p>
+                  <p className="text-sm" style={{ color: "hsl(var(--steel))" }}>{m.noHistory}</p>
                 )}
               </SettingsSection>
 
@@ -2128,28 +2128,28 @@ function App() {
                 description=""
               >
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.versionLabel.split(" ")[0]}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{appVersion ? `v${appVersion}` : "—"}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.versionLabel.split(" ")[0]}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{appVersion ? `v${appVersion}` : "—"}</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.dataDirectory}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>~/.nanowhisper</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.dataDirectory}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>~/.nanowhisper</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--secondary))" }}>
-                    <span className="text-sm" style={{ color: "hsl(var(--foreground))" }}>{m.audioFilesCount}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--muted-foreground))" }}>{audioFileCount}</span>
+                  <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
+                    <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.audioFilesCount}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{audioFileCount}</span>
                   </div>
                 </div>
               </SettingsSection>
 
               <div className="mt-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--foreground))" }}>{m.runLogs}</h2>
+                  <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>{m.runLogs}</h2>
                   <div className="flex gap-2">
                     <Button variant="secondary" size="sm" onClick={copyAllLogs}>{m.copyAll}</Button>
                     <Button variant="secondary" size="sm" onClick={clearLogs}>{m.clearLogs}</Button>
-                    <Button variant={logsAutoScroll ? "brand" : "secondary"} size="sm" onClick={() => setLogsAutoScroll(!logsAutoScroll)}>
+                    <Button variant={logsAutoScroll ? "primary" : "secondary"} size="sm" onClick={() => setLogsAutoScroll(!logsAutoScroll)}>
                       {logsAutoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
                     </Button>
                   </div>
@@ -2158,25 +2158,25 @@ function App() {
                   ref={logContainerRef}
                   className="rounded-lg border overflow-y-auto font-mono text-xs leading-relaxed"
                   style={{
-                    background: "hsl(var(--card))",
-                    borderColor: "hsl(var(--border))",
+                    background: "hsl(var(--canvas))",
+                    borderColor: "hsl(var(--hairline))",
                     height: "320px",
                     userSelect: "text",
                     WebkitUserSelect: "text",
                   }}
                 >
                   {logs.length === 0 ? (
-                    <div className="p-4 text-center" style={{ color: "hsl(var(--muted-foreground))" }}>暂无日志</div>
+                    <div className="p-4 text-center" style={{ color: "hsl(var(--steel))" }}>暂无日志</div>
                   ) : (
                     <div className="p-2 space-y-0.5">
                       {logs.map((entry, idx) => (
                         <div key={idx} className="flex gap-2 px-2 py-0.5 rounded hover:bg-black/5 group">
-                          <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.timestamp}</span>
+                          <span className="shrink-0" style={{ color: "hsl(var(--steel))" }}>{entry.timestamp}</span>
                           <span className="shrink-0 font-semibold" style={{
-                            color: entry.level === "ERROR" ? "hsl(var(--destructive))" : entry.level === "WARN" ? "hsl(var(--warning))" : "hsl(var(--brand))"
+                            color: entry.level === "ERROR" ? "hsl(var(--destructive))" : entry.level === "WARN" ? "hsl(var(--warning))" : "hsl(var(--primary))"
                           }}>[{entry.level}]</span>
-                          <span className="shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.target}:</span>
-                          <span className="flex-1 break-all" style={{ color: "hsl(var(--foreground))", userSelect: "text", WebkitUserSelect: "text" }}>{entry.message}</span>
+                          <span className="shrink-0" style={{ color: "hsl(var(--steel))" }}>{entry.target}:</span>
+                          <span className="flex-1 break-all" style={{ color: "hsl(var(--ink))", userSelect: "text", WebkitUserSelect: "text" }}>{entry.message}</span>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2204,8 +2204,8 @@ function App() {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--foreground))" }}>{m.history}</h1>
-            <p className="text-xs mt-1" style={{ color: "hsl(var(--muted-foreground))" }}>
+            <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{m.history}</h1>
+            <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
               {formatTemplate(m.startHint, { shortcut: translateShortcut(settings.shortcut || "") })}
             </p>
           </div>
@@ -2238,30 +2238,30 @@ function App() {
         {/* Stat cards */}
         <div className="px-6 pb-3 grid grid-cols-4 gap-3">
           <StatCard
-            icon={<FileAudio size={18} className="text-[hsl(var(--brand))]" />}
+            icon={<FileAudio size={18} className="text-[hsl(var(--primary))]" />}
             label={m.statsTotal}
             value={String(stats.total)}
           />
           <StatCard
-            icon={<Clock size={18} className="text-[hsl(var(--brand))]" />}
+            icon={<Clock size={18} className="text-[hsl(var(--primary))]" />}
             label={m.statsToday}
             value={String(todayCount)}
           />
           <StatCard
-            icon={<Check size={18} className="text-[hsl(var(--brand))]" />}
+            icon={<Check size={18} className="text-[hsl(var(--primary))]" />}
             label={m.statsSuccess}
             value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : "—"}
           />
           <StatCard
-            icon={<Volume2 size={18} className="text-[hsl(var(--brand))]" />}
+            icon={<Volume2 size={18} className="text-[hsl(var(--primary))]" />}
             label={m.audioSaved}
             value={String(stats.audioSaved)}
           />
         </div>
         {(stats.totalCost > 0 || stats.totalTokens > 0) && (
-          <div className="px-6 pb-3 flex gap-4 text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
-            {stats.totalCost > 0 && <span>{m.totalCost}: <strong style={{ color: "hsl(var(--foreground))" }}>¥{stats.totalCost.toFixed(4)}</strong></span>}
-            {stats.totalTokens > 0 && <span>{m.totalTokens}: <strong style={{ color: "hsl(var(--foreground))" }}>{stats.totalTokens.toLocaleString()}</strong></span>}
+          <div className="px-6 pb-3 flex gap-4 text-xs" style={{ color: "hsl(var(--steel))" }}>
+            {stats.totalCost > 0 && <span>{m.totalCost}: <strong style={{ color: "hsl(var(--ink))" }}>¥{stats.totalCost.toFixed(4)}</strong></span>}
+            {stats.totalTokens > 0 && <span>{m.totalTokens}: <strong style={{ color: "hsl(var(--ink))" }}>{stats.totalTokens.toLocaleString()}</strong></span>}
           </div>
         )}
 
@@ -2283,7 +2283,7 @@ function App() {
             </div>
           )}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(var(--muted-foreground))" }}>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "hsl(var(--steel))" }}>
               <Search size={14} />
             </span>
             <Input
@@ -2310,17 +2310,17 @@ function App() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex flex-col items-center justify-center py-16 text-center"
               >
-                <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--secondary))] flex items-center justify-center mb-4">
-                  <Mic size={28} className="text-[hsl(var(--muted-foreground))]" />
+                <div className="w-16 h-16 rounded-2xl bg-[hsl(var(--surface))] flex items-center justify-center mb-4">
+                  <Mic size={28} className="text-[hsl(var(--steel))]" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{m.noHistory}</h3>
-                <p className="text-sm text-[hsl(var(--muted-foreground))] max-w-xs">
+                <p className="text-sm text-[hsl(var(--steel))] max-w-xs">
                   {formatTemplate(m.startHint, { shortcut: translateShortcut(settings.shortcut || "") })}
                 </p>
               </motion.div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-sm" style={{ color: "hsl(var(--muted-foreground))" }}>{m.noResults}</p>
+                <p className="text-sm" style={{ color: "hsl(var(--steel))" }}>{m.noResults}</p>
               </div>
             )
           ) : (
@@ -2334,7 +2334,7 @@ function App() {
                 const failed = entry.status === "failed";
                 const canRetry = Boolean(entry.audio_path);
                 return (
-                  <Card key={entry.id} className="p-4 hover:shadow-md transition-shadow duration-200" style={{
+                  <Card key={entry.id} className="p-4 border-[hsl(var(--hairline))]" style={{
                     borderColor: failed ? "hsl(var(--destructive) / 0.3)" : undefined,
                   }}>
                     <div className="flex items-start justify-between gap-3">
@@ -2359,7 +2359,7 @@ function App() {
                           <Badge>{displaySpeechLanguage(entry.language, uiLanguage)}</Badge>
                         </div>
                       </div>
-                      <div className="text-xs shrink-0" style={{ color: "hsl(var(--muted-foreground))" }}>{formatTime(entry.timestamp, uiLanguage)}</div>
+                      <div className="text-xs shrink-0" style={{ color: "hsl(var(--steel))" }}>{formatTime(entry.timestamp, uiLanguage)}</div>
                     </div>
 
                     <div className="mt-2">
@@ -2376,7 +2376,7 @@ function App() {
                           </Button>
                         </div>
                       ) : (
-                        <div className="text-sm cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ userSelect: "text", color: "hsl(var(--foreground))" }}>
+                        <div className="text-sm cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ userSelect: "text", color: "hsl(var(--ink))" }}>
                           {expandedId === entry.id || entry.text.length <= 120 ? `${entry.text}` : `${entry.text.slice(0, 120)}...`}
                         </div>
                       )}
@@ -2384,7 +2384,7 @@ function App() {
 
                     <div className="flex items-center justify-between mt-3 gap-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{entry.model}</span>
+                        <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>{entry.model}</span>
                         {entry.duration_ms ? (
                           <Badge>{formatDuration(entry.duration_ms)}</Badge>
                         ) : null}
@@ -2394,11 +2394,11 @@ function App() {
                           </Badge>
                         )}
                         {entry.polish_tokens && entry.polish_tokens > 0 && (
-                          <Badge variant="secondary">
+                          <Badge variant="default">
                             {entry.polish_tokens} tokens
                           </Badge>
                         )}
-                        <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>{canRetry ? m.audioSavedLabel : m.noAudio}</span>
+                        <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>{canRetry ? m.audioSavedLabel : m.noAudio}</span>
                       </div>
                       <div className="flex gap-0.5">
                         {!failed && (

@@ -1,91 +1,154 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Whisp Design System — Linear-inspired
-   Ultra-minimal, precise, purple accent, tight typography
+   Whisp Design System — Notion-inspired
+   Warm editorial, signature purple, sober rectangles, pastel tints
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --background: 0 0% 99%;
-  --foreground: 240 10% 3.5%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.5%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 96.5%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 96.5%;
-  --muted-foreground: 240 3.8% 42%;
-  --accent: 260 30% 96%;
-  --accent-foreground: 260 30% 25%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 91%;
-  --input: 240 5.9% 91%;
-  --ring: 260 30% 55%;
-  --radius: 0.625rem;
+  /* Brand & Primary */
+  --primary: 260 62% 48%;
+  --primary-pressed: 260 62% 38%;
+  --primary-deep: 260 62% 30%;
+  --on-primary: 0 0% 100%;
 
-  --sidebar-bg: 0 0% 99.5%;
-  --sidebar-border: 240 5.9% 92%;
-  --sidebar-item-active-bg: 260 30% 95%;
-  --sidebar-item-hover-bg: 240 4.8% 97.5%;
-  --sidebar-text: 240 4% 42%;
-  --sidebar-text-active: 260 30% 30%;
+  /* Surface */
+  --canvas: 0 0% 100%;
+  --surface: 40 20% 97%;
+  --surface-soft: 40 20% 99%;
+  --hairline: 40 12% 88%;
+  --hairline-soft: 40 16% 93%;
+  --hairline-strong: 40 10% 78%;
 
-  --success: 152 60% 36%;
+  /* Text — Notion's warm charcoal system */
+  --ink-deep: 0 0% 0%;
+  --ink: 0 0% 10%;
+  --charcoal: 30 5% 20%;
+  --slate: 30 4% 35%;
+  --steel: 30 4% 45%;
+  --stone: 30 4% 60%;
+  --muted: 30 5% 72%;
+
+  /* Card Tints (pastel feature cards) */
+  --tint-peach: 24 100% 92%;
+  --tint-rose: 340 80% 93%;
+  --tint-mint: 142 50% 90%;
+  --tint-lavender: 268 50% 92%;
+  --tint-sky: 210 80% 93%;
+  --tint-yellow: 48 80% 92%;
+  --tint-yellow-bold: 48 90% 80%;
+  --tint-cream: 40 40% 96%;
+  --tint-gray: 40 8% 94%;
+
+  /* Semantic */
+  --success: 142 60% 36%;
   --success-foreground: 0 0% 100%;
-  --warning: 38 92% 50%;
+  --warning: 24 90% 50%;
   --warning-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
 
-  /* Linear purple accent system */
-  --brand: 260 50% 55%;
+  /* Shorthand mappings for existing component usage */
+  --background: 40 20% 99%;
+  --foreground: 30 5% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 30 5% 20%;
+  --primary-fg: 0 0% 100%;
+  --secondary: 40 20% 97%;
+  --secondary-foreground: 30 5% 20%;
+  --muted-fg: 30 4% 45%;
+  --accent: 268 50% 95%;
+  --accent-foreground: 260 62% 35%;
+  --border: 40 12% 88%;
+  --input: 40 10% 78%;
+  --ring: 260 62% 48%;
+  --radius: 0.5rem;
+
+  --sidebar-bg: 40 20% 98.5%;
+  --sidebar-border: 40 12% 90%;
+  --sidebar-item-active-bg: 260 40% 95%;
+  --sidebar-item-hover-bg: 40 20% 97%;
+  --sidebar-text: 30 4% 45%;
+  --sidebar-text-active: 260 62% 35%;
+
+  --brand: 260 62% 48%;
   --brand-foreground: 0 0% 100%;
   --brand-subtle: 260 40% 96%;
-  --brand-glow: 260 60% 60%;
+  --brand-glow: 260 70% 55%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    --primary: 260 60% 62%;
+    --primary-pressed: 260 60% 52%;
+    --primary-deep: 260 60% 45%;
+    --on-primary: 0 0% 5%;
+
+    --canvas: 240 6% 6%;
+    --surface: 240 5% 10%;
+    --surface-soft: 240 5% 8%;
+    --hairline: 240 5% 18%;
+    --hairline-soft: 240 5% 14%;
+    --hairline-strong: 240 5% 25%;
+
+    --ink-deep: 0 0% 95%;
+    --ink: 0 0% 90%;
+    --charcoal: 40 5% 82%;
+    --slate: 40 4% 65%;
+    --steel: 40 4% 52%;
+    --stone: 40 4% 40%;
+    --muted: 40 5% 30%;
+
+    --tint-peach: 24 30% 18%;
+    --tint-rose: 340 25% 18%;
+    --tint-mint: 142 20% 16%;
+    --tint-lavender: 268 20% 18%;
+    --tint-sky: 210 25% 18%;
+    --tint-yellow: 48 25% 18%;
+    --tint-yellow-bold: 48 35% 22%;
+    --tint-cream: 40 15% 15%;
+    --tint-gray: 40 8% 14%;
+
+    --success: 142 50% 42%;
+    --success-foreground: 0 0% 5%;
+    --warning: 24 80% 55%;
+    --warning-foreground: 0 0% 5%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 0 0% 95%;
+
     --background: 240 6% 6%;
-    --foreground: 0 0% 93%;
+    --foreground: 40 5% 82%;
     --card: 240 6% 8.5%;
-    --card-foreground: 0 0% 93%;
-    --primary: 0 0% 93%;
-    --primary-foreground: 240 6% 6%;
-    --secondary: 240 4% 13%;
-    --secondary-foreground: 0 0% 93%;
-    --muted: 240 4% 14%;
-    --muted-foreground: 240 5% 55%;
-    --accent: 260 30% 16%;
-    --accent-foreground: 260 50% 80%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 16%;
-    --ring: 260 50% 60%;
+    --card-foreground: 40 5% 82%;
+    --primary-fg: 0 0% 5%;
+    --secondary: 240 5% 13%;
+    --secondary-foreground: 40 5% 82%;
+    --muted-fg: 40 4% 52%;
+    --accent: 260 20% 16%;
+    --accent-foreground: 260 60% 75%;
+    --border: 240 5% 18%;
+    --input: 240 5% 25%;
+    --ring: 260 60% 62%;
 
     --sidebar-bg: 240 6% 5%;
-    --sidebar-border: 240 4% 14%;
+    --sidebar-border: 240 5% 16%;
     --sidebar-item-active-bg: 260 25% 14%;
-    --sidebar-item-hover-bg: 240 4% 10%;
-    --sidebar-text: 240 5% 48%;
-    --sidebar-text-active: 260 50% 80%;
+    --sidebar-item-hover-bg: 240 5% 10%;
+    --sidebar-text: 40 4% 48%;
+    --sidebar-text-active: 260 60% 75%;
 
-    --success: 152 55% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 85% 55%;
-    --warning-foreground: 0 0% 100%;
-
-    --brand: 260 60% 68%;
-    --brand-foreground: 0 0% 100%;
-    --brand-subtle: 260 30% 12%;
+    --brand: 260 60% 62%;
+    --brand-foreground: 0 0% 5%;
+    --brand-subtle: 260 25% 12%;
     --brand-glow: 260 70% 55%;
   }
 }
 
+/* ═══ Typography ═══ */
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   user-select: none;
@@ -93,13 +156,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  font-size: 14px;
+  line-height: 1.50;
   letter-spacing: -0.011em;
-  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 }
 
 * {
   box-sizing: border-box;
 }
+
+/* ═══ Scrollbar ═══ */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -110,13 +177,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.2);
+  background: hsl(var(--muted) / 0.3);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.35);
+  background: hsl(var(--muted) / 0.5);
 }
+
+/* ═══ Form Controls ═══ */
 
 input, select, textarea {
   -webkit-appearance: none;
@@ -125,18 +194,21 @@ input, select, textarea {
   background-image: none !important;
   box-shadow: none !important;
   -webkit-box-shadow: none !important;
-  border: 1px solid hsl(var(--border)) !important;
-  background-color: hsl(var(--card)) !important;
-  color: hsl(var(--foreground)) !important;
+  border: 1px solid hsl(var(--hairline-strong)) !important;
+  background-color: hsl(var(--canvas)) !important;
+  color: hsl(var(--ink)) !important;
   outline: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.50;
   letter-spacing: -0.011em;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: hsl(var(--ring)) !important;
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.12) !important;
+  border-color: hsl(var(--primary)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.12) !important;
   outline: none !important;
 }
 
@@ -147,11 +219,12 @@ select {
   padding-right: 28px !important;
 }
 
+/* ═══ Animations ═══ */
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-/* Subtle pulse animation for brand-colored elements */
 @keyframes brand-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
