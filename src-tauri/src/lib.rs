@@ -9,6 +9,9 @@ mod recorder;
 mod settings;
 mod sound;
 mod transcribe;
+mod cost;
+mod shortcut;
+mod tray;
 
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use recorder::{encode_wav, trim_silence, AudioRecorder};
@@ -16,11 +19,10 @@ use settings::AppSettings;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 /// ~/.whisp/ (migrated from ~/.nanowhisper/)
 pub fn data_dir() -> PathBuf {
@@ -163,7 +165,7 @@ pub fn run() {
             let recent: Vec<_> = recent_entries.into_iter().take(5).collect();
             let recent_texts: Arc<Mutex<Vec<String>>> =
                 Arc::new(Mutex::new(recent.iter().map(|e| e.text.clone()).collect()));
-            app.manage(TrayRecentTexts(recent_texts.clone()));
+            app.manage(tray::TrayRecentTexts(recent_texts.clone()));
 
             let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> =
                 vec![Box::new(show_i), Box::new(separator)];
@@ -258,7 +260,7 @@ pub fn run() {
 
             // Register global shortcut (secondary, user-configurable)
             let settings = settings::get_settings();
-            register_shortcut(&app_handle, &settings);
+            shortcut::register_shortcut(&app_handle, &settings);
 
             // Listen for silence auto-stop from recorder worker
             let silence_handle = app_handle.clone();
@@ -273,7 +275,7 @@ pub fn run() {
             // Rebuild tray menu when history changes
             let tray_handle = app_handle.clone();
             app_handle.listen("history-updated", move |_| {
-                rebuild_tray_menu(&tray_handle);
+                tray::rebuild_tray_menu(&tray_handle);
             });
 
             // Show main window
@@ -311,162 +313,12 @@ pub fn run() {
         });
 }
 
-static SHORTCUT_PROCESSING: AtomicBool = AtomicBool::new(false);
 static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
-static LAST_SHORTCUT_TIME: AtomicU64 = AtomicU64::new(0);
-const DEBOUNCE_MS: u64 = 500;
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
-struct TrayRecentTexts(Arc<Mutex<Vec<String>>>);
 
-fn rebuild_tray_menu(app_handle: &tauri::AppHandle) {
-    let history = app_handle.state::<Arc<HistoryManager>>();
-    let entries = history.get_entries().unwrap_or_default();
-    let recent: Vec<_> = entries.into_iter().take(5).collect();
-
-    if let Some(tray_state) = app_handle.try_state::<TrayRecentTexts>() {
-        let mut texts = tray_state.0.lock().unwrap_or_else(|e| e.into_inner());
-        *texts = recent.iter().map(|e| e.text.clone()).collect();
-    }
-
-    let Some(tray) = app_handle.tray_by_id("main") else {
-        return;
-    };
-
-    let show_i = tauri::menu::MenuItem::with_id(app_handle, "show", "Show Whisp", true, None::<&str>);
-    let quit_i = tauri::menu::MenuItem::with_id(app_handle, "quit", "Quit", true, None::<&str>);
-    let separator = tauri::menu::PredefinedMenuItem::separator(app_handle);
-
-    let (Ok(show_i), Ok(quit_i), Ok(separator)) = (show_i, quit_i, separator) else {
-        return;
-    };
-
-    let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> =
-        vec![Box::new(show_i), Box::new(separator)];
-    for (i, entry) in recent.iter().enumerate() {
-        let label: String = entry.text.chars().take(40).collect();
-        let label = if entry.text.chars().count() > 40 {
-            format!("{}…", label)
-        } else {
-            label
-        };
-        let label = label.replace('&', "&amp;").replace('<', "&lt;");
-        if let Ok(item) = tauri::menu::MenuItem::with_id(
-            app_handle,
-            format!("history_{}", i),
-            label,
-            true,
-            None::<&str>,
-        ) {
-            menu_items.push(Box::new(item));
-        }
-    }
-    if let Ok(sep2) = tauri::menu::PredefinedMenuItem::separator(app_handle) {
-        menu_items.push(Box::new(sep2));
-    }
-    menu_items.push(Box::new(quit_i));
-
-    let menu_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
-        menu_items.iter().map(|b| b.as_ref()).collect();
-    if let Ok(menu) = tauri::menu::Menu::with_items(app_handle, &menu_refs) {
-        let _ = tray.set_menu(Some(menu));
-    }
-}
-
-pub fn register_shortcut(app_handle: &tauri::AppHandle, settings: &AppSettings) {
-    let shortcut_str = &settings.shortcut;
-    if shortcut_str.is_empty() {
-        return; // No custom shortcut configured; native hotkey only
-    }
-    let shortcut: Shortcut = match shortcut_str.parse() {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Invalid shortcut '{}': {}", shortcut_str, e);
-            return;
-        }
-    };
-
-    let handle = app_handle.clone();
-    if let Err(e) = app_handle
-        .global_shortcut()
-        .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            if event.state == ShortcutState::Pressed {
-                // Debounce: ignore duplicate events within 500ms
-                let now = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis() as u64;
-                let last = LAST_SHORTCUT_TIME.load(Ordering::SeqCst);
-                if now - last < DEBOUNCE_MS {
-                    return;
-                }
-                LAST_SHORTCUT_TIME.store(now, Ordering::SeqCst);
-
-                // CAS guard: prevent concurrent toggle
-                if SHORTCUT_PROCESSING
-                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-                    .is_err()
-                {
-                    return;
-                }
-
-                log::info!("Shortcut triggered");
-                let h = handle.clone();
-                std::thread::spawn(move || {
-                    toggle_recording(&h);
-                    SHORTCUT_PROCESSING.store(false, Ordering::SeqCst);
-                });
-            }
-        })
-    {
-        log::error!("Failed to register shortcut '{}': {}", shortcut_str, e);
-        let _ = app_handle.emit("shortcut-conflict", e.to_string());
-    }
-}
-
-/// Unregister old shortcut and register new one (called when settings change)
-pub fn re_register_shortcut(
-    app_handle: &tauri::AppHandle,
-    old_shortcut_str: &str,
-    new_settings: &AppSettings,
-) {
-    // Unregister old shortcut
-    if let Ok(old) = old_shortcut_str.parse::<Shortcut>() {
-        let _ = app_handle.global_shortcut().unregister(old);
-        log::info!("Unregistered old shortcut: {}", old_shortcut_str);
-    }
-    // Register new shortcut
-    register_shortcut(app_handle, new_settings);
-    log::info!("Registered new shortcut: {}", new_settings.shortcut);
-}
-
-fn register_escape(app_handle: &tauri::AppHandle) {
-    let escape: Shortcut = match "Escape".parse() {
-        Ok(s) => s,
-        Err(_) => return,
-    };
-    let handle = app_handle.clone();
-    let _ = app_handle
-        .global_shortcut()
-        .on_shortcut(escape, move |_app, _shortcut, event| {
-            if event.state != ShortcutState::Released {
-                log::info!("Escape triggered");
-                let h = handle.clone();
-                std::thread::spawn(move || {
-                    cancel_recording(&h);
-                });
-            }
-        });
-}
-
-fn unregister_escape(app_handle: &tauri::AppHandle) {
-    if let Ok(escape) = "Escape".parse::<Shortcut>() {
-        let _ = app_handle.global_shortcut().unregister(escape);
-    }
-}
-
-fn toggle_recording(app_handle: &tauri::AppHandle) {
+pub(crate) fn toggle_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
 
     if recorder.is_recording() {
@@ -556,7 +408,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
     log::info!("Recording started, model={}", saved.model);
 
     // Register Escape only while recording
-    register_escape(app_handle);
+    shortcut::register_escape(app_handle);
 }
 
 fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
@@ -579,7 +431,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     }
     let _guard = TranscribeGuard;
 
-    unregister_escape(app_handle);
+    shortcut::unregister_escape(app_handle);
 
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
     let history = app_handle.state::<Arc<HistoryManager>>();
@@ -780,9 +632,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 };
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
-                let asr_cost = estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
+                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
                 let polish_cost = if polish_tokens > 0 {
-                    estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens)
+                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens)
                 } else {
                     0.0
                 };
@@ -883,11 +735,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     });
 }
 
-fn cancel_recording(app_handle: &tauri::AppHandle) {
+pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
     if recorder.is_recording() {
         log::info!("Recording cancelled by user");
-        unregister_escape(app_handle);
+        shortcut::unregister_escape(app_handle);
         recorder.cancel();
         // Notify overlay so it can show brief "cancelled" feedback before self-closing
         let _ = app_handle.emit("recording-cancelled", ());
@@ -906,40 +758,3 @@ fn close_overlay(app_handle: &tauri::AppHandle) {
     }
 }
 
-fn estimate_asr_cost(api_base_url: &str, _model: &str, duration_sec: f64) -> f64 {
-    let url = api_base_url.to_ascii_lowercase();
-    let minutes = duration_sec / 60.0;
-    if url.contains("openai.com") {
-        minutes * 0.006
-    } else if url.contains("groq.com") {
-        0.0
-    } else if url.contains("xiaomimimo.com") {
-        (duration_sec / 3600.0) * 0.5
-    } else if url.contains("deepseek.com") {
-        minutes * 0.002
-    } else {
-        0.0
-    }
-}
-
-fn estimate_polish_cost(api_base_url: &str, model: &str, tokens: i64) -> f64 {
-    let url = api_base_url.to_ascii_lowercase();
-    let million_tokens = tokens as f64 / 1_000_000.0;
-    if url.contains("deepseek.com") {
-        if model.contains("v4-flash") {
-            million_tokens * 0.5
-        } else {
-            million_tokens * 1.0
-        }
-    } else if url.contains("openai.com") {
-        if model.contains("mini") {
-            million_tokens * 0.15
-        } else {
-            million_tokens * 2.5
-        }
-    } else if url.contains("xiaomimimo.com") {
-        million_tokens * 1.0
-    } else {
-        0.0
-    }
-}
