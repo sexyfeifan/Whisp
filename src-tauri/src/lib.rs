@@ -22,10 +22,23 @@ use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
-/// ~/.nanowhisper/
+/// ~/.whisp/ (migrated from ~/.nanowhisper/)
 pub fn data_dir() -> PathBuf {
     let home = dirs::home_dir().expect("Cannot determine home directory");
-    home.join(".nanowhisper")
+    let new_dir = home.join(".whisp");
+    let old_dir = home.join(".nanowhisper");
+
+    // Migrate from old directory if new doesn't exist but old does
+    if !new_dir.exists() && old_dir.exists() {
+        if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
+            log::warn!("Failed to migrate data dir from {:?} to {:?}: {}", old_dir, new_dir, e);
+            // Fall back to old directory if rename fails
+            return old_dir;
+        }
+        log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
+    }
+
+    new_dir
 }
 
 // Named constants
@@ -210,7 +223,7 @@ pub fn run() {
                     }
                     id if id.starts_with("history_") => {
                         if let Ok(idx) = id["history_".len()..].parse::<usize>() {
-                            let texts = tray_recent.lock().unwrap();
+                            let texts = tray_recent.lock().unwrap_or_else(|e| e.into_inner());
                             if let Some(text) = texts.get(idx) {
                                 let _ = app.clipboard().write_text(text);
                                 let settings = settings::get_settings();
@@ -299,6 +312,7 @@ pub fn run() {
 }
 
 static SHORTCUT_PROCESSING: AtomicBool = AtomicBool::new(false);
+static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
 static LAST_SHORTCUT_TIME: AtomicU64 = AtomicU64::new(0);
 const DEBOUNCE_MS: u64 = 500;
 #[cfg(target_os = "macos")]
@@ -312,7 +326,7 @@ fn rebuild_tray_menu(app_handle: &tauri::AppHandle) {
     let recent: Vec<_> = entries.into_iter().take(5).collect();
 
     if let Some(tray_state) = app_handle.try_state::<TrayRecentTexts>() {
-        let mut texts = tray_state.0.lock().unwrap();
+        let mut texts = tray_state.0.lock().unwrap_or_else(|e| e.into_inner());
         *texts = recent.iter().map(|e| e.text.clone()).collect();
     }
 
@@ -381,7 +395,7 @@ pub fn register_shortcut(app_handle: &tauri::AppHandle, settings: &AppSettings) 
                 // Debounce: ignore duplicate events within 500ms
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_millis() as u64;
                 let last = LAST_SHORTCUT_TIME.load(Ordering::SeqCst);
                 if now - last < DEBOUNCE_MS {
@@ -428,7 +442,10 @@ pub fn re_register_shortcut(
 }
 
 fn register_escape(app_handle: &tauri::AppHandle) {
-    let escape: Shortcut = "Escape".parse().unwrap();
+    let escape: Shortcut = match "Escape".parse() {
+        Ok(s) => s,
+        Err(_) => return,
+    };
     let handle = app_handle.clone();
     let _ = app_handle
         .global_shortcut()
@@ -543,6 +560,25 @@ fn start_recording(app_handle: &tauri::AppHandle) {
 }
 
 fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
+    // Guard: prevent concurrent transcriptions
+    if TRANSCRIBING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        log::warn!("Transcription already in progress, ignoring duplicate call");
+        return;
+    }
+
+    // RAII guard: clears TRANSCRIBING flag on all synchronous exit paths.
+    // The async path clears it explicitly at the end of the spawned task.
+    struct TranscribeGuard;
+    impl Drop for TranscribeGuard {
+        fn drop(&mut self) {
+            TRANSCRIBING.store(false, Ordering::SeqCst);
+        }
+    }
+    let _guard = TranscribeGuard;
+
     unregister_escape(app_handle);
 
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
@@ -679,10 +715,14 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let ai_polish_model = settings.ai_polish_model.clone();
     let ai_polish_prompt = settings.ai_polish_prompt.clone();
     let audio_retention_limit = settings.audio_retention_limit;
+    let ui_language = settings.ui_language.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!("Transcription requested, model={}, api_url={}, language={}", model, api_base_url, language);
     log::info!("Calling API with model={} via {}...", model, api_base_url);
+
+    // Prevent the RAII guard from clearing the flag — the async task will clear it
+    std::mem::forget(_guard);
 
     tauri::async_runtime::spawn(async move {
         let lang = if language == "auto" {
@@ -721,7 +761,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                         &ai_polish_model,
                         &text,
                         &ai_polish_prompt,
-                        settings.request_timeout_sec,
+                        request_timeout_sec,
                     )
                     .await
                     {
@@ -805,7 +845,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
                 let error_message = e.to_string();
                 let entry = NewHistoryEntry {
-                    text: format!("转写失败: {}", &error_message.chars().take(100).collect::<String>()),
+                    text: format!("{} {}", tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"), &error_message.chars().take(100).collect::<String>()),
                     model: model.clone(),
                     duration_ms,
                     audio_path: audio_path_str.clone(),
@@ -837,6 +877,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
         // Notify main window to refresh (both success and failure)
         let _ = handle.emit("history-updated", ());
+
+        // Clear transcription guard
+        TRANSCRIBING.store(false, Ordering::SeqCst);
     });
 }
 

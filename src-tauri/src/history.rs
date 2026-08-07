@@ -97,7 +97,7 @@ impl HistoryManager {
     }
 
     pub fn add_entry(&self, entry: &NewHistoryEntry) -> Result<HistoryEntry> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let timestamp = chrono::Utc::now().timestamp();
         conn.execute(
             "INSERT INTO transcriptions (
@@ -154,7 +154,7 @@ impl HistoryManager {
     }
 
     pub fn get_entry_by_id(&self, id: i64) -> Result<Option<HistoryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT
                 id,
@@ -190,7 +190,7 @@ impl HistoryManager {
         api_base_url: &str,
         language: &str,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let timestamp = chrono::Utc::now().timestamp();
         conn.execute(
             "UPDATE transcriptions
@@ -225,7 +225,7 @@ impl HistoryManager {
         polish_tokens: Option<i64>,
         estimated_cost: Option<f64>,
     ) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute(
             "UPDATE transcriptions
              SET asr_duration_sec = ?1,
@@ -238,7 +238,7 @@ impl HistoryManager {
     }
 
     pub fn get_entries(&self) -> Result<Vec<HistoryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT
                 id,
@@ -266,7 +266,7 @@ impl HistoryManager {
     }
 
     pub fn get_entries_page(&self, limit: i64, offset: i64) -> Result<Vec<HistoryEntry>> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let mut stmt = conn.prepare(
             "SELECT
                 id,
@@ -295,7 +295,7 @@ impl HistoryManager {
     }
 
     pub fn delete_entry(&self, id: i64) -> Result<()> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let audio_path: Option<String> = conn
             .query_row(
                 "SELECT audio_path FROM transcriptions WHERE id = ?1",
@@ -315,7 +315,7 @@ impl HistoryManager {
         if ids.is_empty() {
             return Ok(());
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         // Collect audio paths first
         let placeholders: String = ids.iter().enumerate()
             .map(|(i, _)| format!("?{}", i + 1))
@@ -347,7 +347,7 @@ impl HistoryManager {
     pub fn cleanup_old_audio(&self, keep: usize) -> Result<()> {
         // Collect paths first, then release lock before doing filesystem I/O
         let paths: Vec<String> = {
-            let conn = self.conn.lock().unwrap();
+            let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
             let mut stmt = conn.prepare(
                 "SELECT audio_path FROM transcriptions
                  ORDER BY timestamp DESC
@@ -362,7 +362,7 @@ impl HistoryManager {
         };
 
         // Delete files and update DB
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         for path in paths {
             if std::fs::remove_file(&path).is_ok() {
                 conn.execute(
@@ -380,7 +380,7 @@ impl HistoryManager {
             let _ = std::fs::remove_dir_all(&audio_dir);
             let _ = std::fs::create_dir_all(&audio_dir);
         }
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("DELETE FROM transcriptions", [])?;
         Ok(())
     }

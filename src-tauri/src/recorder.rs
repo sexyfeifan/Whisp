@@ -36,7 +36,7 @@ impl AudioRecorder {
     }
 
     pub fn is_recording(&self) -> bool {
-        *self.is_recording.lock().unwrap()
+        *self.is_recording.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     pub fn start(&self, app_handle: AppHandle, silence_timeout_sec: u64, silence_threshold: f32) -> Result<()> {
@@ -49,7 +49,7 @@ impl AudioRecorder {
         let is_recording = self.is_recording.clone();
 
         // Mark as recording before spawning thread to prevent double-start
-        *is_recording.lock().unwrap() = true;
+        *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = true;
 
         // Build stream on worker thread so Stream doesn't need Send
         let worker = thread::spawn(move || {
@@ -58,7 +58,7 @@ impl AudioRecorder {
                 Some(d) => d,
                 None => {
                     log::error!("No input device available");
-                    *is_recording.lock().unwrap() = false;
+                    *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     return;
                 }
             };
@@ -66,7 +66,7 @@ impl AudioRecorder {
                 Ok(c) => c,
                 Err(e) => {
                     log::error!("Failed to get input config: {}", e);
-                    *is_recording.lock().unwrap() = false;
+                    *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     return;
                 }
             };
@@ -90,7 +90,7 @@ impl AudioRecorder {
                 }
                 _ => {
                     log::error!("Unsupported sample format");
-                    *is_recording.lock().unwrap() = false;
+                    *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     return;
                 }
             };
@@ -98,13 +98,13 @@ impl AudioRecorder {
                 Ok(s) => s,
                 Err(e) => {
                     log::error!("Failed to build stream: {}", e);
-                    *is_recording.lock().unwrap() = false;
+                    *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     return;
                 }
             };
             if let Err(e) = stream.play() {
                 log::error!("Failed to play stream: {}", e);
-                *is_recording.lock().unwrap() = false;
+                *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                 return;
             }
 
@@ -159,7 +159,7 @@ impl AudioRecorder {
                 if silent_chunks >= silence_chunks_limit {
                     log::info!("Silence timeout reached, auto-stopping recording");
                     drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
-                    *is_recording.lock().unwrap() = false;
+                    *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     let audio = RecordedAudio {
                         samples: std::mem::take(&mut buffer),
                         sample_rate,
@@ -174,7 +174,7 @@ impl AudioRecorder {
                     Ok(Cmd::Stop(reply)) => {
                         // Drain remaining audio before returning
                         drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
-                        *is_recording.lock().unwrap() = false;
+                        *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         let audio = RecordedAudio {
                             samples: std::mem::take(&mut buffer),
                             sample_rate,
@@ -183,7 +183,7 @@ impl AudioRecorder {
                         break;
                     }
                     Ok(Cmd::Cancel) => {
-                        *is_recording.lock().unwrap() = false;
+                        *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         break;
                     }
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -194,9 +194,9 @@ impl AudioRecorder {
             drop(stream);
         });
 
-        *self.cmd_tx.lock().unwrap() = Some(cmd_tx);
-        *self.worker.lock().unwrap() = Some(worker);
-        *self.auto_stop_rx.lock().unwrap() = Some(auto_stop_rx);
+        *self.cmd_tx.lock().unwrap_or_else(|e| e.into_inner()) = Some(cmd_tx);
+        *self.worker.lock().unwrap_or_else(|e| e.into_inner()) = Some(worker);
+        *self.auto_stop_rx.lock().unwrap_or_else(|e| e.into_inner()) = Some(auto_stop_rx);
         Ok(())
     }
 
@@ -217,7 +217,7 @@ impl AudioRecorder {
 
     /// Returns audio if silence auto-stop fired, None otherwise (non-blocking).
     pub fn take_auto_stop_audio(&self) -> Option<RecordedAudio> {
-        let rx = self.auto_stop_rx.lock().unwrap();
+        let rx = self.auto_stop_rx.lock().unwrap_or_else(|e| e.into_inner());
         rx.as_ref()?.try_recv().ok()
     }
 
@@ -227,17 +227,17 @@ impl AudioRecorder {
     }
 
     fn send_cmd(&self, cmd: Cmd) {
-        if let Some(tx) = self.cmd_tx.lock().unwrap().as_ref() {
+        if let Some(tx) = self.cmd_tx.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             let _ = tx.send(cmd);
         }
     }
 
     fn join_worker(&self) {
-        if let Some(handle) = self.worker.lock().unwrap().take() {
+        if let Some(handle) = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take() {
             let _ = handle.join();
         }
-        *self.cmd_tx.lock().unwrap() = None;
-        *self.auto_stop_rx.lock().unwrap() = None;
+        *self.cmd_tx.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *self.auto_stop_rx.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
 }
 
@@ -336,4 +336,64 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
     }
 
     trimmed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_audio(samples: Vec<f32>, sample_rate: u32) -> RecordedAudio {
+        RecordedAudio { samples, sample_rate }
+    }
+
+    #[test]
+    fn test_trim_silence_empty() {
+        let audio = make_audio(vec![], 16000);
+        let trimmed = trim_silence(&audio, 0.015, 120);
+        assert!(trimmed.samples.is_empty());
+    }
+
+    #[test]
+    fn test_trim_silence_all_silent() {
+        let audio = make_audio(vec![0.0; 16000], 16000); // 1s silence
+        let trimmed = trim_silence(&audio, 0.015, 120);
+        assert_eq!(trimmed.samples.len(), 16000); // Should return original
+    }
+
+    #[test]
+    fn test_trim_silence_with_speech() {
+        // 0.5s silence + 1s speech + 0.5s silence at 16kHz
+        let mut samples = vec![0.0; 8000]; // leading silence
+        samples.extend(vec![0.5; 16000]); // speech
+        samples.extend(vec![0.0; 8000]); // trailing silence
+        let audio = make_audio(samples, 16000);
+        let trimmed = trim_silence(&audio, 0.015, 120);
+        // Should trim silence but keep padding
+        assert!(trimmed.samples.len() < 32000);
+        assert!(trimmed.samples.len() > 16000); // speech + padding
+    }
+
+    #[test]
+    fn test_encode_wav() {
+        let audio = make_audio(vec![0.1, -0.1, 0.5, -0.5], 16000);
+        let wav = encode_wav(&audio).unwrap();
+        // WAV header starts with "RIFF"
+        assert!(wav.starts_with(b"RIFF"));
+        // Contains "WAVE"
+        assert!(wav.windows(4).any(|w| w == b"WAVE"));
+    }
+
+    #[test]
+    fn test_encode_wav_empty() {
+        let audio = make_audio(vec![], 16000);
+        let wav = encode_wav(&audio).unwrap();
+        assert!(wav.starts_with(b"RIFF"));
+    }
+
+    #[test]
+    fn test_trim_silence_zero_sample_rate() {
+        let audio = make_audio(vec![0.5; 100], 0);
+        let trimmed = trim_silence(&audio, 0.015, 120);
+        assert_eq!(trimmed.samples.len(), 100); // Should return original
+    }
 }

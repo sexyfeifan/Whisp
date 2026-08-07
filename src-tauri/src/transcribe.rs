@@ -392,3 +392,113 @@ pub async fn transcribe_audio(
 
     anyhow::bail!("Transcription failed after retries")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_name() {
+        assert_eq!(provider_name("https://api.openai.com/v1"), "OpenAI");
+        assert_eq!(provider_name("https://api.groq.com/openai/v1"), "Groq");
+        assert_eq!(provider_name("https://api.fireworks.ai/v1"), "Fireworks");
+        assert_eq!(provider_name("https://api.deepgram.com/v1"), "Deepgram");
+        assert_eq!(provider_name("https://speech.googleapis.com/v1"), "Google Cloud");
+        assert_eq!(provider_name("https://api.xiaomimimo.com/v1"), "MiMo");
+        assert_eq!(provider_name("https://my-custom-api.com/v1"), "Custom");
+    }
+
+    #[test]
+    fn test_provider_name_case_insensitive() {
+        assert_eq!(provider_name("https://API.OPENAI.COM/v1"), "OpenAI");
+        assert_eq!(provider_name("https://Api.Groq.Com/v1"), "Groq");
+    }
+
+    #[test]
+    fn test_transcription_endpoint_standard() {
+        let url = transcription_endpoint("https://api.openai.com/v1").unwrap();
+        assert_eq!(url.as_str(), "https://api.openai.com/v1/audio/transcriptions");
+    }
+
+    #[test]
+    fn test_transcription_endpoint_already_full() {
+        let url = transcription_endpoint("https://api.openai.com/v1/audio/transcriptions").unwrap();
+        assert_eq!(url.as_str(), "https://api.openai.com/v1/audio/transcriptions");
+    }
+
+    #[test]
+    fn test_transcription_endpoint_no_v1() {
+        let url = transcription_endpoint("https://api.example.com").unwrap();
+        assert_eq!(url.as_str(), "https://api.example.com/v1/audio/transcriptions");
+    }
+
+    #[test]
+    fn test_transcription_endpoint_empty() {
+        assert!(transcription_endpoint("").is_err());
+    }
+
+    #[test]
+    fn test_generate_silent_wav() {
+        let wav = generate_silent_wav();
+        assert!(wav.starts_with(b"RIFF"));
+        assert!(wav.len() > 44); // At least header + some data
+    }
+
+    #[test]
+    fn test_shorten_error_body_short() {
+        assert_eq!(shorten_error_body("short error".to_string()), "short error");
+    }
+
+    #[test]
+    fn test_shorten_error_body_long() {
+        let long = "x".repeat(1000);
+        let result = shorten_error_body(long);
+        assert!(result.len() <= 502); // 500 + "…"
+        assert!(result.ends_with('…'));
+    }
+
+    #[test]
+    fn test_should_retry_status() {
+        assert!(should_retry_status(StatusCode::TOO_MANY_REQUESTS));
+        assert!(should_retry_status(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(should_retry_status(StatusCode::BAD_GATEWAY));
+        assert!(!should_retry_status(StatusCode::OK));
+        assert!(!should_retry_status(StatusCode::BAD_REQUEST));
+        assert!(!should_retry_status(StatusCode::UNAUTHORIZED));
+    }
+
+    #[test]
+    fn test_backoff_duration() {
+        let d0 = backoff_duration(0);
+        let d1 = backoff_duration(1);
+        let d2 = backoff_duration(2);
+        assert!(d1 > d0);
+        assert!(d2 > d1);
+        assert_eq!(d0.as_millis(), 400);
+        assert_eq!(d1.as_millis(), 800);
+        assert_eq!(d2.as_millis(), 1600);
+    }
+
+    #[test]
+    fn test_extract_text() {
+        let json = serde_json::json!({"text": "hello world"});
+        assert_eq!(extract_text(&json), Some("hello world".to_string()));
+
+        let json2 = serde_json::json!({"transcript": "test transcript"});
+        assert_eq!(extract_text(&json2), Some("test transcript".to_string()));
+
+        let json3 = serde_json::json!({"choices": [{"message": {"content": "chat result"}}]});
+        assert_eq!(extract_text(&json3), Some("chat result".to_string()));
+
+        let json4 = serde_json::json!({"empty": true});
+        assert_eq!(extract_text(&json4), None);
+    }
+
+    #[test]
+    fn test_is_mimo_asr() {
+        assert!(is_mimo_asr("mimo-v2.5-asr"));
+        assert!(is_mimo_asr("MIMO-V2.5-ASR"));
+        assert!(!is_mimo_asr("whisper-1"));
+        assert!(!is_mimo_asr("gpt-4o-transcribe"));
+    }
+}

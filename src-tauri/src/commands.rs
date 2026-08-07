@@ -188,10 +188,16 @@ pub fn export_history(history: State<'_, Arc<HistoryManager>>) -> Result<String,
 }
 
 fn csv_escape(field: &str) -> String {
-    if field.contains(',') || field.contains('"') || field.contains('\n') || field.contains('\r') {
-        format!("\"{}\"", field.replace('"', "\"\""))
+    // Prevent CSV formula injection: prefix dangerous leading chars with a single quote
+    let sanitized = if field.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{}", field)
     } else {
         field.to_string()
+    };
+    if sanitized.contains(',') || sanitized.contains('"') || sanitized.contains('\n') || sanitized.contains('\r') {
+        format!("\"{}\"", sanitized.replace('"', "\"\""))
+    } else {
+        sanitized
     }
 }
 
@@ -669,5 +675,43 @@ pub async fn download_and_install_update(
     #[cfg(target_os = "linux")]
     {
         return Ok(format!("已下载到: {}", file_path.display()));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_csv_escape_normal() {
+        assert_eq!(csv_escape("hello"), "hello");
+    }
+
+    #[test]
+    fn test_csv_escape_with_comma() {
+        assert_eq!(csv_escape("hello, world"), "\"hello, world\"");
+    }
+
+    #[test]
+    fn test_csv_escape_with_quotes() {
+        assert_eq!(csv_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
+    }
+
+    #[test]
+    fn test_csv_escape_formula_injection() {
+        // Formula injection attempts should be prefixed with single quote
+        assert_eq!(csv_escape("=cmd|' /C calc'!A0"), "'=cmd|' /C calc'!A0");
+        assert_eq!(csv_escape("+SUM(A1)"), "'+SUM(A1)");
+        assert_eq!(csv_escape("-SUM(A1)"), "'-SUM(A1)");
+        assert_eq!(csv_escape("@SUM(A1)"), "'@SUM(A1)");
+    }
+
+    #[test]
+    fn test_compare_versions() {
+        assert_eq!(compare_versions("2.8.0", "2.7.1"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("2.7.1", "2.7.1"), std::cmp::Ordering::Equal);
+        assert_eq!(compare_versions("2.7.0", "2.7.1"), std::cmp::Ordering::Less);
+        assert_eq!(compare_versions("v2.8.0", "v2.7.1"), std::cmp::Ordering::Greater);
+        assert_eq!(compare_versions("2.8.0-beta", "2.7.1"), std::cmp::Ordering::Greater);
     }
 }
