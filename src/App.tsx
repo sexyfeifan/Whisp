@@ -2134,7 +2134,7 @@ function App() {
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
                     <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.dataDirectory}</span>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>~/.nanowhisper</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>~/.whisp</span>
                   </div>
                   <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
                     <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.audioFilesCount}</span>

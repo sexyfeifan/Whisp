@@ -8,8 +8,7 @@ pub struct EnigoState(pub Mutex<Enigo>);
 
 impl EnigoState {
     pub fn new() -> Result<Self, String> {
-        let enigo = Enigo::new(&Settings::default())
-            .map_err(|e| format!("Failed to initialize Enigo: {}", e))?;
+        let enigo = Enigo::new(&Settings::default()).map_err(|e| format!("Failed to initialize Enigo: {}", e))?;
         Ok(Self(Mutex::new(enigo)))
     }
 }
@@ -68,9 +67,7 @@ pub fn simulate_paste(app_handle: &AppHandle) -> Result<(), String> {
         log::info!("EnigoState auto-initialized");
     }
 
-    let enigo_state = app_handle
-        .try_state::<EnigoState>()
-        .ok_or("Enigo not initialized")?;
+    let enigo_state = app_handle.try_state::<EnigoState>().ok_or("Enigo not initialized")?;
     let mut enigo = enigo_state
         .0
         .lock()
@@ -123,10 +120,7 @@ pub fn activate_app_by_bundle_id(bundle_id: &str) -> Result<(), String> {
         return Err("Empty bundle id".into());
     }
 
-    let script = format!(
-        "tell application id \"{}\" to activate",
-        normalized.replace('\"', "")
-    );
+    let script = format!("tell application id \"{}\" to activate", normalized.replace('\"', ""));
     let output = Command::new("osascript")
         .arg("-e")
         .arg(script)

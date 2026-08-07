@@ -26,9 +26,7 @@ impl Log for RingBufferLogger {
     }
     fn log(&self, record: &Record) {
         let entry = LogEntry {
-            timestamp: chrono::Local::now()
-                .format("%Y-%m-%d %H:%M:%S%.3f")
-                .to_string(),
+            timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
             level: record.level().to_string(),
             target: record.target().to_string(),
             message: format!("{}", record.args()),
@@ -53,11 +51,7 @@ pub fn init() {
 }
 
 pub fn get_logs() -> Vec<LogEntry> {
-    LOGGER
-        .buffer
-        .lock()
-        .map(|buf| buf.clone())
-        .unwrap_or_default()
+    LOGGER.buffer.lock().map(|buf| buf.clone()).unwrap_or_default()
 }
 
 pub fn clear_logs() {

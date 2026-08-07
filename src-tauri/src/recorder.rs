@@ -76,18 +76,10 @@ impl AudioRecorder {
             let (audio_tx, audio_rx) = mpsc::channel::<Vec<f32>>();
 
             let stream = match config.sample_format() {
-                SampleFormat::F32 => {
-                    build_stream::<f32>(&device, &config.into(), audio_tx, channels)
-                }
-                SampleFormat::I16 => {
-                    build_stream::<i16>(&device, &config.into(), audio_tx, channels)
-                }
-                SampleFormat::I32 => {
-                    build_stream::<i32>(&device, &config.into(), audio_tx, channels)
-                }
-                SampleFormat::U16 => {
-                    build_stream::<u16>(&device, &config.into(), audio_tx, channels)
-                }
+                SampleFormat::F32 => build_stream::<f32>(&device, &config.into(), audio_tx, channels),
+                SampleFormat::I16 => build_stream::<i16>(&device, &config.into(), audio_tx, channels),
+                SampleFormat::I32 => build_stream::<i32>(&device, &config.into(), audio_tx, channels),
+                SampleFormat::U16 => build_stream::<u16>(&device, &config.into(), audio_tx, channels),
                 _ => {
                     log::error!("Unsupported sample format");
                     *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
@@ -123,42 +115,51 @@ impl AudioRecorder {
             // This prevents brief pauses during speech from triggering auto-stop
             let min_chunks_before_silence = (sample_rate as u64 * 3) / 512;
 
-            let drain_audio =
-                |audio_rx: &mpsc::Receiver<Vec<f32>>,
-                 buffer: &mut Vec<f32>,
-                 app_handle: &AppHandle,
-                 silent_chunks: &mut u64,
-                 total_chunks: &mut u64| {
-                    while let Ok(chunk) = audio_rx.try_recv() {
-                        buffer.extend_from_slice(&chunk);
+            let drain_audio = |audio_rx: &mpsc::Receiver<Vec<f32>>,
+                               buffer: &mut Vec<f32>,
+                               app_handle: &AppHandle,
+                               silent_chunks: &mut u64,
+                               total_chunks: &mut u64| {
+                while let Ok(chunk) = audio_rx.try_recv() {
+                    buffer.extend_from_slice(&chunk);
 
-                        if buffer.len() % 512 < chunk.len() {
-                            *total_chunks += 1;
-                            let recent = &buffer[buffer.len().saturating_sub(512)..];
-                            let rms = (recent.iter().map(|s| s * s).sum::<f32>()
-                                / recent.len() as f32)
-                                .sqrt();
-                            let _ = app_handle.emit("audio-level", rms.min(1.0));
-                            // Only count silence after minimum recording duration
-                            if *total_chunks > min_chunks_before_silence {
-                                if rms < silence_threshold {
-                                    *silent_chunks += 1;
-                                } else {
-                                    *silent_chunks = 0;
-                                }
+                    if buffer.len() % 512 < chunk.len() {
+                        *total_chunks += 1;
+                        let recent = &buffer[buffer.len().saturating_sub(512)..];
+                        let rms = (recent.iter().map(|s| s * s).sum::<f32>() / recent.len() as f32).sqrt();
+                        let _ = app_handle.emit("audio-level", rms.min(1.0));
+                        // Only count silence after minimum recording duration
+                        if *total_chunks > min_chunks_before_silence {
+                            if rms < silence_threshold {
+                                *silent_chunks += 1;
+                            } else {
+                                *silent_chunks = 0;
                             }
                         }
                     }
-                };
+                }
+            };
 
             loop {
                 // Drain audio data
-                drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
+                drain_audio(
+                    &audio_rx,
+                    &mut buffer,
+                    &app_handle,
+                    &mut silent_chunks,
+                    &mut total_chunks,
+                );
 
                 // Silence auto-stop
                 if silent_chunks >= silence_chunks_limit {
                     log::info!("Silence timeout reached, auto-stopping recording");
-                    drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
+                    drain_audio(
+                        &audio_rx,
+                        &mut buffer,
+                        &app_handle,
+                        &mut silent_chunks,
+                        &mut total_chunks,
+                    );
                     *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     let audio = RecordedAudio {
                         samples: std::mem::take(&mut buffer),
@@ -173,7 +174,13 @@ impl AudioRecorder {
                 match cmd_rx.recv_timeout(std::time::Duration::from_millis(5)) {
                     Ok(Cmd::Stop(reply)) => {
                         // Drain remaining audio before returning
-                        drain_audio(&audio_rx, &mut buffer, &app_handle, &mut silent_chunks, &mut total_chunks);
+                        drain_audio(
+                            &audio_rx,
+                            &mut buffer,
+                            &app_handle,
+                            &mut silent_chunks,
+                            &mut total_chunks,
+                        );
                         *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         let audio = RecordedAudio {
                             samples: std::mem::take(&mut buffer),
@@ -255,10 +262,7 @@ fn build_stream<T: Sample + cpal::SizedSample + Send + 'static>(
                 mono.extend(data.iter().map(|s| s.to_float_sample().to_sample::<f32>()));
             } else {
                 for frame in data.chunks_exact(channels) {
-                    let sum: f32 = frame
-                        .iter()
-                        .map(|s| s.to_float_sample().to_sample::<f32>())
-                        .sum();
+                    let sum: f32 = frame.iter().map(|s| s.to_float_sample().to_sample::<f32>()).sum();
                     mono.push(sum / channels as f32);
                 }
             }
@@ -296,24 +300,14 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
         return audio.clone();
     }
 
-    let peak = audio
-        .samples
-        .iter()
-        .map(|sample| sample.abs())
-        .fold(0.0_f32, f32::max);
+    let peak = audio.samples.iter().map(|sample| sample.abs()).fold(0.0_f32, f32::max);
     if peak <= floor_threshold {
         return audio.clone();
     }
 
     let threshold = floor_threshold.max(peak * 0.08);
-    let start = audio
-        .samples
-        .iter()
-        .position(|sample| sample.abs() >= threshold);
-    let end = audio
-        .samples
-        .iter()
-        .rposition(|sample| sample.abs() >= threshold);
+    let start = audio.samples.iter().position(|sample| sample.abs() >= threshold);
+    let end = audio.samples.iter().rposition(|sample| sample.abs() >= threshold);
 
     let (start, end) = match (start, end) {
         (Some(start), Some(end)) if end >= start => (start, end),

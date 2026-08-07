@@ -40,10 +40,7 @@ fn trigger_callback() {
 }
 
 fn now_ms() -> u64 {
-    MONOTONIC_START
-        .get_or_init(Instant::now)
-        .elapsed()
-        .as_millis() as u64
+    MONOTONIC_START.get_or_init(Instant::now).elapsed().as_millis() as u64
 }
 
 /// Temporarily disable the native hotkey (e.g. while capturing a custom shortcut).
@@ -176,8 +173,8 @@ mod platform {
     use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
-        WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+        CallNextHookEx, GetMessageW, SetWindowsHookExW, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP,
+        WM_SYSKEYDOWN, WM_SYSKEYUP,
     };
 
     const VK_RCONTROL: u32 = 0xA3;
@@ -217,12 +214,7 @@ mod platform {
     pub fn start() {
         std::thread::spawn(|| unsafe {
             let hmod = GetModuleHandleW(std::ptr::null());
-            let hook = SetWindowsHookExW(
-                WH_KEYBOARD_LL,
-                Some(hook_proc),
-                hmod,
-                0,
-            );
+            let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), hmod, 0);
             if hook.is_null() {
                 log::error!("Failed to install keyboard hook");
                 return;

@@ -1,0 +1,18 @@
+# Clippy configuration for Whisp
+# See: https://doc.rust-lang.org/clippy/configuration.html
+
+# Warn on common issues
+warns = [
+    "clippy::unwrap_used",
+    "clippy::expect_used",
+    "clippy::panic",
+    "clippy::todo",
+    "clippy::unimplemented",
+]
+
+# Allow specific lints that are acceptable in this codebase
+allows = [
+    "clippy::too_many_arguments",      # Tauri command signatures require many params
+    "clippy::needless_return",         # Explicit returns improve readability
+    "clippy::module_inception",        # Module naming conventions
+]

@@ -1,4 +1,5 @@
 mod commands;
+mod cost;
 mod history;
 mod hotkey;
 pub mod log_buffer;
@@ -7,10 +8,9 @@ mod permissions;
 mod polish;
 mod recorder;
 mod settings;
+mod shortcut;
 mod sound;
 mod transcribe;
-mod cost;
-mod shortcut;
 mod tray;
 
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
@@ -59,7 +59,6 @@ fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     }
 }
 
-
 pub fn run() {
     log_buffer::init();
     // Load .env file if present (for development)
@@ -106,8 +105,7 @@ pub fn run() {
             let app_handle = app.handle().clone();
 
             // Initialize history manager
-            let history_manager =
-                Arc::new(HistoryManager::new().expect("Failed to init history DB"));
+            let history_manager = Arc::new(HistoryManager::new().expect("Failed to init history DB"));
             app.manage(history_manager.clone());
 
             // Initialize audio recorder
@@ -129,14 +127,13 @@ pub fn run() {
             }
 
             // Create main window
-            let _main_window =
-                tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
-                    .title("Whisp")
-                    .inner_size(960.0, 640.0)
-                    .resizable(true)
-                    .maximizable(false)
-                    .visible(false)
-                    .build()?;
+            let _main_window = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::App("/".into()))
+                .title("Whisp")
+                .inner_size(960.0, 640.0)
+                .resizable(true)
+                .maximizable(false)
+                .visible(false)
+                .build()?;
 
             // Apply saved launch-at-startup setting
             {
@@ -150,13 +147,7 @@ pub fn run() {
             }
 
             // System tray
-            let show_i = tauri::menu::MenuItem::with_id(
-                app,
-                "show",
-                "Show Whisp",
-                true,
-                None::<&str>,
-            )?;
+            let show_i = tauri::menu::MenuItem::with_id(app, "show", "Show Whisp", true, None::<&str>)?;
             let quit_i = tauri::menu::MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
 
@@ -177,13 +168,7 @@ pub fn run() {
                     label
                 };
                 let label = label.replace('&', "&amp;").replace('<', "&lt;");
-                let item = tauri::menu::MenuItem::with_id(
-                    app,
-                    format!("history_{}", i),
-                    label,
-                    true,
-                    None::<&str>,
-                )?;
+                let item = tauri::menu::MenuItem::with_id(app, format!("history_{}", i), label, true, None::<&str>)?;
                 menu_items.push(Box::new(item));
             }
             let sep2 = tauri::menu::PredefinedMenuItem::separator(app)?;
@@ -317,7 +302,6 @@ static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
-
 pub(crate) fn toggle_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
 
@@ -360,25 +344,21 @@ fn start_recording(app_handle: &tauri::AppHandle) {
     }
 
     let overlay_url = format!("/src/overlay/index.html?lang={}", saved.ui_language);
-    match tauri::WebviewWindowBuilder::new(
-        app_handle,
-        "overlay",
-        tauri::WebviewUrl::App(overlay_url.into()),
-    )
-    .title("")
-    .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
-    .position(pos_x, pos_y)
-    .resizable(false)
-    .maximizable(false)
-    .minimizable(false)
-    .decorations(false)
-    .transparent(true)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .shadow(false)
-    .focused(false)
-    .accept_first_mouse(true)
-    .build()
+    match tauri::WebviewWindowBuilder::new(app_handle, "overlay", tauri::WebviewUrl::App(overlay_url.into()))
+        .title("")
+        .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
+        .position(pos_x, pos_y)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .shadow(false)
+        .focused(false)
+        .accept_first_mouse(true)
+        .build()
     {
         Ok(_) => {
             log::info!("Overlay window created");
@@ -391,7 +371,11 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         sound::play_start_sound();
     }
 
-    if let Err(e) = recorder.start(app_handle.clone(), saved.silence_timeout_sec, saved.silence_threshold as f32) {
+    if let Err(e) = recorder.start(
+        app_handle.clone(),
+        saved.silence_timeout_sec,
+        saved.silence_threshold as f32,
+    ) {
         log::error!("Failed to start recording: {}", e);
         let _ = app_handle.emit(
             "transcription-error",
@@ -453,11 +437,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
             }
         }
     };
-    log::info!(
-        "Got {} samples at {}Hz",
-        audio.samples.len(),
-        audio.sample_rate
-    );
+    log::info!("Got {} samples at {}Hz", audio.samples.len(), audio.sample_rate);
 
     let settings = settings::get_settings();
 
@@ -570,7 +550,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let ui_language = settings.ui_language.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
-    log::info!("Transcription requested, model={}, api_url={}, language={}", model, api_base_url, language);
+    log::info!(
+        "Transcription requested, model={}, api_url={}, language={}",
+        model,
+        api_base_url,
+        language
+    );
     log::info!("Calling API with model={} via {}...", model, api_base_url);
 
     // Prevent the RAII guard from clearing the flag — the async task will clear it
@@ -697,7 +682,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
                 let error_message = e.to_string();
                 let entry = NewHistoryEntry {
-                    text: format!("{} {}", tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"), &error_message.chars().take(100).collect::<String>()),
+                    text: format!(
+                        "{} {}",
+                        tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"),
+                        &error_message.chars().take(100).collect::<String>()
+                    ),
                     model: model.clone(),
                     duration_ms,
                     audio_path: audio_path_str.clone(),
@@ -757,4 +746,3 @@ fn close_overlay(app_handle: &tauri::AppHandle) {
         let _ = w.close();
     }
 }
-

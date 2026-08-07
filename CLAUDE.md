@@ -57,7 +57,7 @@ No tests or linting are configured.
 
 ### Data Storage
 
-All persisted to `~/.nanowhisper/`:
+All persisted to `~/.whisp/` (migrated from `~/.nanowhisper/`):
 - `settings.json` — API key, model, language, shortcut
 - `history.db` — SQLite (table: `transcriptions`)
 - `audio/` — WAV files (enables retry with different model/settings)

@@ -28,8 +28,7 @@ pub fn rebuild_tray_menu(app_handle: &AppHandle) {
         return;
     };
 
-    let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> =
-        vec![Box::new(show_i), Box::new(separator)];
+    let mut menu_items: Vec<Box<dyn tauri::menu::IsMenuItem<tauri::Wry>>> = vec![Box::new(show_i), Box::new(separator)];
     for (i, entry) in recent.iter().enumerate() {
         let label: String = entry.text.chars().take(40).collect();
         let label = if entry.text.chars().count() > 40 {
@@ -38,13 +37,9 @@ pub fn rebuild_tray_menu(app_handle: &AppHandle) {
             label
         };
         let label = label.replace('&', "&amp;").replace('<', "&lt;");
-        if let Ok(item) = tauri::menu::MenuItem::with_id(
-            app_handle,
-            format!("history_{}", i),
-            label,
-            true,
-            None::<&str>,
-        ) {
+        if let Ok(item) =
+            tauri::menu::MenuItem::with_id(app_handle, format!("history_{}", i), label, true, None::<&str>)
+        {
             menu_items.push(Box::new(item));
         }
     }
@@ -53,8 +48,7 @@ pub fn rebuild_tray_menu(app_handle: &AppHandle) {
     }
     menu_items.push(Box::new(quit_i));
 
-    let menu_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> =
-        menu_items.iter().map(|b| b.as_ref()).collect();
+    let menu_refs: Vec<&dyn tauri::menu::IsMenuItem<tauri::Wry>> = menu_items.iter().map(|b| b.as_ref()).collect();
     if let Ok(menu) = tauri::menu::Menu::with_items(app_handle, &menu_refs) {
         let _ = tray.set_menu(Some(menu));
     }

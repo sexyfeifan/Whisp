@@ -297,11 +297,9 @@ impl HistoryManager {
     pub fn delete_entry(&self, id: i64) -> Result<()> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let audio_path: Option<String> = conn
-            .query_row(
-                "SELECT audio_path FROM transcriptions WHERE id = ?1",
-                [id],
-                |row| row.get(0),
-            )
+            .query_row("SELECT audio_path FROM transcriptions WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
             .ok()
             .flatten();
         if let Some(path) = audio_path {
@@ -317,17 +315,18 @@ impl HistoryManager {
         }
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         // Collect audio paths first
-        let placeholders: String = ids.iter().enumerate()
+        let placeholders: String = ids
+            .iter()
+            .enumerate()
             .map(|(i, _)| format!("?{}", i + 1))
             .collect::<Vec<_>>()
             .join(", ");
-        let query = format!(
-            "SELECT audio_path FROM transcriptions WHERE id IN ({})",
-            placeholders
-        );
+        let query = format!("SELECT audio_path FROM transcriptions WHERE id IN ({})", placeholders);
         let mut stmt = conn.prepare(&query)?;
         let paths: Vec<String> = stmt
-            .query_map(rusqlite::params_from_iter(ids.iter()), |row| row.get::<_, Option<String>>(0))?
+            .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+                row.get::<_, Option<String>>(0)
+            })?
             .filter_map(|r| r.ok())
             .flatten()
             .collect();
@@ -335,10 +334,7 @@ impl HistoryManager {
         for path in paths {
             let _ = std::fs::remove_file(&path);
         }
-        let del_query = format!(
-            "DELETE FROM transcriptions WHERE id IN ({})",
-            placeholders
-        );
+        let del_query = format!("DELETE FROM transcriptions WHERE id IN ({})", placeholders);
         conn.execute(&del_query, rusqlite::params_from_iter(ids.iter()))?;
         Ok(())
     }

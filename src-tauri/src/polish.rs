@@ -48,11 +48,7 @@ pub async fn polish_text(
         custom_prompt
     };
 
-    let model = if model.trim().is_empty() {
-        "gpt-4o-mini"
-    } else {
-        model
-    };
+    let model = if model.trim().is_empty() { "gpt-4o-mini" } else { model };
 
     let body = serde_json::json!({
         "model": model,
@@ -89,10 +85,7 @@ pub async fn polish_text(
         anyhow::bail!("Polish API error {}: {}", status, shortened);
     }
 
-    let json: serde_json::Value = resp
-        .json()
-        .await
-        .context("Failed to parse polish API response")?;
+    let json: serde_json::Value = resp.json().await.context("Failed to parse polish API response")?;
 
     if let Some(err) = json.get("error") {
         let msg = err
@@ -127,11 +120,7 @@ pub async fn validate_polish_key(
 ) -> Result<()> {
     let endpoint = polish_endpoint(api_base_url)?;
 
-    let model = if model.trim().is_empty() {
-        "gpt-4o-mini"
-    } else {
-        model
-    };
+    let model = if model.trim().is_empty() { "gpt-4o-mini" } else { model };
 
     let body = serde_json::json!({
         "model": model,
@@ -177,7 +166,10 @@ pub async fn validate_polish_key(
     };
 
     if status == reqwest::StatusCode::NOT_FOUND {
-        anyhow::bail!("Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}", shortened);
+        anyhow::bail!(
+            "Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}",
+            shortened
+        );
     }
     if matches!(
         status,

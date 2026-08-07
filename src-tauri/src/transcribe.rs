@@ -62,11 +62,7 @@ fn mimo_endpoint(api_base_url: &str) -> Result<Url> {
     Url::parse(&endpoint).context("Invalid API base URL")
 }
 
-fn build_mimo_json(
-    wav_data: Vec<u8>,
-    model: &str,
-    language: Option<&str>,
-) -> Result<serde_json::Value> {
+fn build_mimo_json(wav_data: Vec<u8>, model: &str, language: Option<&str>) -> Result<serde_json::Value> {
     use base64::engine::general_purpose::STANDARD;
     let encoded = STANDARD.encode(&wav_data);
     let data_url = format!("data:audio/wav;base64,{}", encoded);
@@ -99,7 +95,10 @@ fn build_mimo_json(
 
 fn extract_mimo_text(json: &serde_json::Value) -> Result<String> {
     if let Some(err) = json.get("error") {
-        let msg = err.get("message").and_then(serde_json::Value::as_str).unwrap_or("unknown error");
+        let msg = err
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown error");
         anyhow::bail!("MiMo API error: {}", msg);
     }
     json.pointer("/choices/0/message/content")
@@ -110,12 +109,7 @@ fn extract_mimo_text(json: &serde_json::Value) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Missing transcription text in MiMo response"))
 }
 
-fn build_form(
-    wav_data: Vec<u8>,
-    model: &str,
-    language: Option<&str>,
-    prompt: Option<&str>,
-) -> Result<multipart::Form> {
+fn build_form(wav_data: Vec<u8>, model: &str, language: Option<&str>, prompt: Option<&str>) -> Result<multipart::Form> {
     let file_part = multipart::Part::bytes(wav_data)
         .file_name("audio.wav")
         .mime_str("audio/wav")?;
@@ -179,18 +173,9 @@ fn shorten_error_body(body: String) -> String {
 }
 
 /// Validate API key by sending a tiny silent WAV to the transcription endpoint.
-pub async fn validate_api_key(
-    client: &reqwest::Client,
-    api_key: &str,
-    api_base_url: &str,
-    model: &str,
-) -> Result<()> {
+pub async fn validate_api_key(client: &reqwest::Client, api_key: &str, api_base_url: &str, model: &str) -> Result<()> {
     let wav = generate_silent_wav();
-    let model = if model.trim().is_empty() {
-        "whisper-1"
-    } else {
-        model
-    };
+    let model = if model.trim().is_empty() { "whisper-1" } else { model };
 
     let resp = if is_mimo_asr(model) {
         let endpoint = mimo_endpoint(api_base_url)?;
@@ -233,7 +218,10 @@ pub async fn validate_api_key(
 
     // 404 = endpoint not found (real error)
     if status == StatusCode::NOT_FOUND {
-        anyhow::bail!("Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}", body);
+        anyhow::bail!(
+            "Endpoint not found (HTTP 404). Check your API Base URL.\nDetails: {}",
+            body
+        );
     }
     // 405/415 = method or media type not supported (real error)
     if matches!(
@@ -247,10 +235,7 @@ pub async fn validate_api_key(
         );
     }
     // 400/422 = server recognized the request but rejected the probe audio (likely config is OK)
-    if matches!(
-        status,
-        StatusCode::BAD_REQUEST | StatusCode::UNPROCESSABLE_ENTITY
-    ) {
+    if matches!(status, StatusCode::BAD_REQUEST | StatusCode::UNPROCESSABLE_ENTITY) {
         anyhow::bail!(
             "Connection successful but probe was rejected (HTTP {}). Your configuration is likely correct — save and try a real recording.\nDetails: {}",
             status.as_u16(),
@@ -323,10 +308,7 @@ pub async fn transcribe_audio(
 
             match response {
                 Ok(resp) if resp.status().is_success() => {
-                    let json: serde_json::Value = resp
-                        .json()
-                        .await
-                        .context("Failed to parse MiMo API response")?;
+                    let json: serde_json::Value = resp.json().await.context("Failed to parse MiMo API response")?;
                     return extract_mimo_text(&json);
                 }
                 Ok(resp) => {
@@ -361,10 +343,7 @@ pub async fn transcribe_audio(
 
             match response {
                 Ok(resp) if resp.status().is_success() => {
-                    let json: serde_json::Value = resp
-                        .json()
-                        .await
-                        .context("Failed to parse API response")?;
+                    let json: serde_json::Value = resp.json().await.context("Failed to parse API response")?;
                     if let Some(text) = extract_text(&json) {
                         return Ok(text);
                     }

@@ -1,0 +1,4 @@
+# Rust formatting configuration for Whisp
+max_width = 120
+tab_spaces = 4
+edition = "2021"

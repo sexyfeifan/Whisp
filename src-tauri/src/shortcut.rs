@@ -61,11 +61,7 @@ pub fn register_shortcut(app_handle: &AppHandle, settings: &AppSettings) {
 }
 
 /// Unregister old shortcut and register new one (called when settings change).
-pub fn re_register_shortcut(
-    app_handle: &AppHandle,
-    old_shortcut_str: &str,
-    new_settings: &AppSettings,
-) {
+pub fn re_register_shortcut(app_handle: &AppHandle, old_shortcut_str: &str, new_settings: &AppSettings) {
     // Unregister old shortcut
     if let Ok(old) = old_shortcut_str.parse::<Shortcut>() {
         let _ = app_handle.global_shortcut().unregister(old);

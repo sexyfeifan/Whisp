@@ -33,12 +33,7 @@ pub fn request_microphone_permission() -> bool {
 
     match unsafe { AVCaptureDevice::authorizationStatusForMediaType(media_type) } {
         status if status == AVAuthorizationStatus::Authorized => true,
-        status
-            if status == AVAuthorizationStatus::Denied
-                || status == AVAuthorizationStatus::Restricted =>
-        {
-            false
-        }
+        status if status == AVAuthorizationStatus::Denied || status == AVAuthorizationStatus::Restricted => false,
         _ => {
             let (tx, rx) = mpsc::channel();
             let block = RcBlock::new(move |granted: Bool| {
