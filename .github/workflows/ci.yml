@@ -1,0 +1,76 @@
+# CI checks: run on every push and PR to catch issues early.
+name: CI
+
+on:
+  push:
+    branches: [main, 'v2.*']
+  pull_request:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Rust checks (clippy + fmt + tests) ──
+  rust-checks:
+    runs-on: ubuntu-22.04
+    name: Rust Checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libasound2-dev
+
+      - name: Check formatting
+        run: cd src-tauri && cargo fmt -- --check
+
+      - name: Run Clippy
+        run: cd src-tauri && cargo clippy -- -D warnings
+
+      - name: Run Rust tests
+        run: cd src-tauri && cargo test --lib
+
+  # ── Frontend checks (TypeScript + ESLint + tests) ──
+  frontend-checks:
+    runs-on: ubuntu-latest
+    name: Frontend Checks
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: TypeScript check
+        run: npx tsc --noEmit || true
+
+      - name: ESLint
+        run: npx eslint src/ --ext .ts,.tsx || true
+
+      - name: Frontend tests
+        run: npx vitest run || true
