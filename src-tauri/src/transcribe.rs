@@ -179,7 +179,7 @@ pub async fn validate_api_key(client: &reqwest::Client, api_key: &str, api_base_
 
     let resp = if is_mimo_asr(model) {
         let endpoint = mimo_endpoint(api_base_url)?;
-        let json_body = build_mimo_json(wav, model, None)?;
+        let json_body = build_mimo_json(&wav, model, None)?;
         client
             .post(endpoint)
             .header("api-key", api_key)
