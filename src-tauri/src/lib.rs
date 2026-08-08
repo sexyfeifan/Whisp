@@ -15,9 +15,10 @@ mod tray;
 
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use recorder::{encode_wav, trim_silence, AudioRecorder};
-use settings::AppSettings;
+use shortcut::SHORTCUT_PROCESSING;
+
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{Emitter, Listener, Manager};
@@ -630,7 +631,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
-                    let target_bundle_id: Option<String> = {
+                    let _target_bundle_id: Option<String> = {
                         #[cfg(target_os = "macos")]
                         {
                             LAST_FRONTMOST_APP_BUNDLE_ID

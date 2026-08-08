@@ -1,5 +1,5 @@
 use crate::history::HistoryManager;
-use crate::settings;
+
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
