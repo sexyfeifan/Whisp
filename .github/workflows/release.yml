@@ -132,7 +132,7 @@ jobs:
 
       # Install npm deps BEFORE importing signing credentials (minimize exposure window)
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # ── macOS code signing setup ────────────────────────────────
       - name: Install Apple intermediate certificate
