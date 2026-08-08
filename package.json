@@ -1,12 +1,15 @@
 {
   "name": "whisp",
   "private": true,
-  "version": "2.7.1",
+  "version": "2.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "tauri": "tauri",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "format:check": "prettier --check src/",
     "sync-version": "node -e \"const v=require('./package.json').version; const fs=require('fs'); let c=fs.readFileSync('src-tauri/Cargo.toml','utf8'); c=c.replace(/^version = \\\".*\\\"/m,'version = \\\"'+v+'\\\"'); fs.writeFileSync('src-tauri/Cargo.toml',c); let t=JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json','utf8')); t.version=v; fs.writeFileSync('src-tauri/tauri.conf.json',JSON.stringify(t,null,2)+'\\n'); console.log('Synced version:',v)\""
   },
   "dependencies": {
@@ -25,11 +28,18 @@
     "thinking-orbs": "^0.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^8.57.0",
     "@tauri-apps/cli": "^2.10.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "typescript": "~5.6.0",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.26",
+    "prettier": "^3.4.0",
+    "typescript": "^5.6.3",
     "vite": "^6.0.0"
   }
 }

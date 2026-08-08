@@ -81,7 +81,7 @@ function Overlay() {
             currentWindow.scaleFactor(),
           ]);
           invoke("save_overlay_position", { x: pos.x / scale, y: pos.y / scale });
-        } catch {}
+        } catch { /* ignore */ }
       }, 300);
     });
     return () => {

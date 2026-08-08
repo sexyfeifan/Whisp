@@ -104,6 +104,14 @@ html, body {
 .cancelled-message .status-icon { color: var(--overlay-dim); }
 .cancelled-message .status-text { color: var(--overlay-dim); }
 
+/* Silence-stopping state: warm amber */
+.silence-message .status-icon { color: #f08c00; }
+.silence-message .status-text { color: #f08c00; }
+
+/* Success state: green for completed transcription */
+.success-message .status-icon { color: #2f9e44; }
+.success-message .status-text { color: #2f9e44; }
+
 .recording-row {
   display: flex;
   align-items: center;
