@@ -1,7 +1,7 @@
 use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
-use crate::shortcut::{register_shortcut, re_register_shortcut};
+use crate::shortcut::{re_register_shortcut, register_shortcut};
 use base64::Engine;
 use serde::Serialize;
 use std::sync::Arc;
