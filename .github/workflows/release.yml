@@ -220,6 +220,49 @@ jobs:
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
           npx tauri build --target ${{ matrix.target }}
 
+      - name: Ad-hoc sign macOS app (unsigned path)
+        if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
+        run: |
+          APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.app" | head -1)
+          echo "Found app bundle: $APP"
+          test -n "$APP"
+
+          # Strip any extended attributes (quarantine etc.)
+          xattr -cr "$APP"
+
+          # Force ad-hoc sign the app bundle (required for Apple Silicon)
+          codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
+
+          # Verify ad-hoc signature
+          echo "=== Ad-hoc signature verification ==="
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dvv "$APP"
+
+          # Rebuild DMG with signed app
+          DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.dmg" | head -1)
+          echo "Original DMG: $DMG"
+
+          # Re-package DMG to include the signed app
+          if [ -n "$DMG" ]; then
+            MOUNT_POINT=$(mktemp -d)
+            hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT_POINT"
+            # The app inside the DMG is the same file; re-sign it there too
+            APP_IN_DMG=$(find "$MOUNT_POINT" -name "*.app" | head -1)
+            if [ -n "$APP_IN_DMG" ]; then
+              xattr -cr "$APP_IN_DMG"
+              codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP_IN_DMG"
+            fi
+            hdiutil detach "$MOUNT_POINT"
+
+            # Re-create DMG with proper compression
+            DMG_DIR=$(mktemp -d)
+            cp -R "$APP" "$DMG_DIR/"
+            rm -f "$DMG"
+            hdiutil create -volname "Whisp" -srcfolder "$DMG_DIR" -ov -format UDZO "$DMG"
+            rm -rf "$DMG_DIR"
+            echo "Re-packaged DMG with ad-hoc signed app: $DMG"
+          fi
+
       - name: Build Tauri app (Windows)
         if: runner.os == 'Windows'
         run: npx tauri build --target ${{ matrix.target }}
@@ -276,6 +319,16 @@ jobs:
           echo "Verifying DMG exists: $DMG"
           test -n "$DMG"
           hdiutil verify "$DMG"
+
+          # Verify app inside DMG is signed
+          MOUNT_POINT=$(mktemp -d)
+          hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT_POINT"
+          APP=$(find "$MOUNT_POINT" -name "*.app" | head -1)
+          echo "Verifying app signature: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "=== Signature details ==="
+          codesign -dvv "$APP"
+          hdiutil detach "$MOUNT_POINT"
 
       - name: Verify Windows code signing
         if: runner.os == 'Windows' && env.AZURE_TENANT_ID != '' && env.AZURE_CLIENT_ID != '' && env.AZURE_CLIENT_SECRET != ''
@@ -435,7 +488,18 @@ jobs:
 
             ### 安装说明
 
-            - **macOS**：下载 `.dmg` 文件，打开后将 Whisp 拖入 Applications
+            #### macOS
+
+            1. 下载 `.dmg` 文件，打开后将 Whisp 拖入 Applications
+            2. 打开终端，运行以下命令移除 Gatekeeper 隔离标记：
+            ```bash
+            sudo xattr -cr /Applications/Whisp.app
+            ```
+            3. 双击 Whisp.app 即可正常使用
+
+            > ⚠️ macOS 会提示"无法验证开发者"，这是正常的（应用未通过 Apple 公证）。
+            > 上述 `xattr -cr` 命令只需运行一次。
+
             - **Windows**：下载 `.exe` 安装程序，双击运行按提示安装
             - **Linux**：下载 `.deb` 或 `.rpm` 包安装，或使用 `.AppImage` 便携版
 

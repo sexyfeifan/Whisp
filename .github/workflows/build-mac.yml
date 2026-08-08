@@ -130,6 +130,37 @@ jobs:
           echo "::warning::MAC_CSC_LINK / MAC_CSC_KEY_PASSWORD missing, building unsigned macOS artifact"
           npx tauri build --target aarch64-apple-darwin
 
+      - name: Ad-hoc sign macOS app (unsigned path)
+        if: env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == ''
+        run: |
+          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" | head -1)
+          echo "Found app bundle: $APP"
+          test -n "$APP"
+
+          # Strip any extended attributes (quarantine etc.)
+          xattr -cr "$APP"
+
+          # Force ad-hoc sign the app bundle (required for Apple Silicon)
+          codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
+
+          # Verify ad-hoc signature
+          echo "=== Ad-hoc signature verification ==="
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dvv "$APP"
+
+          # Rebuild DMG with signed app
+          DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.dmg" | head -1)
+          echo "Original DMG: $DMG"
+
+          if [ -n "$DMG" ]; then
+            DMG_DIR=$(mktemp -d)
+            cp -R "$APP" "$DMG_DIR/"
+            rm -f "$DMG"
+            hdiutil create -volname "Whisp" -srcfolder "$DMG_DIR" -ov -format UDZO "$DMG"
+            rm -rf "$DMG_DIR"
+            echo "Re-packaged DMG with ad-hoc signed app: $DMG"
+          fi
+
       - name: Verify code signing
         if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         run: |
