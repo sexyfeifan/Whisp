@@ -698,9 +698,18 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
             let _ = std::process::Command::new("open").arg(&file_path).spawn();
             return Ok(tr(
                 lang,
-                &format!("已下载到 {}，安装窗口即将打开。请将 Whisp 拖入 Applications 完成更新。", file_path.display()),
-                &format!("Downloaded to {}. The installer should open automatically. Drag Whisp to Applications to update.", file_path.display()),
-                &format!("ダウンロード完了: {}。インストーラーが開きます。Whisp を Applications にドラッグしてください。", file_path.display()),
+                &format!(
+                    "已下载到 {}，安装窗口即将打开。请将 Whisp 拖入 Applications 完成更新。",
+                    file_path.display()
+                ),
+                &format!(
+                    "Downloaded to {}. The installer should open automatically. Drag Whisp to Applications to update.",
+                    file_path.display()
+                ),
+                &format!(
+                    "ダウンロード完了: {}。インストーラーが開きます。Whisp を Applications にドラッグしてください。",
+                    file_path.display()
+                ),
             ));
         }
         let _ = std::process::Command::new("open").arg(&file_path).spawn();
@@ -720,8 +729,14 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
         return Ok(tr(
             lang,
             &format!("已下载到 {}，安装程序即将启动。", file_path.display()),
-            &format!("Downloaded to {}. The installer should launch shortly.", file_path.display()),
-            &format!("ダウンロード完了: {}。インストーラーが起動します。", file_path.display()),
+            &format!(
+                "Downloaded to {}. The installer should launch shortly.",
+                file_path.display()
+            ),
+            &format!(
+                "ダウンロード完了: {}。インストーラーが起動します。",
+                file_path.display()
+            ),
         ));
     }
 

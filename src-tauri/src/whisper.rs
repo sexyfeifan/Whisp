@@ -322,8 +322,7 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
 
     while let Some(chunk) = response.chunk().await.transpose() {
         let bytes = chunk.with_context(|| "Failed to read chunk")?;
-        file.write_all(&bytes)
-            .with_context(|| "Failed to write chunk")?;
+        file.write_all(&bytes).with_context(|| "Failed to write chunk")?;
         downloaded += bytes.len() as u64;
         if total_size > 0 {
             log::info!(
@@ -341,15 +340,16 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
     // Verify downloaded size
     if total_size > 0 && downloaded != total_size {
         let _ = std::fs::remove_file(&dest_path_tmp);
-        anyhow::bail!(
-            "Download incomplete: expected {} bytes, got {}",
-            total_size,
-            downloaded
-        );
+        anyhow::bail!("Download incomplete: expected {} bytes, got {}", total_size, downloaded);
     }
 
-    std::fs::rename(&dest_path_tmp, &dest_path)
-        .with_context(|| format!("Failed to rename {} to {}", dest_path_tmp.display(), dest_path.display()))?;
+    std::fs::rename(&dest_path_tmp, &dest_path).with_context(|| {
+        format!(
+            "Failed to rename {} to {}",
+            dest_path_tmp.display(),
+            dest_path.display()
+        )
+    })?;
 
     log::info!(
         "Model downloaded: {} ({:.1} MB)",

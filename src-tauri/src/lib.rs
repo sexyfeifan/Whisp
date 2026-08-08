@@ -61,7 +61,10 @@ pub fn data_dir() -> PathBuf {
                 log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
             }
             Err(e) => {
-                log::warn!("Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...", e);
+                log::warn!(
+                    "Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...",
+                    e
+                );
                 // Fallback: copy files then delete old directory
                 if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
                     log::warn!("Copy migration also failed: {}. Using old directory.", e2);

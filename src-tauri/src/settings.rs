@@ -345,7 +345,11 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         ai_polish_model: settings.ai_polish_model.clone(),
         ai_polish_prompt: settings.ai_polish_prompt.clone(),
         audio_retention_limit: settings.audio_retention_limit,
-        api_key: if keychain_ok { String::new() } else { settings.api_key.clone() },
+        api_key: if keychain_ok {
+            String::new()
+        } else {
+            settings.api_key.clone()
+        },
         whisper_config_json: settings.whisper_config_json.clone(),
         custom_endpoints: settings.custom_endpoints.clone(),
     };
@@ -408,8 +412,8 @@ pub fn get_settings() -> AppSettings {
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     // Best-effort keychain store (may fail on ad-hoc signed builds)
-    let keychain_ok = store_api_key(&settings.api_key).is_ok()
-        && store_polish_api_key(&settings.ai_polish_api_key).is_ok();
+    let keychain_ok =
+        store_api_key(&settings.api_key).is_ok() && store_polish_api_key(&settings.ai_polish_api_key).is_ok();
     if !keychain_ok {
         log::warn!("Keychain unavailable; API key(s) will be stored on disk as fallback");
     }

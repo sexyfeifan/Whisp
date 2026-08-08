@@ -52,7 +52,11 @@ pub fn init() {
 }
 
 pub fn get_logs() -> Vec<LogEntry> {
-    LOGGER.buffer.lock().map(|buf| buf.iter().cloned().collect()).unwrap_or_default()
+    LOGGER
+        .buffer
+        .lock()
+        .map(|buf| buf.iter().cloned().collect())
+        .unwrap_or_default()
 }
 
 pub fn clear_logs() {
