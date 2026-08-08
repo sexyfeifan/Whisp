@@ -71,7 +71,7 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
 
     // Hot-reload shortcut if changed
     if settings.shortcut != old_settings.shortcut {
-        crate::re_register_shortcut(&app, &old_settings.shortcut, &settings);
+        re_register_shortcut(&app, &old_settings.shortcut, &settings);
     }
 
     // Apply launch-at-startup if changed
@@ -137,7 +137,7 @@ pub fn pause_shortcut(app: AppHandle) {
 pub fn resume_shortcut(app: AppHandle) {
     crate::hotkey::resume();
     let settings = settings::get_settings();
-    crate::register_shortcut(&app, &settings);
+    register_shortcut(&app, &settings);
     log::info!("Shortcuts resumed");
 }
 
@@ -627,7 +627,7 @@ pub fn import_settings_json(app: AppHandle, json: String) -> Result<String, Stri
     settings::save_settings(&s).map_err(|e| e.to_string())?;
 
     if s.shortcut != old_settings.shortcut {
-        crate::re_register_shortcut(&app, &old_settings.shortcut, &s);
+        re_register_shortcut(&app, &old_settings.shortcut, &s);
     }
 
     log::info!("Settings imported successfully");
