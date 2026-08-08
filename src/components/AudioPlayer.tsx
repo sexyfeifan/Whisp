@@ -22,6 +22,30 @@ export function AudioPlayer({ audioPath }: AudioPlayerProps) {
   const [volume, setVolume] = useState(1);
   const [showVolume, setShowVolume] = useState(false);
 
+  // Generate waveform data from WAV bytes
+  const generateWaveform = useCallback((bytes: Uint8Array) => {
+    // Simple waveform: sample every Nth byte from the audio data
+    // Skip WAV header (44 bytes)
+    const dataStart = 44;
+    const sampleCount = 100; // Number of bars in waveform
+    const step = Math.max(1, Math.floor((bytes.length - dataStart) / sampleCount / 2));
+    const samples: number[] = [];
+
+    for (let i = 0; i < sampleCount; i++) {
+      const offset = dataStart + i * step * 2;
+      if (offset + 1 < bytes.length) {
+        // 16-bit signed little-endian
+        const sample = (bytes[offset + 1] << 8) | bytes[offset];
+        const normalized = ((sample > 32768 ? sample - 65536 : sample) / 32768);
+        samples.push(Math.abs(normalized));
+      } else {
+        samples.push(0);
+      }
+    }
+
+    setWaveformData(samples);
+  }, []);
+
   // Load audio data and generate waveform
   useEffect(() => {
     if (!audioPath) return;
@@ -69,30 +93,6 @@ export function AudioPlayer({ audioPath }: AudioPlayerProps) {
       cancelAnimationFrame(animationRef.current);
     };
   }, [audioPath, generateWaveform, volume]);
-
-  // Generate waveform data from WAV bytes
-  const generateWaveform = useCallback((bytes: Uint8Array) => {
-    // Simple waveform: sample every Nth byte from the audio data
-    // Skip WAV header (44 bytes)
-    const dataStart = 44;
-    const sampleCount = 100; // Number of bars in waveform
-    const step = Math.max(1, Math.floor((bytes.length - dataStart) / sampleCount / 2));
-    const samples: number[] = [];
-
-    for (let i = 0; i < sampleCount; i++) {
-      const offset = dataStart + i * step * 2;
-      if (offset + 1 < bytes.length) {
-        // 16-bit signed little-endian
-        const sample = (bytes[offset + 1] << 8) | bytes[offset];
-        const normalized = ((sample > 32768 ? sample - 65536 : sample) / 32768);
-        samples.push(Math.abs(normalized));
-      } else {
-        samples.push(0);
-      }
-    }
-
-    setWaveformData(samples);
-  }, []);
 
   // Draw waveform on canvas
   useEffect(() => {
