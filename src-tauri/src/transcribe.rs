@@ -432,7 +432,7 @@ mod tests {
     fn test_shorten_error_body_long() {
         let long = "x".repeat(1000);
         let result = shorten_error_body(long);
-        assert!(result.len() <= 502); // 500 + "…"
+        assert!(result.len() <= 503); // 500 + "…" (3 bytes UTF-8)
         assert!(result.ends_with('…'));
     }
 
