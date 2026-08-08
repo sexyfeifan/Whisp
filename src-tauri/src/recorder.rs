@@ -123,6 +123,9 @@ impl AudioRecorder {
                 while let Ok(chunk) = audio_rx.try_recv() {
                     buffer.extend_from_slice(&chunk);
 
+                    // Emit RMS level every ~512 new samples (modulo check detects
+                    // when buffer crosses a 512-sample boundary; chunk.len() guard prevents
+                    // duplicate emissions for small chunks)
                     if buffer.len() % 512 < chunk.len() {
                         *total_chunks += 1;
                         let recent = &buffer[buffer.len().saturating_sub(512)..];
@@ -310,6 +313,8 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
     // threshold that works well for typical recordings: quiet sections are
     // reliably distinguished from speech while avoiding false positives from
     // breathing, ambient noise, or slight microphone hiss.
+    // 0.08 = 8% of peak amplitude; empirically chosen to distinguish speech from noise
+    // while preserving soft consonants and trailing words
     let threshold = floor_threshold.max(peak * 0.08);
     let start = audio.samples.iter().position(|sample| sample.abs() >= threshold);
     let end = audio.samples.iter().rposition(|sample| sample.abs() >= threshold);

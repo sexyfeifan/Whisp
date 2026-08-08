@@ -37,7 +37,7 @@ tauri-plugin-updater = "2"
 whisper-rs = { version = "0.12", optional = true, features = ["raw-api"] }
 
 [features]
-default = ["offline-whisper"]
+default = []
 offline-whisper = ["whisper-rs"]
 
 [target.'cfg(target_os = "windows")'.dependencies]

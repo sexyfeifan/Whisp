@@ -547,6 +547,7 @@ pub fn export_settings_json() -> Result<String, String> {
         "silence_threshold": s.silence_threshold,
         "trim_silence_enabled": s.trim_silence_enabled,
         "whisper_prompt": s.whisper_prompt,
+        "whisper_config_json": s.whisper_config_json,
         "launch_at_startup": s.launch_at_startup,
         "ai_polish_enabled": s.ai_polish_enabled,
         "ai_polish_api_url": s.ai_polish_api_url,
@@ -611,6 +612,9 @@ pub fn import_settings_json(app: AppHandle, json: String) -> Result<String, Stri
     }
     if let Some(v) = obj.get("whisper_prompt").and_then(|v| v.as_str()) {
         s.whisper_prompt = v.to_string();
+    }
+    if let Some(v) = obj.get("whisper_config_json").and_then(|v| v.as_str()) {
+        s.whisper_config_json = v.to_string();
     }
     if let Some(v) = obj.get("launch_at_startup").and_then(|v| v.as_bool()) {
         s.launch_at_startup = v;

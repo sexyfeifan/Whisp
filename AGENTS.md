@@ -1,10 +1,10 @@
 # AGENTS.md
 
-This file provides guidance to AI agents working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-Whisp is a minimal desktop speech-to-text app built with **Tauri v2** (Rust backend + React/TypeScript frontend). It captures microphone audio, sends it to OpenAI Whisper API (or MiMo ASR), and auto-pastes the transcribed text into the active application.
+Whisp is a minimal desktop speech-to-text app built with **Tauri v2** (Rust backend + React/TypeScript frontend). It captures microphone audio, sends it to OpenAI Whisper API (or any compatible ASR provider), and auto-pastes the transcribed text into the active application.
 
 ## Development Commands
 
