@@ -301,7 +301,7 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
 
     log::info!("Downloading model from {} to {}", url, dest_path.display());
 
-    let response = client
+    let mut response = client
         .get(url)
         .timeout(std::time::Duration::from_secs(1800))
         .send()
