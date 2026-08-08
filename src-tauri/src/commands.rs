@@ -59,6 +59,11 @@ pub fn clear_history(history: State<'_, Arc<HistoryManager>>) -> Result<(), Stri
 }
 
 #[tauri::command]
+pub fn search_history(history: State<'_, Arc<HistoryManager>>, query: String) -> Result<Vec<HistoryEntry>, String> {
+    history.search_history(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_settings() -> AppSettings {
     settings::get_settings()
 }
@@ -699,6 +704,137 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
     {
         return Ok(format!("已下载到: {}", file_path.display()));
     }
+}
+
+// --- Offline Whisper Engine Commands ---
+
+#[tauri::command]
+pub fn get_whisper_config() -> crate::whisper::WhisperConfig {
+    crate::whisper::WhisperEngine::new().get_config()
+}
+
+#[tauri::command]
+pub fn set_whisper_config(config: crate::whisper::WhisperConfig) -> Result<(), String> {
+    // Save to settings file
+    let mut s = settings::get_settings();
+    // Store whisper config as JSON in a dedicated field
+    let config_json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
+    s.whisper_prompt = config_json;
+    settings::save_settings(&s)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_whisper_models() -> Result<Vec<crate::whisper::ModelInfo>, String> {
+    crate::whisper::WhisperEngine::list_models().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn check_whisper_model() -> bool {
+    crate::whisper::WhisperEngine::new().is_model_loaded()
+}
+
+#[tauri::command]
+pub fn get_whisper_model_dir() -> Result<String, String> {
+    crate::whisper::WhisperEngine::model_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn transcribe_offline(
+    model_path: String,
+    audio_path: String,
+    language: String,
+) -> Result<crate::whisper::WhisperResult, String> {
+    use crate::whisper::WhisperEngine;
+
+    log::info!(
+        "Offline transcription requested: audio={}, model={}, lang={}",
+        audio_path,
+        model_path,
+        language
+    );
+
+    // Read WAV file with hound
+    let reader = hound::WavReader::open(&audio_path).map_err(|e| format!("Failed to open audio file: {}", e))?;
+
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate;
+    let channels = spec.channels as u32;
+
+    let samples: Vec<f32> = if spec.sample_format == hound::SampleFormat::Float {
+        reader
+            .into_samples::<f32>()
+            .map(|s| s.map_err(|e| format!("Failed to read sample: {}", e)))
+            .collect::<Result<Vec<_>, _>>()?
+    } else {
+        reader
+            .into_samples::<i16>()
+            .map(|s| {
+                s.map_err(|e| format!("Failed to read sample: {}", e))
+                    .map(|s| s as f32 / i16::MAX as f32)
+            })
+            .collect::<Result<Vec<_>, _>>()?
+    };
+
+    // Convert to mono if needed
+    let mono_samples = if channels > 1 {
+        samples
+            .chunks(channels as usize)
+            .map(|chunk| chunk.iter().sum::<f32>() / channels as f32)
+            .collect::<Vec<_>>()
+    } else {
+        samples
+    };
+
+    log::info!(
+        "Audio read: {} samples at {}Hz, {} channels",
+        mono_samples.len(),
+        sample_rate,
+        channels
+    );
+
+    let engine = WhisperEngine::new();
+    engine.set_config(crate::whisper::WhisperConfig {
+        model_path,
+        language: if language.is_empty() {
+            "auto".to_string()
+        } else {
+            language
+        },
+        n_threads: 2,
+        translate: false,
+        prompt: String::new(),
+    });
+
+    engine.transcribe(&mono_samples, sample_rate).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_offline_models() -> Result<Vec<crate::whisper::ModelInfo>, String> {
+    crate::whisper::WhisperEngine::list_models().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_known_models() -> Vec<crate::whisper::KnownModel> {
+    crate::whisper::list_known_models()
+}
+
+#[tauri::command]
+pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Result<String, String> {
+    use crate::whisper::download_model;
+
+    log::info!("Downloading Whisper model: {}", model_name);
+
+    let client = app
+        .try_state::<reqwest::Client>()
+        .map(|s| (*s).clone())
+        .unwrap_or_else(|| reqwest::Client::new());
+
+    let path = download_model(&client, &model_name).await.map_err(|e| e.to_string())?;
+
+    Ok(path.to_string_lossy().to_string())
 }
 
 #[cfg(test)]

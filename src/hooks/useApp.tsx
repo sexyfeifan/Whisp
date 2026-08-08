@@ -8,7 +8,7 @@ import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
-import { History, Settings, Mic, Shield, Zap, Activity, BarChart3 } from "lucide-react";
+import { History, Settings, Mic, Shield, Zap, Activity, BarChart3, Terminal } from "lucide-react";
 
 export interface UpdateInfo {
   latestVersion: string; releaseUrl: string; releaseNotes: string;
@@ -55,6 +55,8 @@ export interface AppState {
   setPolishError: React.Dispatch<React.SetStateAction<string | null>>;
   polishErrorMsg: string | null;
   playingAudioId: number | null;
+  audioUrls: Record<number, string>;
+  stopAudio: () => void;
   logs: LogEntry[];
   logsAutoScroll: boolean;
   setLogsAutoScroll: React.Dispatch<React.SetStateAction<boolean>>;
@@ -86,6 +88,7 @@ export interface AppState {
   retryEntry: (id: number) => Promise<void>;
   loadHistory: (reset?: boolean) => Promise<void>;
   loadSettings: () => Promise<void>;
+  searchHistory: (query: string) => Promise<void>;
   handleEnableMicrophone: () => Promise<void>;
   handleEnableAccessibility: () => Promise<void>;
   checkForUpdates: () => Promise<void>;
@@ -108,6 +111,7 @@ export function useApp(): AppState {
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [showModelGuide, setShowModelGuide] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [ftsResults, setFtsResults] = useState<HistoryEntry[] | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
@@ -127,7 +131,7 @@ export function useApp(): AppState {
   const [polishError, setPolishError] = useState<string | null>(null);
   const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logsAutoScroll, setLogsAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -388,25 +392,28 @@ export function useApp(): AppState {
 
   const playAudio = useCallback(async (path: string, id: number) => {
     if (playingAudioId === id) {
-      audioRef.current?.pause();
-      audioRef.current = null;
+      // Already playing this entry — stop it
       setPlayingAudioId(null);
       return;
     }
-    try {
-      const base64 = await invoke<string>("read_audio_file", { path });
-      const audioUrl = `data:audio/wav;base64,${base64}`;
-      if (audioRef.current) { audioRef.current.pause(); }
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      audio.onended = () => { setPlayingAudioId(null); audioRef.current = null; };
-      audio.onerror = () => { setPlayingAudioId(null); audioRef.current = null; };
-      await audio.play();
-      setPlayingAudioId(id);
-    } catch (error) {
-      console.error("Failed to play audio:", error);
+    // Load URL if not already cached
+    if (!audioUrls[id]) {
+      try {
+        const base64 = await invoke<string>("read_audio_file", { path });
+        const url = `data:audio/wav;base64,${base64}`;
+        setAudioUrls((prev) => ({ ...prev, [id]: url }));
+      } catch (error) {
+        console.error("Failed to load audio:", error);
+        return;
+      }
     }
-  }, [playingAudioId]);
+    // Set this as the active player (AudioPlayer component handles play)
+    setPlayingAudioId(id);
+  }, [playingAudioId, audioUrls]);
+
+  const stopAudio = useCallback(() => {
+    setPlayingAudioId(null);
+  }, []);
 
   const loadLogs = useCallback(async () => {
     try {
@@ -448,18 +455,32 @@ export function useApp(): AppState {
   }, [logs, logsAutoScroll]);
 
   const deleteEntry = useCallback(async (id: number) => {
+    // Stop playback if deleting the currently-playing entry
+    if (playingAudioId === id) setPlayingAudioId(null);
     await invoke("delete_history_entry", { id });
     setHistory((items) => items.filter((item) => item.id !== id));
+    setAudioUrls((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-  }, []);
+  }, [playingAudioId]);
 
   const deleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
+    // Stop playback if any selected entry is currently playing
+    if (playingAudioId !== null && selectedIds.has(playingAudioId)) setPlayingAudioId(null);
     await invoke("delete_history_entries", { ids });
     setHistory((items) => items.filter((item) => !selectedIds.has(item.id)));
+    setAudioUrls((prev) => {
+      const next = { ...prev };
+      for (const id of ids) delete next[id];
+      return next;
+    });
     setSelectedIds(new Set());
-  }, [selectedIds]);
+  }, [selectedIds, playingAudioId]);
 
   const clearHistory = useCallback(async () => {
     if (history.length === 0) {
@@ -475,6 +496,7 @@ export function useApp(): AppState {
     if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
     try {
       await invoke("clear_history"); setHistory([]); setConfirmingClear(false);
+      setPlayingAudioId(null); setAudioUrls({});
       setSettingsFeedback({ tone: "success", message: m.clearSuccess });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
     } catch (error) { setConfirmingClear(false); setErrorMsg(`${m.clearFailed} ${String(error)}`); }
@@ -487,15 +509,43 @@ export function useApp(): AppState {
     finally { setRetrying(null); }
   }, [loadHistory]);
 
+  const searchHistory = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setFtsResults(null);
+      return;
+    }
+    try {
+      const results = await invoke<HistoryEntry[]>("search_history", { query });
+      setFtsResults(results);
+    } catch {
+      setFtsResults(null);
+    }
+  }, []);
+
+  // Debounced FTS5 backend search: triggers when searchQuery changes
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setFtsResults(null);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      searchHistory(trimmed);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, searchHistory]);
+
   const filteredHistory = useMemo(() => {
     const needle = searchQuery.trim().toLowerCase();
-    return history.filter((entry) => {
+    // Use backend FTS5 results if available, otherwise fall back to frontend filter
+    const source = ftsResults ?? history;
+    return source.filter((entry) => {
       if (statusFilter !== "all" && entry.status !== statusFilter) return false;
-      if (!needle) return true;
+      if (!needle || ftsResults !== null) return true; // backend already filtered by query
       const haystack = [entry.text, entry.error_message ?? "", entry.model, entry.provider, entry.language].join(" ").toLowerCase();
       return haystack.includes(needle);
     });
-  }, [history, searchQuery, statusFilter]);
+  }, [history, searchQuery, statusFilter, ftsResults]);
 
   const stats = useMemo(() => {
     const total = history.length;
@@ -517,13 +567,14 @@ export function useApp(): AppState {
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
 
   const navItems: Array<{ id: View; icon: React.ReactNode; label: string; group?: string }> = useMemo(() => [
+    { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats", group: "main" },
     { id: "history", icon: <History size={16} />, label: m.history, group: "main" },
     { id: "settingsApi", icon: <Shield size={16} />, label: m.apiConfiguration, group: "config" },
     { id: "settingsPolish", icon: <Zap size={16} />, label: m.aiPolishSettings, group: "config" },
     { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
     { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
     { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
-    { id: "diagnostics", icon: <BarChart3 size={16} />, label: m.diagnostics, group: "footer" },
+    { id: "diagnostics", icon: <Terminal size={16} />, label: m.diagnostics, group: "footer" },
   ], [m]);
 
   return {
@@ -533,12 +584,14 @@ export function useApp(): AppState {
     setStatusFilter, savingSettings, settingsFeedback, setSettingsFeedback,
     confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
-    polishStatus, setPolishStatus, polishError, setPolishError, polishErrorMsg, playingAudioId, logs, logsAutoScroll,
+    polishStatus, setPolishStatus, polishError, setPolishError, polishErrorMsg, playingAudioId, audioUrls,
+    stopAudio, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, defaultPolishPrompt, darkMode, setDarkMode,
     uiLanguage, m, filteredHistory, stats, todayCount, hasApiConfig, canProceed,
     navItems, updateSettings, persistSettings, testApiKey, testPolishConnection,
     copyText, playAudio, loadLogs, clearLogs, copyAllLogs, flushAutoSave,
     deleteEntry, deleteSelected, clearHistory, retryEntry, loadHistory, loadSettings,
+    searchHistory,
     handleEnableMicrophone, handleEnableAccessibility, checkForUpdates, downloadAndInstall,
   };
 }

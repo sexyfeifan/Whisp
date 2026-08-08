@@ -7,6 +7,7 @@ import { SettingsBehaviorPage } from "./pages/SettingsBehaviorPage";
 import { SettingsAppPage } from "./pages/SettingsAppPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { StatsPage } from "./pages/StatsPage";
 
 function App() {
   const app = useApp();
@@ -23,6 +24,8 @@ function App() {
   switch (view) {
     case "onboarding":
       return <OnboardingPage {...app} />;
+    case "stats":
+      return <StatsPage {...app} />;
     case "settingsApi":
       return <SettingsApiPage {...app} />;
     case "settingsPolish":

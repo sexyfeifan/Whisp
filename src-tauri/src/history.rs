@@ -30,6 +30,32 @@ static MIGRATIONS: &[M] = &[
     M::up("ALTER TABLE transcriptions ADD COLUMN asr_duration_sec REAL;"),
     M::up("ALTER TABLE transcriptions ADD COLUMN polish_tokens INTEGER;"),
     M::up("ALTER TABLE transcriptions ADD COLUMN estimated_cost REAL;"),
+    M::up(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS transcriptions_fts USING fts5(\
+            text, model, provider, language,\
+            content='transcriptions', content_rowid='id'\
+        );",
+    ),
+    M::up(
+        "CREATE TRIGGER IF NOT EXISTS transcriptions_ai AFTER INSERT ON transcriptions BEGIN\
+            INSERT INTO transcriptions_fts(rowid, text, model, provider, language)\
+            VALUES (new.id, new.text, new.model, new.provider, new.language);\
+        END;",
+    ),
+    M::up(
+        "CREATE TRIGGER IF NOT EXISTS transcriptions_ad AFTER DELETE ON transcriptions BEGIN\
+            INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)\
+            VALUES('delete', old.id, old.text, old.model, old.provider, old.language);\
+        END;",
+    ),
+    M::up(
+        "CREATE TRIGGER IF NOT EXISTS transcriptions_au AFTER UPDATE ON transcriptions BEGIN\
+            INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)\
+            VALUES('delete', old.id, old.text, old.model, old.provider, old.language);\
+            INSERT INTO transcriptions_fts(rowid, text, model, provider, language)\
+            VALUES (new.id, new.text, new.model, new.provider, new.language);\
+        END;",
+    ),
 ];
 
 #[derive(Debug, Clone, Serialize)]
@@ -380,6 +406,60 @@ impl HistoryManager {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         conn.execute("DELETE FROM transcriptions", [])?;
         Ok(())
+    }
+
+    pub fn search_history(&self, query: &str) -> Result<Vec<HistoryEntry>> {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Build safe FTS5 prefix query: quote each word and add * for prefix matching
+        let fts_query = trimmed
+            .split_whitespace()
+            .filter_map(|w| {
+                let cleaned: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+                if cleaned.is_empty() {
+                    None
+                } else {
+                    Some(format!("\"{}\"*", cleaned))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if fts_query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                t.id,
+                t.text,
+                t.model,
+                t.timestamp,
+                t.duration_ms,
+                t.audio_path,
+                t.status,
+                t.error_message,
+                t.provider,
+                t.api_base_url,
+                t.language,
+                t.retry_of,
+                t.asr_duration_sec,
+                t.polish_tokens,
+                t.estimated_cost
+             FROM transcriptions t
+             INNER JOIN transcriptions_fts fts ON t.id = fts.rowid
+             WHERE transcriptions_fts MATCH ?1
+             ORDER BY rank
+             LIMIT 200",
+        )?;
+        let entries = stmt
+            .query_map([fts_query], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
     }
 }
 

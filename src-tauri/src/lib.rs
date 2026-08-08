@@ -12,6 +12,7 @@ mod shortcut;
 mod sound;
 mod transcribe;
 mod tray;
+mod whisper;
 
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use recorder::{encode_wav, trim_silence, AudioRecorder};
@@ -77,6 +78,7 @@ pub fn run() {
             commands::delete_history_entry,
             commands::delete_history_entries,
             commands::clear_history,
+            commands::search_history,
             commands::get_settings,
             commands::save_settings,
             commands::check_accessibility,
@@ -101,6 +103,15 @@ pub fn run() {
             commands::download_and_install_update,
             commands::export_settings_json,
             commands::import_settings_json,
+            commands::get_whisper_config,
+            commands::set_whisper_config,
+            commands::list_whisper_models,
+            commands::check_whisper_model,
+            commands::get_whisper_model_dir,
+            commands::transcribe_offline,
+            commands::list_offline_models,
+            commands::list_known_models,
+            commands::download_whisper_model,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

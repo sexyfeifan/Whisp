@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="64" fill="#7C3AED"/>
+  
+  <!-- Sound wave arcs -->
+  <path d="M 44 52 Q 44 44 52 40" stroke="white" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"/>
+  <path d="M 38 60 Q 38 44 52 32" stroke="white" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.7"/>
+  <path d="M 32 68 Q 32 44 52 24" stroke="white" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.5"/>
+  
+  <!-- Central microphone / W icon -->
+  <path d="M 58 72 L 58 88" stroke="white" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M 52 62 L 52 88" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 46 52 L 46 88" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Right side: text/transcription lines -->
+  <path d="M 72 52 L 96 52" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 68 62 L 92 62" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
+  <path d="M 70 72 L 88 72" stroke="white" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+  <path d="M 72 82 L 90 82" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.3"/>
+  
+  <!-- Dot at the end of longest line -->
+  <circle cx="98" cy="52" r="2" fill="white" opacity="0.6"/>
+</svg>

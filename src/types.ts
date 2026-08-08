@@ -42,6 +42,7 @@ export interface AppSettings {
   ai_polish_model: string;
   ai_polish_prompt: string;
   audio_retention_limit: number;
+  custom_endpoints: Array<{ label: string; url: string }>;
 }
 
 export interface LogEntry {
@@ -49,4 +50,37 @@ export interface LogEntry {
   level: string;
   target: string;
   message: string;
+}
+
+export interface WhisperConfig {
+  model_path: string;
+  language: string;
+  n_threads: number;
+  translate: boolean;
+  prompt: string;
+}
+
+export interface WhisperModelInfo {
+  name: string;
+  path: string;
+  size_bytes: number;
+}
+
+export interface KnownModel {
+  name: string;
+  url: string;
+  size_bytes: number;
+}
+
+export interface WhisperResult {
+  text: string;
+  segments: WhisperSegment[];
+  language: string;
+  duration_sec: number;
+}
+
+export interface WhisperSegment {
+  start_ms: number;
+  end_ms: number;
+  text: string;
 }

@@ -59,6 +59,14 @@ pub struct AppSettings {
     pub ai_polish_prompt: String,
     #[serde(default = "default_audio_retention_limit")]
     pub audio_retention_limit: usize,
+    #[serde(default)]
+    pub custom_endpoints: Vec<CustomEndpoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomEndpoint {
+    pub label: String,
+    pub url: String,
 }
 
 /// Stored on disk — no api_key field (stored in keychain instead)
@@ -116,6 +124,8 @@ struct DiskSettings {
     /// Written as fallback when keychain is unavailable (e.g. ad-hoc signed builds).
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub api_key: String,
+    #[serde(default)]
+    pub custom_endpoints: Vec<CustomEndpoint>,
 }
 
 fn default_api_key() -> String {
@@ -226,6 +236,7 @@ impl Default for AppSettings {
             ai_polish_model: default_ai_polish_model(),
             ai_polish_prompt: String::new(),
             audio_retention_limit: default_audio_retention_limit(),
+            custom_endpoints: Vec::new(),
         }
     }
 }
@@ -330,6 +341,7 @@ fn save_disk_settings(settings: &AppSettings) -> Result<(), String> {
         ai_polish_prompt: settings.ai_polish_prompt.clone(),
         audio_retention_limit: settings.audio_retention_limit,
         api_key: settings.api_key.clone(), // always persist to disk; keychain is best-effort only
+        custom_endpoints: settings.custom_endpoints.clone(),
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -363,6 +375,7 @@ pub fn get_settings() -> AppSettings {
         ai_polish_model: disk.ai_polish_model,
         ai_polish_prompt: disk.ai_polish_prompt,
         audio_retention_limit: disk.audio_retention_limit,
+        custom_endpoints: disk.custom_endpoints,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth

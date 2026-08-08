@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Shield } from "lucide-react";
+import { Shield, Plus, X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FilterChip } from "../components/FilterChip";
@@ -19,7 +20,27 @@ export function SettingsApiPage(app: AppState) {
     checkForUpdates, flushAutoSave,
   } = app;
 
+  const [showAddEndpoint, setShowAddEndpoint] = useState(false);
+  const [newEndpointLabel, setNewEndpointLabel] = useState("");
+  const [newEndpointUrl, setNewEndpointUrl] = useState("");
+
   if (!settings) return null;
+
+  const customEndpoints = settings.custom_endpoints || [];
+
+  const addCustomEndpoint = () => {
+    if (!newEndpointLabel.trim() || !newEndpointUrl.trim()) return;
+    const updated = [...customEndpoints, { label: newEndpointLabel.trim(), url: newEndpointUrl.trim() }];
+    updateSettings({ custom_endpoints: updated });
+    setNewEndpointLabel("");
+    setNewEndpointUrl("");
+    setShowAddEndpoint(false);
+  };
+
+  const removeCustomEndpoint = (index: number) => {
+    const updated = customEndpoints.filter((_, i) => i !== index);
+    updateSettings({ custom_endpoints: updated });
+  };
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
@@ -47,6 +68,39 @@ export function SettingsApiPage(app: AppState) {
                   {endpointPresets.map((preset) => (
                     <FilterChip key={preset.value} active={settings.api_base_url === preset.value} label={preset.label} onClick={() => updateSettings({ api_base_url: preset.value })} />
                   ))}
+                  {customEndpoints.map((ep, i) => (
+                    <FilterChip key={`custom-${i}`} active={settings.api_base_url === ep.url} label={ep.label} onClick={() => updateSettings({ api_base_url: ep.url })} />
+                  ))}
+                </div>
+                {/* Custom endpoints management */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[13px] font-normal" style={{ color: "hsl(var(--steel))" }}>{m.customEndpoints}</label>
+                    <Button variant="ghost" size="sm" onClick={() => setShowAddEndpoint(!showAddEndpoint)}>
+                      <Plus size={14} className="mr-1" />{m.addEndpoint}
+                    </Button>
+                  </div>
+                  {showAddEndpoint && (
+                    <div className="flex gap-2 mb-2">
+                      <Input type="text" value={newEndpointLabel} onChange={(e) => setNewEndpointLabel(e.target.value)} placeholder={m.endpointLabel} className="w-1/3" />
+                      <Input type="text" value={newEndpointUrl} onChange={(e) => setNewEndpointUrl(e.target.value)} placeholder={m.endpointUrl} className="flex-1" />
+                      <Button variant="primary" size="sm" onClick={addCustomEndpoint} disabled={!newEndpointLabel.trim() || !newEndpointUrl.trim()}>OK</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowAddEndpoint(false)}><X size={14} /></Button>
+                    </div>
+                  )}
+                  {customEndpoints.length > 0 ? (
+                    <div className="space-y-1">
+                      {customEndpoints.map((ep, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs px-2 py-1 rounded" style={{ background: "hsl(var(--canvas))" }}>
+                          <span className="font-medium" style={{ color: "hsl(var(--ink))" }}>{ep.label}</span>
+                          <span className="flex-1 truncate" style={{ color: "hsl(var(--steel))" }}>{ep.url}</span>
+                          <button onClick={() => removeCustomEndpoint(i)} className="p-0.5 hover:opacity-70"><X size={12} style={{ color: "hsl(var(--destructive))" }} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : !showAddEndpoint && (
+                    <p className="text-xs" style={{ color: "hsl(var(--steel))" }}>{m.noCustomEndpoints}</p>
+                  )}
                 </div>
               </div>
               <div>

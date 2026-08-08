@@ -23,7 +23,7 @@ export function HistoryPage(app: AppState) {
     settingsFeedback, searchQuery, setSearchQuery, statusFilter, setStatusFilter,
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory, confirmingClear,
-    retryEntry, copyText, playAudio, playingAudioId, loadHistory, m, uiLanguage,
+    retryEntry, copyText, playAudio, playingAudioId, audioUrls, loadHistory, m, uiLanguage,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -248,20 +248,28 @@ export function HistoryPage(app: AppState) {
                             )}
                           </IconButton>
                         )}
-                        {entry.audio_path && (
-                          <IconButton title={playingAudioId === entry.id ? m.pauseAudio : m.playAudio} onClick={() => playAudio(entry.audio_path!, entry.id)}>
-                            {playingAudioId === entry.id ? (
-                              <Pause size={14} />
-                            ) : (
-                              <Play size={14} />
-                            )}
-                          </IconButton>
-                        )}
                         <IconButton title={m.delete} onClick={() => deleteEntry(entry.id)}>
                           <Trash2 size={14} />
                         </IconButton>
                       </div>
                     </div>
+
+                    {/* Audio player */}
+                    {entry.audio_path && !audioUrls[entry.id] && (
+                      <div className="mt-2">
+                        <button
+                          onClick={() => playAudio(entry.audio_path!, entry.id)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg border-none cursor-pointer text-xs transition-colors"
+                          style={{
+                            background: "hsl(var(--surface))",
+                            color: playingAudioId === entry.id ? "hsl(var(--primary))" : "hsl(var(--steel))",
+                          }}
+                        >
+                          {playingAudioId === entry.id ? <Pause size={14} /> : <Play size={14} />}
+                          {playingAudioId === entry.id ? m.pauseAudio : m.playAudio}
+                        </button>
+                      </div>
+                    )}
                   </Card>
                 );
               })}

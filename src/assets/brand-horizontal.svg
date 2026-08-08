@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Icon (scaled from brand-logo) -->
+  <rect x="10" y="10" width="180" height="180" rx="38" fill="url(#bgGrad)"/>
+  
+  <!-- Microphone -->
+  <g transform="translate(10, 10) scale(0.352)">
+    <rect x="216" y="120" width="80" height="160" rx="40" fill="white" opacity="0.95"/>
+    <path d="M184 280 C184 340 232 380 256 380 C280 380 328 340 328 280" stroke="white" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.9"/>
+    <line x1="256" y1="380" x2="256" y2="420" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+    <line x1="220" y1="420" x2="292" y2="420" stroke="white" stroke-width="12" stroke-linecap="round" opacity="0.9"/>
+    <path d="M140 200 C130 220 130 260 140 280" stroke="white" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M116 180 C100 210 100 270 116 300" stroke="white" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M372 200 C382 220 382 260 372 280" stroke="white" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M396 180 C412 210 412 270 396 300" stroke="white" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  
+  <!-- Text -->
+  <text x="220" y="125" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="80" font-weight="700" fill="#1e1b4b" letter-spacing="-2">Whisp</text>
+  <text x="222" y="155" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="18" fill="#6b7280" letter-spacing="4">VOICE · TRANSCRIBE · PASTE</text>
+</svg>
