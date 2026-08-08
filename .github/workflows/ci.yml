@@ -47,7 +47,10 @@ jobs:
         run: cd src-tauri && cargo clippy 2>&1 || true
 
       - name: Run Rust tests
-        run: cd src-tauri && set -o pipefail && cargo test --lib 2>&1
+        run: |
+          cd src-tauri
+          cargo test --lib 2>&1
+        shell: bash
 
   # ── Frontend checks (TypeScript + ESLint + tests) ──
   frontend-checks:
