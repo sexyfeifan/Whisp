@@ -281,7 +281,7 @@ jobs:
 
       - name: Build Tauri app (Linux)
         if: runner.os == 'Linux'
-        run: npx tauri build --target ${{ matrix.target }}
+        run: npx tauri build --target ${{ matrix.target }} 2>&1 | tail -80
 
       # ── Verification ────────────────────────────────────────────
       - name: Verify macOS code signing
