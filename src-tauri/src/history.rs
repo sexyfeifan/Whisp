@@ -57,3 +57,423 @@ static MIGRATIONS: &[M] = &[
         END;",
     ),
 ];
+
+#[derive(Debug, Clone, Serialize)]
+pub struct HistoryEntry {
+    pub id: i64,
+    pub text: String,
+    pub model: String,
+    pub timestamp: i64,
+    pub duration_ms: Option<i64>,
+    pub audio_path: Option<String>,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub provider: String,
+    pub api_base_url: String,
+    pub language: String,
+    pub retry_of: Option<i64>,
+    pub asr_duration_sec: Option<f64>,
+    pub polish_tokens: Option<i64>,
+    pub estimated_cost: Option<f64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewHistoryEntry {
+    pub text: String,
+    pub model: String,
+    pub duration_ms: Option<i64>,
+    pub audio_path: Option<String>,
+    pub status: String,
+    pub error_message: Option<String>,
+    pub provider: String,
+    pub api_base_url: String,
+    pub language: String,
+    pub retry_of: Option<i64>,
+    pub asr_duration_sec: Option<f64>,
+    pub polish_tokens: Option<i64>,
+    pub estimated_cost: Option<f64>,
+}
+
+pub struct HistoryManager {
+    conn: Mutex<Connection>,
+    data_dir: PathBuf,
+}
+
+impl HistoryManager {
+    pub fn new() -> Result<Self> {
+        let data_dir = crate::data_dir();
+        std::fs::create_dir_all(&data_dir)?;
+
+        let audio_dir = data_dir.join("audio");
+        std::fs::create_dir_all(&audio_dir)?;
+
+        let db_path = data_dir.join("history.db");
+        let mut conn = Connection::open(&db_path)?;
+        let migrations = Migrations::new(MIGRATIONS.to_vec());
+        migrations.to_latest(&mut conn)?;
+
+        Ok(Self {
+            conn: Mutex::new(conn),
+            data_dir,
+        })
+    }
+
+    pub fn audio_dir(&self) -> PathBuf {
+        self.data_dir.join("audio")
+    }
+
+    pub fn add_entry(&self, entry: &NewHistoryEntry) -> Result<HistoryEntry> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let timestamp = chrono::Utc::now().timestamp();
+        conn.execute(
+            "INSERT INTO transcriptions (
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            rusqlite::params![
+                entry.text,
+                entry.model,
+                timestamp,
+                entry.duration_ms,
+                entry.audio_path,
+                entry.status,
+                entry.error_message,
+                entry.provider,
+                entry.api_base_url,
+                entry.language,
+                entry.retry_of,
+                entry.asr_duration_sec,
+                entry.polish_tokens,
+                entry.estimated_cost,
+            ],
+        )?;
+        let id = conn.last_insert_rowid();
+        Ok(HistoryEntry {
+            id,
+            text: entry.text.clone(),
+            model: entry.model.clone(),
+            timestamp,
+            duration_ms: entry.duration_ms,
+            audio_path: entry.audio_path.clone(),
+            status: entry.status.clone(),
+            error_message: entry.error_message.clone(),
+            provider: entry.provider.clone(),
+            api_base_url: entry.api_base_url.clone(),
+            language: entry.language.clone(),
+            retry_of: entry.retry_of,
+            asr_duration_sec: entry.asr_duration_sec,
+            polish_tokens: entry.polish_tokens,
+            estimated_cost: entry.estimated_cost,
+        })
+    }
+
+    pub fn get_entry_by_id(&self, id: i64) -> Result<Option<HistoryEntry>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                id,
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+             FROM transcriptions
+             WHERE id = ?1",
+        )?;
+        let entry = stmt.query_row([id], row_to_history_entry).ok();
+        Ok(entry)
+    }
+
+    pub fn update_entry(
+        &self,
+        id: i64,
+        text: &str,
+        model: &str,
+        status: &str,
+        error_message: Option<&str>,
+        provider: &str,
+        api_base_url: &str,
+        language: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let timestamp = chrono::Utc::now().timestamp();
+        conn.execute(
+            "UPDATE transcriptions
+             SET text = ?1,
+                 model = ?2,
+                 timestamp = ?3,
+                 status = ?4,
+                 error_message = ?5,
+                 provider = ?6,
+                 api_base_url = ?7,
+                 language = ?8
+             WHERE id = ?9",
+            rusqlite::params![
+                text,
+                model,
+                timestamp,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                id
+            ],
+        )?;
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn update_usage(
+        &self,
+        id: i64,
+        asr_duration_sec: Option<f64>,
+        polish_tokens: Option<i64>,
+        estimated_cost: Option<f64>,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "UPDATE transcriptions
+             SET asr_duration_sec = ?1,
+                 polish_tokens = ?2,
+                 estimated_cost = ?3
+             WHERE id = ?4",
+            rusqlite::params![asr_duration_sec, polish_tokens, estimated_cost, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_entries(&self) -> Result<Vec<HistoryEntry>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                id,
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+             FROM transcriptions
+             ORDER BY timestamp DESC",
+        )?;
+        let entries = stmt
+            .query_map([], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
+    pub fn get_entries_page(&self, limit: i64, offset: i64) -> Result<Vec<HistoryEntry>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                id,
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+             FROM transcriptions
+             ORDER BY timestamp DESC
+             LIMIT ?1 OFFSET ?2",
+        )?;
+        let entries = stmt
+            .query_map(rusqlite::params![limit, offset], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
+    pub fn delete_entry(&self, id: i64) -> Result<()> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let audio_path: Option<String> = conn
+            .query_row("SELECT audio_path FROM transcriptions WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .ok()
+            .flatten();
+        if let Some(path) = audio_path {
+            let _ = std::fs::remove_file(&path);
+        }
+        conn.execute("DELETE FROM transcriptions WHERE id = ?1", [id])?;
+        Ok(())
+    }
+
+    pub fn delete_entries(&self, ids: &[i64]) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let placeholders: String = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!("SELECT audio_path FROM transcriptions WHERE id IN ({})", placeholders);
+        let mut stmt = conn.prepare(&query)?;
+        let paths: Vec<String> = stmt
+            .query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+                row.get::<_, Option<String>>(0)
+            })?
+            .filter_map(|r| r.ok())
+            .flatten()
+            .collect();
+        drop(stmt);
+        for path in paths {
+            let _ = std::fs::remove_file(&path);
+        }
+        let del_query = format!("DELETE FROM transcriptions WHERE id IN ({})", placeholders);
+        conn.execute(&del_query, rusqlite::params_from_iter(ids.iter()))?;
+        Ok(())
+    }
+
+    pub fn cleanup_old_audio(&self, keep: usize) -> Result<()> {
+        let paths: Vec<String> = {
+            let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+            let mut stmt = conn.prepare(
+                "SELECT audio_path FROM transcriptions
+                 ORDER BY timestamp DESC
+                 LIMIT -1 OFFSET ?1",
+            )?;
+            let paths: Vec<String> = stmt
+                .query_map([keep as i64], |row| row.get::<_, Option<String>>(0))?
+                .filter_map(|r| r.ok())
+                .flatten()
+                .collect();
+            paths
+        };
+
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        for path in paths {
+            if std::fs::remove_file(&path).is_ok() {
+                conn.execute(
+                    "UPDATE transcriptions SET audio_path = NULL WHERE audio_path = ?1",
+                    [&path],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn clear_all(&self) -> Result<()> {
+        let audio_dir = self.audio_dir();
+        if audio_dir.exists() {
+            let _ = std::fs::remove_dir_all(&audio_dir);
+            let _ = std::fs::create_dir_all(&audio_dir);
+        }
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute("DELETE FROM transcriptions", [])?;
+        Ok(())
+    }
+
+    pub fn search_history(&self, query: &str) -> Result<Vec<HistoryEntry>> {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let fts_query = trimmed
+            .split_whitespace()
+            .filter_map(|w| {
+                let cleaned: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+                if cleaned.is_empty() {
+                    None
+                } else {
+                    Some(format!("\"{}\"*", cleaned))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if fts_query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                t.id,
+                t.text,
+                t.model,
+                t.timestamp,
+                t.duration_ms,
+                t.audio_path,
+                t.status,
+                t.error_message,
+                t.provider,
+                t.api_base_url,
+                t.language,
+                t.retry_of,
+                t.asr_duration_sec,
+                t.polish_tokens,
+                t.estimated_cost
+             FROM transcriptions t
+             INNER JOIN transcriptions_fts fts ON t.id = fts.rowid
+             WHERE transcriptions_fts MATCH ?1
+             ORDER BY rank
+             LIMIT 200",
+        )?;
+        let entries = stmt
+            .query_map([fts_query], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+}
+
+fn row_to_history_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntry> {
+    Ok(HistoryEntry {
+        id: row.get(0)?,
+        text: row.get(1)?,
+        model: row.get(2)?,
+        timestamp: row.get(3)?,
+        duration_ms: row.get(4)?,
+        audio_path: row.get(5)?,
+        status: row.get(6)?,
+        error_message: row.get(7)?,
+        provider: row.get(8)?,
+        api_base_url: row.get(9)?,
+        language: row.get(10)?,
+        retry_of: row.get(11)?,
+        asr_duration_sec: row.get(12)?,
+        polish_tokens: row.get(13)?,
+        estimated_cost: row.get(14)?,
+    })
+}
