@@ -23,6 +23,9 @@ jobs:
     env:
       MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
       MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
 
     steps:
       - name: Checkout
@@ -107,10 +110,18 @@ jobs:
 
           rm "$CERTIFICATE_PATH"
 
+      - name: Set up Apple API key for notarization
+        if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != '' && env.APPLE_API_KEY != ''
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s' "$APPLE_API_KEY" | base64 --decode > ~/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
+          echo "Notarization API key ready"
+
       - name: Build Tauri app (signed)
         if: env.MAC_CSC_LINK != '' && env.MAC_CSC_KEY_PASSWORD != ''
         env:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: Jicai, Inc. (NDX2ZZ8U2R)"
+          APPLE_API_KEY: ${{ env.APPLE_API_KEY_ID != '' && format('{0}/.appstoreconnect/private_keys/AuthKey_{1}.p8', env.HOME, env.APPLE_API_KEY_ID) || '' }}
         run: npx tauri build --target aarch64-apple-darwin
 
       - name: Build Tauri app (unsigned)
@@ -124,23 +135,22 @@ jobs:
         run: |
           DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.dmg" | head -1)
           echo "Verifying DMG: $DMG"
+          test -n "$DMG"
 
+          echo "=== DMG integrity ==="
           hdiutil verify "$DMG"
 
-          hdiutil attach "$DMG" -nobrowse
-          APP=$(find /Volumes -maxdepth 2 -name "*.app" -path "*NanoWhisper*" 2>/dev/null | head -1)
-          echo "Found app: $APP"
-
           echo "=== Code signature ==="
-          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign --verify --deep --strict --verbose=2 \
+            "$(hdiutil attach "$DMG" -nobrowse -mountpoint /tmp/whisp-verify && find /tmp/whisp-verify -name '*.app' | head -1)"
 
           echo "=== Gatekeeper assessment ==="
-          spctl -a -t exec -vvv "$APP" || true
+          spctl -a -t open --context context:primary-signature -vvv /tmp/whisp-verify/*.app 2>&1 || true
 
           echo "=== Notarization staple ==="
-          xcrun stapler validate "$DMG" || true
+          xcrun stapler validate "$DMG"
 
-          hdiutil detach "$(dirname "$APP")" -quiet
+          hdiutil detach /tmp/whisp-verify -quiet
 
       - name: Verify artifact (unsigned path)
         if: env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == ''
