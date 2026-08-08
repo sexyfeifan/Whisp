@@ -62,7 +62,7 @@ fn mimo_endpoint(api_base_url: &str) -> Result<Url> {
     Url::parse(&endpoint).context("Invalid API base URL")
 }
 
-fn build_mimo_json(wav_data: Vec<u8>, model: &str, language: Option<&str>) -> Result<serde_json::Value> {
+fn build_mimo_json(wav_data: &[u8], model: &str, language: Option<&str>) -> Result<serde_json::Value> {
     use base64::engine::general_purpose::STANDARD;
     let encoded = STANDARD.encode(&wav_data);
     let data_url = format!("data:audio/wav;base64,{}", encoded);
@@ -109,8 +109,8 @@ fn extract_mimo_text(json: &serde_json::Value) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Missing transcription text in MiMo response"))
 }
 
-fn build_form(wav_data: Vec<u8>, model: &str, language: Option<&str>, prompt: Option<&str>) -> Result<multipart::Form> {
-    let file_part = multipart::Part::bytes(wav_data)
+fn build_form(wav_data: &[u8], model: &str, language: Option<&str>, prompt: Option<&str>) -> Result<multipart::Form> {
+    let file_part = multipart::Part::bytes(wav_data.to_vec())
         .file_name("audio.wav")
         .mime_str("audio/wav")?;
 
@@ -189,7 +189,7 @@ pub async fn validate_api_key(client: &reqwest::Client, api_key: &str, api_base_
             .await
             .context("Network error")?
     } else {
-        let form = build_form(wav, model, None, None)?;
+        let form = build_form(&wav, model, None, None)?;
         let endpoint = transcription_endpoint(api_base_url)?;
         client
             .post(endpoint)
@@ -284,7 +284,7 @@ pub async fn transcribe_audio(
     api_key: &str,
     api_base_url: &str,
     model: &str,
-    wav_data: Vec<u8>,
+    wav_data: &[u8],
     language: Option<&str>,
     prompt: Option<&str>,
     timeout_secs: u64,
@@ -292,12 +292,11 @@ pub async fn transcribe_audio(
 ) -> Result<String> {
     let timeout = Duration::from_secs(timeout_secs.max(10));
     let attempts = retry_count.saturating_add(1);
-    let wav_arc = Arc::new(wav_data);
 
     if is_mimo_asr(model) {
         let endpoint = mimo_endpoint(api_base_url)?;
         for attempt in 0..attempts {
-            let json_body = build_mimo_json((*wav_arc).clone(), model, language)?;
+            let json_body = build_mimo_json(wav_data, model, language)?;
             let response = client
                 .post(endpoint.clone())
                 .header("api-key", api_key)
@@ -332,7 +331,7 @@ pub async fn transcribe_audio(
     } else {
         let endpoint = transcription_endpoint(api_base_url)?;
         for attempt in 0..attempts {
-            let form = build_form((*wav_arc).clone(), model, language, prompt)?;
+            let form = build_form(wav_data, model, language, prompt)?;
             let response = client
                 .post(endpoint.clone())
                 .bearer_auth(api_key)

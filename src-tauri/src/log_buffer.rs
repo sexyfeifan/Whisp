@@ -1,5 +1,6 @@
 use log::{LevelFilter, Log, Metadata, Record};
 use serde::Serialize;
+use std::collections::VecDeque;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize)]
@@ -11,12 +12,12 @@ pub struct LogEntry {
 }
 
 struct RingBufferLogger {
-    buffer: Mutex<Vec<LogEntry>>,
+    buffer: Mutex<VecDeque<LogEntry>>,
     max_entries: usize,
 }
 
 static LOGGER: RingBufferLogger = RingBufferLogger {
-    buffer: Mutex::new(Vec::new()),
+    buffer: Mutex::new(VecDeque::new()),
     max_entries: 500,
 };
 
@@ -36,10 +37,10 @@ impl Log for RingBufferLogger {
             entry.timestamp, entry.level, entry.target, entry.message
         );
         if let Ok(mut buf) = self.buffer.lock() {
-            buf.push(entry);
-            if buf.len() > self.max_entries {
-                buf.remove(0);
+            if buf.len() >= self.max_entries {
+                buf.pop_front();
             }
+            buf.push_back(entry);
         }
     }
     fn flush(&self) {}
@@ -51,7 +52,7 @@ pub fn init() {
 }
 
 pub fn get_logs() -> Vec<LogEntry> {
-    LOGGER.buffer.lock().map(|buf| buf.clone()).unwrap_or_default()
+    LOGGER.buffer.lock().map(|buf| buf.iter().cloned().collect()).unwrap_or_default()
 }
 
 pub fn clear_logs() {

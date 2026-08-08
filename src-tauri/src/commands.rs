@@ -2,6 +2,14 @@ use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
 use crate::shortcut::{re_register_shortcut, register_shortcut};
+
+fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
+    match ui_language {
+        "en" => en.to_string(),
+        "ja" => ja.to_string(),
+        _ => zh.to_string(),
+    }
+}
 use base64::Engine;
 use serde::Serialize;
 use std::sync::Arc;
@@ -258,7 +266,7 @@ pub async fn retry_transcription(
         &settings.api_key,
         &settings.api_base_url,
         &settings.model,
-        wav_data,
+        &wav_data,
         lang,
         prompt,
         settings.request_timeout_sec,
@@ -525,7 +533,6 @@ pub fn export_settings_json() -> Result<String, String> {
     let s = settings::get_settings();
     let map = serde_json::json!({
         "api_base_url": s.api_base_url,
-        "api_key": s.api_key,
         "model": s.model,
         "language": s.language,
         "shortcut": s.shortcut,
@@ -543,7 +550,6 @@ pub fn export_settings_json() -> Result<String, String> {
         "launch_at_startup": s.launch_at_startup,
         "ai_polish_enabled": s.ai_polish_enabled,
         "ai_polish_api_url": s.ai_polish_api_url,
-        "ai_polish_api_key": s.ai_polish_api_key,
         "ai_polish_model": s.ai_polish_model,
         "ai_polish_prompt": s.ai_polish_prompt,
         "audio_retention_limit": s.audio_retention_limit,
@@ -679,17 +685,27 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
     log::info!("Update downloaded to: {}", file_path.display());
 
     // Auto-open the installer
+    let s = settings::get_settings();
+    let lang = &s.ui_language;
+
     #[cfg(target_os = "macos")]
     {
         if filename.ends_with(".dmg") {
             let _ = std::process::Command::new("open").arg(&file_path).spawn();
-            return Ok(format!(
-                "已下载到 {}，安装窗口即将打开。请将 Whisp 拖入 Applications 完成更新。",
-                file_path.display()
+            return Ok(tr(
+                lang,
+                &format!("已下载到 {}，安装窗口即将打开。请将 Whisp 拖入 Applications 完成更新。", file_path.display()),
+                &format!("Downloaded to {}. The installer should open automatically. Drag Whisp to Applications to update.", file_path.display()),
+                &format!("ダウンロード完了: {}。インストーラーが開きます。Whisp を Applications にドラッグしてください。", file_path.display()),
             ));
         }
         let _ = std::process::Command::new("open").arg(&file_path).spawn();
-        return Ok(format!("已下载并打开: {}", file_path.display()));
+        return Ok(tr(
+            lang,
+            &format!("已下载并打开: {}", file_path.display()),
+            &format!("Downloaded and opened: {}", file_path.display()),
+            &format!("ダウンロードして開きました: {}", file_path.display()),
+        ));
     }
 
     #[cfg(target_os = "windows")]
@@ -697,12 +713,22 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
         let _ = std::process::Command::new("cmd")
             .args(["/C", "start", "", &file_path.to_string_lossy().to_string()])
             .spawn();
-        return Ok(format!("已下载到 {}，安装程序即将启动。", file_path.display()));
+        return Ok(tr(
+            lang,
+            &format!("已下载到 {}，安装程序即将启动。", file_path.display()),
+            &format!("Downloaded to {}. The installer should launch shortly.", file_path.display()),
+            &format!("ダウンロード完了: {}。インストーラーが起動します。", file_path.display()),
+        ));
     }
 
     #[cfg(target_os = "linux")]
     {
-        return Ok(format!("已下载到: {}", file_path.display()));
+        return Ok(tr(
+            lang,
+            &format!("已下载到: {}", file_path.display()),
+            &format!("Downloaded to: {}", file_path.display()),
+            &format!("ダウンロード完了: {}", file_path.display()),
+        ));
     }
 }
 
@@ -715,11 +741,10 @@ pub fn get_whisper_config() -> crate::whisper::WhisperConfig {
 
 #[tauri::command]
 pub fn set_whisper_config(config: crate::whisper::WhisperConfig) -> Result<(), String> {
-    // Save to settings file
     let mut s = settings::get_settings();
-    // Store whisper config as JSON in a dedicated field
+    // Store whisper config in dedicated field (not whisper_prompt)
     let config_json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
-    s.whisper_prompt = config_json;
+    s.whisper_config_json = config_json;
     settings::save_settings(&s)?;
     Ok(())
 }

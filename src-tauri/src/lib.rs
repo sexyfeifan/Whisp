@@ -26,6 +26,28 @@ use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
+// Note: The `unwrap_or_else(|e| e.into_inner())` pattern is used throughout
+// this codebase to recover poisoned Mutex guards. While this means we continue
+// with potentially inconsistent state after a panic, all writes are idempotent
+// (settings overwrites, history DB transactions) so the risk is minimal.
+// Panics that poison Mutexes are logged at the point of occurrence.
+
+/// Recursively copy a directory (fallback when rename() fails across filesystems).
+fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+        if src_path.is_dir() {
+            copy_dir_recursive(&src_path, &dst_path)?;
+        } else {
+            std::fs::copy(&src_path, &dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 /// ~/.whisp/ (migrated from ~/.nanowhisper/)
 pub fn data_dir() -> PathBuf {
     let home = dirs::home_dir().expect("Cannot determine home directory");
@@ -34,12 +56,21 @@ pub fn data_dir() -> PathBuf {
 
     // Migrate from old directory if new doesn't exist but old does
     if !new_dir.exists() && old_dir.exists() {
-        if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
-            log::warn!("Failed to migrate data dir from {:?} to {:?}: {}", old_dir, new_dir, e);
-            // Fall back to old directory if rename fails
-            return old_dir;
+        match std::fs::rename(&old_dir, &new_dir) {
+            Ok(_) => {
+                log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
+            }
+            Err(e) => {
+                log::warn!("Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...", e);
+                // Fallback: copy files then delete old directory
+                if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
+                    log::warn!("Copy migration also failed: {}. Using old directory.", e2);
+                    return old_dir;
+                }
+                let _ = std::fs::remove_dir_all(&old_dir);
+                log::info!("Migrated data directory via copy from ~/.nanowhisper to ~/.whisp");
+            }
         }
-        log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
     }
 
     new_dir
@@ -116,8 +147,17 @@ pub fn run() {
         .setup(|app| {
             let app_handle = app.handle().clone();
 
-            // Initialize history manager
-            let history_manager = Arc::new(HistoryManager::new().expect("Failed to init history DB"));
+            // Initialize history manager with graceful degradation.
+            // If the DB is corrupted, attempt to delete and recreate it once.
+            let history_manager = Arc::new(HistoryManager::new().unwrap_or_else(|e| {
+                log::error!("Failed to init history DB: {}. Attempting recovery...", e);
+                let db_path = data_dir().join("history.db");
+                if db_path.exists() {
+                    let _ = std::fs::remove_file(&db_path);
+                    log::warn!("Removed corrupted history DB, recreating...");
+                }
+                HistoryManager::new().expect("Failed to init history DB even after recovery")
+            }));
             app.manage(history_manager.clone());
 
             // Initialize audio recorder
@@ -590,7 +630,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
             &api_key,
             &api_base_url,
             &model,
-            wav_data,
+            &wav_data,
             lang,
             prompt,
             request_timeout_sec,

@@ -156,7 +156,11 @@ mod platform {
             ];
         }
 
-        // Leak blocks to keep monitors alive for the app's lifetime
+        // SAFETY: We intentionally leak both blocks to keep the NSEvent monitors
+        // alive for the entire app lifetime. These monitors must never be deallocated
+        // while the app is running, and the blocks have no Drop logic that would
+        // release critical resources. This is a one-time allocation (~hundreds of
+        // bytes) and the app only creates these monitors once at startup.
         std::mem::forget(global_block);
         std::mem::forget(local_block);
 

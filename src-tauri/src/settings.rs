@@ -57,6 +57,8 @@ pub struct AppSettings {
     pub ai_polish_model: String,
     #[serde(default)]
     pub ai_polish_prompt: String,
+    #[serde(default)]
+    pub whisper_config_json: String,
     #[serde(default = "default_audio_retention_limit")]
     pub audio_retention_limit: usize,
     #[serde(default)]
@@ -118,6 +120,8 @@ struct DiskSettings {
     pub ai_polish_model: String,
     #[serde(default)]
     pub ai_polish_prompt: String,
+    #[serde(default)]
+    pub whisper_config_json: String,
     #[serde(default = "default_audio_retention_limit")]
     pub audio_retention_limit: usize,
     /// api_key is normally empty here (stored in keychain).
@@ -235,6 +239,7 @@ impl Default for AppSettings {
             ai_polish_api_url: default_ai_polish_api_url(),
             ai_polish_model: default_ai_polish_model(),
             ai_polish_prompt: String::new(),
+            whisper_config_json: String::new(),
             audio_retention_limit: default_audio_retention_limit(),
             custom_endpoints: Vec::new(),
         }
@@ -311,7 +316,7 @@ fn load_disk_settings() -> DiskSettings {
     }
 }
 
-fn save_disk_settings(settings: &AppSettings) -> Result<(), String> {
+fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), String> {
     let dir = crate::data_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("settings.json");
@@ -340,7 +345,8 @@ fn save_disk_settings(settings: &AppSettings) -> Result<(), String> {
         ai_polish_model: settings.ai_polish_model.clone(),
         ai_polish_prompt: settings.ai_polish_prompt.clone(),
         audio_retention_limit: settings.audio_retention_limit,
-        api_key: settings.api_key.clone(), // always persist to disk; keychain is best-effort only
+        api_key: if keychain_ok { String::new() } else { settings.api_key.clone() },
+        whisper_config_json: settings.whisper_config_json.clone(),
         custom_endpoints: settings.custom_endpoints.clone(),
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
@@ -374,6 +380,7 @@ pub fn get_settings() -> AppSettings {
         ai_polish_api_url: disk.ai_polish_api_url,
         ai_polish_model: disk.ai_polish_model,
         ai_polish_prompt: disk.ai_polish_prompt,
+        whisper_config_json: disk.whisper_config_json,
         audio_retention_limit: disk.audio_retention_limit,
         custom_endpoints: disk.custom_endpoints,
     };
@@ -401,12 +408,11 @@ pub fn get_settings() -> AppSettings {
 
 pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     // Best-effort keychain store (may fail on ad-hoc signed builds)
-    if let Err(e) = store_api_key(&settings.api_key) {
-        log::warn!("Failed to store API key in system keychain: {}", e);
+    let keychain_ok = store_api_key(&settings.api_key).is_ok()
+        && store_polish_api_key(&settings.ai_polish_api_key).is_ok();
+    if !keychain_ok {
+        log::warn!("Keychain unavailable; API key(s) will be stored on disk as fallback");
     }
-    if let Err(e) = store_polish_api_key(&settings.ai_polish_api_key) {
-        log::warn!("Failed to store polish API key in system keychain: {}", e);
-    }
-    // Always persist to disk as the reliable source of truth
-    save_disk_settings(settings)
+    // Only persist API key to disk when keychain fails
+    save_disk_settings(settings, keychain_ok)
 }

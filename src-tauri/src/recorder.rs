@@ -305,6 +305,11 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
         return audio.clone();
     }
 
+    // Adaptive threshold: use the larger of the noise floor (floor_threshold)
+    // and 8% of the signal peak. The 8% value is a conservative speech detection
+    // threshold that works well for typical recordings: quiet sections are
+    // reliably distinguished from speech while avoiding false positives from
+    // breathing, ambient noise, or slight microphone hiss.
     let threshold = floor_threshold.max(peak * 0.08);
     let start = audio.samples.iter().position(|sample| sample.abs() >= threshold);
     let end = audio.samples.iter().rposition(|sample| sample.abs() >= threshold);

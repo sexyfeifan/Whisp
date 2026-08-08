@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -312,25 +313,48 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
     }
 
     let total_size = response.content_length().unwrap_or(0);
-    let bytes = response
-        .bytes()
-        .await
-        .with_context(|| "Failed to read model download response")?;
+    let dest_path_tmp = dest_path.with_extension("part");
 
-    if total_size > 0 && bytes.len() as u64 != total_size {
+    // Stream download to avoid loading entire model into memory
+    let mut file = std::fs::File::create(&dest_path_tmp)
+        .with_context(|| format!("Failed to create temp file: {}", dest_path_tmp.display()))?;
+    let mut downloaded: u64 = 0;
+
+    while let Some(chunk) = response.chunk().await.transpose() {
+        let bytes = chunk.with_context(|| "Failed to read chunk")?;
+        file.write_all(&bytes)
+            .with_context(|| "Failed to write chunk")?;
+        downloaded += bytes.len() as u64;
+        if total_size > 0 {
+            log::info!(
+                "Download progress: {:.1}% ({:.1} MB / {:.1} MB)",
+                (downloaded as f64 / total_size as f64) * 100.0,
+                downloaded as f64 / 1_048_576.0,
+                total_size as f64 / 1_048_576.0
+            );
+        }
+    }
+
+    file.flush().with_context(|| "Failed to flush file")?;
+    drop(file);
+
+    // Verify downloaded size
+    if total_size > 0 && downloaded != total_size {
+        let _ = std::fs::remove_file(&dest_path_tmp);
         anyhow::bail!(
             "Download incomplete: expected {} bytes, got {}",
             total_size,
-            bytes.len()
+            downloaded
         );
     }
 
-    std::fs::write(&dest_path, &bytes).with_context(|| format!("Failed to write model to {}", dest_path.display()))?;
+    std::fs::rename(&dest_path_tmp, &dest_path)
+        .with_context(|| format!("Failed to rename {} to {}", dest_path_tmp.display(), dest_path.display()))?;
 
     log::info!(
         "Model downloaded: {} ({:.1} MB)",
         file_name,
-        bytes.len() as f64 / 1_048_576.0
+        downloaded as f64 / 1_048_576.0
     );
 
     Ok(dest_path)
