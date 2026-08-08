@@ -48,3 +48,13 @@ objc2-av-foundation = { version = "0.3.2", default-features = false, features = 
 lto = true
 codegen-units = 1
 strip = true
+
+[lints.clippy]
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+too_many_arguments = "allow"
+needless_return = "allow"
+module_inception = "allow"
