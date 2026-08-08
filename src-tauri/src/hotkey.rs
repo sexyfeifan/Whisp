@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Native single-key hotkey monitoring.
 //!
 //! Detects a "solo tap" of Right Command (macOS) or Right Control (Windows):

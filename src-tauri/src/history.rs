@@ -218,6 +218,7 @@ impl HistoryManager {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn update_usage(
         &self,
         id: i64,
