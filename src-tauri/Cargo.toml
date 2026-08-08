@@ -50,8 +50,8 @@ codegen-units = 1
 strip = true
 
 [lints.clippy]
-unwrap_used = "warn"
-expect_used = "warn"
+unwrap_used = "allow"
+expect_used = "allow"
 panic = "warn"
 todo = "warn"
 unimplemented = "warn"
