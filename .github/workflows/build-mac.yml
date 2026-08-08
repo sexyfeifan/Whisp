@@ -133,22 +133,27 @@ jobs:
       - name: Ad-hoc sign macOS app (unsigned path)
         if: env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == ''
         run: |
-          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" | head -1)
+          echo "Looking for .app in: src-tauri/target/aarch64-apple-darwin/release/bundle/"
+          find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" -type d
+          APP=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.app" -type d | head -1)
           echo "Found app bundle: $APP"
-          test -n "$APP"
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found!"
+            exit 1
+          fi
 
           # Strip any extended attributes (quarantine etc.)
           xattr -cr "$APP"
 
-          # Force ad-hoc sign the app bundle (required for Apple Silicon)
-          codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
+          # Force ad-hoc sign the app bundle
+          codesign --force --deep --sign - "$APP"
 
           # Verify ad-hoc signature
           echo "=== Ad-hoc signature verification ==="
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP"
 
-          # Rebuild DMG with signed app
+          # Re-package DMG with signed app
           DMG=$(find src-tauri/target/aarch64-apple-darwin/release/bundle -name "*.dmg" | head -1)
           echo "Original DMG: $DMG"
 

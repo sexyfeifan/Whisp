@@ -223,38 +223,32 @@ jobs:
       - name: Ad-hoc sign macOS app (unsigned path)
         if: runner.os == 'macOS' && (env.MAC_CSC_LINK == '' || env.MAC_CSC_KEY_PASSWORD == '')
         run: |
-          APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.app" | head -1)
+          echo "Looking for .app in: src-tauri/target/${{ matrix.target }}/release/bundle/"
+          find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.app" -type d
+          APP=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.app" -type d | head -1)
           echo "Found app bundle: $APP"
-          test -n "$APP"
+          if [ -z "$APP" ]; then
+            echo "::error::No .app bundle found!"
+            find src-tauri/target/${{ matrix.target }}/release -maxdepth 4 -type d | head -20
+            exit 1
+          fi
 
           # Strip any extended attributes (quarantine etc.)
           xattr -cr "$APP"
 
-          # Force ad-hoc sign the app bundle (required for Apple Silicon)
-          codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP"
+          # Force ad-hoc sign the app bundle with entitlements (required for Apple Silicon)
+          codesign --force --deep --sign - "$APP"
 
           # Verify ad-hoc signature
           echo "=== Ad-hoc signature verification ==="
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign -dvv "$APP"
 
-          # Rebuild DMG with signed app
+          # Re-package DMG with signed app
           DMG=$(find src-tauri/target/${{ matrix.target }}/release/bundle -name "*.dmg" | head -1)
           echo "Original DMG: $DMG"
 
-          # Re-package DMG to include the signed app
           if [ -n "$DMG" ]; then
-            MOUNT_POINT=$(mktemp -d)
-            hdiutil attach "$DMG" -nobrowse -mountpoint "$MOUNT_POINT"
-            # The app inside the DMG is the same file; re-sign it there too
-            APP_IN_DMG=$(find "$MOUNT_POINT" -name "*.app" | head -1)
-            if [ -n "$APP_IN_DMG" ]; then
-              xattr -cr "$APP_IN_DMG"
-              codesign --force --deep --sign - --entitlements src-tauri/Entitlements.plist "$APP_IN_DMG"
-            fi
-            hdiutil detach "$MOUNT_POINT"
-
-            # Re-create DMG with proper compression
             DMG_DIR=$(mktemp -d)
             cp -R "$APP" "$DMG_DIR/"
             rm -f "$DMG"
