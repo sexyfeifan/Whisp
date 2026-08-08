@@ -118,7 +118,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-          key: ${{ matrix.target }}
+          key: ${{ matrix.target }}-v2.9.0
 
       # Linux: install system dependencies required by Tauri and cpal (ALSA)
       - name: Install Linux dependencies
