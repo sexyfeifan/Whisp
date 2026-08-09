@@ -659,6 +659,20 @@ mod tests {
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
             waveform_preview_enabled: settings.waveform_preview_enabled,
+            global_hotkey: settings.global_hotkey.clone(),
+            global_hotkey_enabled: settings.global_hotkey_enabled,
+            vocabulary: settings.vocabulary.clone(),
+            vocabulary_enabled: settings.vocabulary_enabled,
+            sync_dir: settings.sync_dir.clone(),
+            device_name: settings.device_name.clone(),
+            summary_model: settings.summary_model.clone(),
+            summary_enabled: settings.summary_enabled,
+            streaming_enabled: settings.streaming_enabled,
+            streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
+            diarization_enabled: settings.diarization_enabled,
+            diarization_api_key: settings.diarization_api_key.clone(),
+            diarization_api_base_url: settings.diarization_api_base_url.clone(),
+            diarization_num_speakers: settings.diarization_num_speakers,
         };
 
         let json = serde_json::to_string(&disk).unwrap();
@@ -701,6 +715,20 @@ mod tests {
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
             waveform_preview_enabled: settings.waveform_preview_enabled,
+            global_hotkey: settings.global_hotkey.clone(),
+            global_hotkey_enabled: settings.global_hotkey_enabled,
+            vocabulary: settings.vocabulary.clone(),
+            vocabulary_enabled: settings.vocabulary_enabled,
+            sync_dir: settings.sync_dir.clone(),
+            device_name: settings.device_name.clone(),
+            summary_model: settings.summary_model.clone(),
+            summary_enabled: settings.summary_enabled,
+            streaming_enabled: settings.streaming_enabled,
+            streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
+            diarization_enabled: settings.diarization_enabled,
+            diarization_api_key: settings.diarization_api_key.clone(),
+            diarization_api_base_url: settings.diarization_api_base_url.clone(),
+            diarization_num_speakers: settings.diarization_num_speakers,
         };
 
         let json = serde_json::to_string(&disk).unwrap();
