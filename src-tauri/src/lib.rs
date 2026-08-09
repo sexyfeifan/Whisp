@@ -973,9 +973,10 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
+                    let paste_handle = handle.clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(Duration::from_millis(paste_delay_ms));
-                        paste::simulate_paste(&handle).ok();
+                        paste::simulate_paste(&paste_handle).ok();
                     });
                 }
 
