@@ -1,4 +1,4 @@
-use crate::history::{HistoryEntry, HistoryManager, STATUS_SUCCESS};
+use crate::history::{HistoryEntry, HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
 use crate::shortcut::{re_register_shortcut, register_shortcut};
