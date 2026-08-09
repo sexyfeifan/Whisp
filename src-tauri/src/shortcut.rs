@@ -110,6 +110,7 @@ pub fn register_global_record_hotkey(app_handle: &AppHandle, hotkey_str: &str) -
         .map_err(|e| format!("Invalid hotkey '{}': {}", hotkey_str, e))?;
 
     let handle = app_handle.clone();
+    let hotkey_name = hotkey_str.to_string();
     app_handle
         .global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
@@ -122,7 +123,7 @@ pub fn register_global_record_hotkey(app_handle: &AppHandle, hotkey_str: &str) -
                     return;
                 }
 
-                log::info!("Global record hotkey triggered: {}", hotkey_str);
+                log::info!("Global record hotkey triggered: {}", hotkey_name);
                 let h = handle.clone();
                 std::thread::spawn(move || {
                     crate::toggle_recording(&h);
