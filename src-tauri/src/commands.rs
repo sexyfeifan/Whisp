@@ -281,6 +281,31 @@ pub fn discard_pending_recording(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn trigger_sync(history: State<'_, Arc<HistoryManager>>) -> Result<serde_json::Value, String> {
+    let settings = crate::settings::get_settings();
+    let device = &settings.device_name;
+    let (exported, imported) = crate::sync::full_sync(history.inner().as_ref(), device)?;
+    Ok(serde_json::json!({
+        "exported": exported,
+        "imported": imported,
+        "device": device,
+        "sync_dir": settings.sync_dir,
+    }))
+}
+
+#[tauri::command]
+pub fn get_sync_status() -> Result<serde_json::Value, String> {
+    let settings = crate::settings::get_settings();
+    let dir = crate::sync::sync_dir();
+    Ok(serde_json::json!({
+        "configured": dir.is_some(),
+        "sync_dir": settings.sync_dir,
+        "device_name": settings.device_name,
+        "dir_exists": dir.map(|d| d.exists()).unwrap_or(false),
+    }))
+}
+
+#[tauri::command]
 pub fn toggle_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     let autolaunch = app.autolaunch();
     if enabled {

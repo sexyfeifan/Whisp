@@ -67,6 +67,12 @@ pub struct AppSettings {
     pub translation_target: String,
     #[serde(default)]
     pub waveform_preview_enabled: bool,
+    /// Sync directory path (e.g., ~/Dropbox/Whisp-sync/)
+    #[serde(default)]
+    pub sync_dir: String,
+    /// Device name for sync identification
+    #[serde(default = "default_device_name")]
+    pub device_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,6 +144,10 @@ struct DiskSettings {
     pub translation_target: String,
     #[serde(default)]
     pub waveform_preview_enabled: bool,
+    #[serde(default)]
+    pub sync_dir: String,
+    #[serde(default = "default_device_name")]
+    pub device_name: String,
 }
 
 fn default_api_key() -> String {
@@ -224,6 +234,12 @@ fn default_translation_target() -> String {
     "none".to_string()
 }
 
+fn default_device_name() -> String {
+    std::env::var("COMPUTERNAME")
+        .or_else(|_| std::env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "unknown-device".to_string())
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -256,6 +272,8 @@ impl Default for AppSettings {
             custom_endpoints: Vec::new(),
             translation_target: default_translation_target(),
             waveform_preview_enabled: false,
+            sync_dir: String::new(),
+            device_name: default_device_name(),
         }
     }
 }
@@ -368,6 +386,8 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         custom_endpoints: settings.custom_endpoints.clone(),
         translation_target: settings.translation_target.clone(),
         waveform_preview_enabled: settings.waveform_preview_enabled,
+        sync_dir: settings.sync_dir.clone(),
+        device_name: settings.device_name.clone(),
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -405,6 +425,8 @@ pub fn get_settings() -> AppSettings {
         custom_endpoints: disk.custom_endpoints,
         translation_target: disk.translation_target,
         waveform_preview_enabled: disk.waveform_preview_enabled,
+        sync_dir: disk.sync_dir,
+        device_name: disk.device_name,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth

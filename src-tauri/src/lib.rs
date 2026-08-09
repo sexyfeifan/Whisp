@@ -11,6 +11,7 @@ mod recorder;
 mod settings;
 mod shortcut;
 mod sound;
+mod sync;
 mod transcribe;
 mod translate;
 mod tray;
@@ -171,6 +172,8 @@ pub fn run() {
             commands::get_pending_waveform,
             commands::confirm_pending_transcription,
             commands::discard_pending_recording,
+            commands::trigger_sync,
+            commands::get_sync_status,
             commands::export_full_backup,
             commands::import_full_backup,
             commands::list_plugins,
