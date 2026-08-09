@@ -16,6 +16,7 @@ import { FilterChip } from "../components/FilterChip";
 import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
+import { AudioPlayer } from "../components/AudioPlayer";
 import type { AppState } from "../hooks/useApp";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage } from "../lib/utils";
 
@@ -32,7 +33,7 @@ export function HistoryPage(app: AppState) {
     settingsFeedback, searchQuery, setSearchQuery, statusFilter, setStatusFilter,
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
-    retryEntry, copyText, playAudio, playingAudioId, audioUrls, loadHistory, m, uiLanguage,
+    retryEntry, copyText, playAudio, playingAudioId, audioUrls, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -41,6 +42,7 @@ export function HistoryPage(app: AppState) {
   const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<Record<number, number>>({});
 
   if (!settings) return null;
 
@@ -69,7 +71,11 @@ export function HistoryPage(app: AppState) {
       const result = await invoke<SummaryResult>("generate_summary", { entryId });
       setSummaryModal({ entry: { id: entryId, text }, result, loading: false });
     } catch (e: any) {
-      setSummaryModal({ entry: { id: entryId, text }, loading: false, error: String(e) });
+      const raw = String(e);
+      const enhanced = raw.includes("404") || raw.includes("Not Found") || raw.includes("model")
+        ? `${raw}\n\nHint: Your API provider may not support chat completions. The AI Summary feature requires a chat/completions endpoint (not just Whisper). Please verify your API settings include a compatible model.`
+        : raw;
+      setSummaryModal({ entry: { id: entryId, text }, loading: false, error: enhanced });
     }
   };
 
@@ -266,8 +272,27 @@ export function HistoryPage(app: AppState) {
                           </Button>
                         </div>
                       ) : (
-                        <div className="text-sm cursor-pointer" onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)} style={{ userSelect: "text", color: "hsl(var(--ink))" }}>
-                          {expandedId === entry.id || entry.text.length <= 120 ? `${entry.text}` : `${entry.text.slice(0, 120)}...`}
+                        <div
+                          className="text-sm cursor-pointer relative"
+                          onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                          style={{ userSelect: "text", color: "hsl(var(--ink))" }}
+                        >
+                          {(() => {
+                            const displayText = expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
+                            if (playingAudioId === entry.id && audioDuration > 0 && audioProgress > 0) {
+                              const progressRatio = Math.min(1, audioProgress / audioDuration);
+                              const highlightIdx = Math.floor(displayText.length * progressRatio);
+                              return (
+                                <>
+                                  <span style={{ background: "hsl(var(--primary) / 0.15)", borderRadius: 2, padding: 0 }}>
+                                    {displayText.slice(0, highlightIdx)}
+                                  </span>
+                                  <span>{displayText.slice(highlightIdx)}</span>
+                                </>
+                              );
+                            }
+                            return displayText;
+                          })()}
                         </div>
                       )}
                     </div>
@@ -342,6 +367,20 @@ export function HistoryPage(app: AppState) {
                     </div>
 
                     {/* Audio player */}
+                    {entry.audio_path && audioUrls[entry.id] && (
+                      <div className="mt-2">
+                        <AudioPlayer
+                          entryId={entry.id}
+                          audioPath={entry.audio_path}
+                          durationMs={entry.duration_ms}
+                          onTimeUpdate={(currentTime, duration) => {
+                            if (duration > 0) {
+                              setSyncProgress(prev => ({ ...prev, [entry.id]: currentTime / duration }));
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                     {entry.audio_path && !audioUrls[entry.id] && (
                       <div className="mt-2">
                         <button
@@ -355,6 +394,36 @@ export function HistoryPage(app: AppState) {
                           {playingAudioId === entry.id ? <Pause size={14} /> : <Play size={14} />}
                           {playingAudioId === entry.id ? m.pauseAudio : m.playAudio}
                         </button>
+                        {/* Progress bar + time display when playing */}
+                        {playingAudioId === entry.id && audioDuration > 0 && (
+                          <div className="space-y-1">
+                            <div
+                              className="h-1.5 rounded-full cursor-pointer group relative"
+                              style={{ background: "hsl(var(--hairline))" }}
+                              onClick={(e) => {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                seekAudio(ratio * audioDuration);
+                              }}
+                            >
+                              <div
+                                className="h-full rounded-full transition-all duration-75"
+                                style={{
+                                  width: `${(audioProgress / audioDuration) * 100}%`,
+                                  background: "hsl(var(--primary))",
+                                }}
+                              />
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
+                                {formatTime(audioProgress * 1000, uiLanguage)}
+                              </span>
+                              <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
+                                {formatTime(audioDuration * 1000, uiLanguage)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </Card>

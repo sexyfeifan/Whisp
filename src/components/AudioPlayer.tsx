@@ -6,9 +6,10 @@ interface AudioPlayerProps {
   entryId: number;
   audioPath: string | null;
   durationMs: number | null;
+  onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
-export function AudioPlayer({ audioPath }: AudioPlayerProps) {
+export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const waveformRef = useRef<HTMLCanvasElement>(null);
@@ -131,9 +132,10 @@ export function AudioPlayer({ audioPath }: AudioPlayerProps) {
   const updateTime = useCallback(() => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
+      onTimeUpdate?.(audioRef.current.currentTime, audioRef.current.duration || 0);
     }
     animationRef.current = requestAnimationFrame(updateTime);
-  }, []);
+  }, [onTimeUpdate]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;

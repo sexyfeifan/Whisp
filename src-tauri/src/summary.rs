@@ -300,7 +300,12 @@ pub async fn generate_summary(
                     continue;
                 }
 
-                anyhow::bail!("Summary API error {}: {}", status, body);
+                let hint = match status.as_u16() {
+                    401 | 403 => " — Your API key may not have chat/completions access. Many Whisper-only keys cannot generate summaries. Try using a different API provider like OpenAI or a generic OpenAI-compatible endpoint that supports chat models.",
+                    404 => " — Chat completions endpoint not found. Your API base URL may only support transcription. Add /v1/chat/completions capability or switch to a full API provider.",
+                    _ => "",
+                };
+                anyhow::bail!("Summary API error {}{}: {}", status.as_u16(), hint, body);
             }
             Err(error) => {
                 if attempt + 1 < attempts {

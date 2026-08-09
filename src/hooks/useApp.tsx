@@ -52,7 +52,10 @@ export interface AppState {
   polishErrorMsg: string | null;
   playingAudioId: number | null;
   audioUrls: Record<number, string>;
+  audioProgress: number;    // current time in seconds
+  audioDuration: number;    // total duration in seconds
   stopAudio: () => void;
+  seekAudio: (time: number) => void;
   logs: LogEntry[];
   logsAutoScroll: boolean;
   setLogsAutoScroll: React.Dispatch<React.SetStateAction<boolean>>;
@@ -125,6 +128,10 @@ export function useApp(): AppState {
   const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const audioAnimRef = useRef<number>(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logsAutoScroll, setLogsAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
@@ -371,29 +378,76 @@ export function useApp(): AppState {
     window.setTimeout(() => setCopied(null), 1500);
   }, []);
 
+  const stopAudio = useCallback(() => {
+    if (audioElRef.current) {
+      audioElRef.current.pause();
+      audioElRef.current.src = "";
+      audioElRef.current = null;
+    }
+    cancelAnimationFrame(audioAnimRef.current);
+    setPlayingAudioId(null);
+    setAudioProgress(0);
+    setAudioDuration(0);
+  }, []);
+
   const playAudio = useCallback(async (path: string, id: number) => {
     if (playingAudioId === id) {
       // Already playing this entry — stop it
-      setPlayingAudioId(null);
+      stopAudio();
       return;
     }
-    // Load URL if not already cached
-    if (!audioUrls[id]) {
-      try {
-        const base64 = await invoke<string>("read_audio_file", { path });
-        const url = `data:audio/wav;base64,${base64}`;
-        setAudioUrls((prev) => ({ ...prev, [id]: url }));
-      } catch (error) {
-        console.error("Failed to load audio:", error);
-        return;
-      }
-    }
-    // Set this as the active player (AudioPlayer component handles play)
-    setPlayingAudioId(id);
-  }, [playingAudioId, audioUrls]);
+    // Stop any currently playing audio first
+    stopAudio();
 
-  const stopAudio = useCallback(() => {
-    setPlayingAudioId(null);
+    try {
+      // Load audio data
+      let url = audioUrls[id];
+      if (!url) {
+        const base64 = await invoke<string>("read_audio_file", { path });
+        url = `data:audio/wav;base64,${base64}`;
+        setAudioUrls((prev) => ({ ...prev, [id]: url }));
+      }
+
+      // Create and play Audio element
+      const audio = new Audio(url);
+      audioElRef.current = audio;
+      audio.volume = 1;
+
+      audio.addEventListener("loadedmetadata", () => {
+        setAudioDuration(audio.duration);
+      });
+
+      audio.addEventListener("ended", () => {
+        stopAudio();
+      });
+
+      audio.addEventListener("error", (e) => {
+        console.error("Audio playback error:", e);
+        stopAudio();
+      });
+
+      await audio.play();
+      setPlayingAudioId(id);
+
+      // Animation loop for progress tracking
+      const tick = () => {
+        if (audioElRef.current) {
+          setAudioProgress(audioElRef.current.currentTime);
+          audioAnimRef.current = requestAnimationFrame(tick);
+        }
+      };
+      audioAnimRef.current = requestAnimationFrame(tick);
+    } catch (error) {
+      console.error("Failed to load/play audio:", error);
+      stopAudio();
+    }
+  }, [playingAudioId, audioUrls, stopAudio]);
+
+  const seekAudio = useCallback((time: number) => {
+    if (audioElRef.current) {
+      audioElRef.current.currentTime = time;
+      setAudioProgress(time);
+    }
   }, []);
 
   const loadLogs = useCallback(async () => {
@@ -560,7 +614,7 @@ export function useApp(): AppState {
     confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
     polishErrorMsg, playingAudioId, audioUrls,
-    stopAudio, logs, logsAutoScroll,
+    audioProgress, audioDuration, stopAudio, seekAudio, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, defaultPolishPrompt, darkMode, setDarkMode,
     uiLanguage, m, filteredHistory, stats, todayCount, hasApiConfig, canProceed,
     navItems, updateSettings, persistSettings, testApiKey,

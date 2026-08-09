@@ -409,8 +409,11 @@ static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
-/// Cached recording-state tray icon (red dot)
+/// Cached recording-state tray icon (red dot) — superseded by orb animation below
 static RECORDING_ICON: std::sync::OnceLock<tauri::image::Image<'static>> = std::sync::OnceLock::new();
+
+/// Cached orb tray icon frame 0 (used as initial icon before animation thread starts)
+static ORB_ICON_0: std::sync::OnceLock<tauri::image::Image<'static>> = std::sync::OnceLock::new();
 
 pub(crate) fn toggle_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
@@ -501,15 +504,14 @@ fn start_recording(app_handle: &tauri::AppHandle) {
     }
     log::info!("Recording started, model={}", saved.model);
 
-    // Update tray to show recording state
+    // Update tray to show recording state with orb icon (animation thread will cycle frames)
     if let Some(tray) = app_handle.tray_by_id("main") {
         let _ = tray.set_tooltip(Some("● Recording..."));
-        // Switch to recording icon (red dot)
-        let rec_icon = RECORDING_ICON.get_or_init(|| {
-            let bytes = include_bytes!("../icons/tray_icon_recording.png");
-            tauri::image::Image::from_bytes(bytes).expect("Failed to load recording icon")
+        let orb_icon = ORB_ICON_0.get_or_init(|| {
+            let bytes = include_bytes!("../icons/tray_orb_0.png");
+            tauri::image::Image::from_bytes(bytes).expect("Failed to load orb icon")
         });
-        let _ = tray.set_icon(Some(rec_icon.clone()));
+        let _ = tray.set_icon(Some(orb_icon.clone()));
         let _ = tray.set_icon_as_template(false);
     }
 
@@ -546,14 +548,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         }
     });
 
-    // Auto-hide overlay after 1.5s — keep recording in background, tray orb icon alone indicates state
-    let hide_handle = app_handle.clone();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(1500));
-        if let Some(w) = hide_handle.get_webview_window("overlay") {
-            let _ = w.hide();
-        }
-    });
+    // Overlay stays visible during recording — tray orb icon provides additional status indication
 
     // Start streaming transcription task if enabled
     if saved.streaming_enabled {
@@ -693,12 +688,6 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let _guard = TranscribeGuard;
 
     shortcut::unregister_escape(app_handle);
-
-    // Show overlay if it was auto-hidden during recording
-    if let Some(w) = app_handle.get_webview_window("overlay") {
-        let _ = w.show();
-        let _ = w.set_focus();
-    }
 
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
     let history = app_handle.state::<Arc<HistoryManager>>();
