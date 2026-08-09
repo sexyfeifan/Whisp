@@ -710,7 +710,7 @@ mod tests {
             ai_polish_model: settings.ai_polish_model.clone(),
             ai_polish_prompt: settings.ai_polish_prompt.clone(),
             audio_retention_limit: settings.audio_retention_limit,
-            api_key: "«redacted:sk-…»".to_string(), // keychain_ok = false
+            api_key: "sk-secret-key".to_string(), // keychain_ok = false
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
