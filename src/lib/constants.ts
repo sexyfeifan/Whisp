@@ -150,9 +150,9 @@ export const modelCatalog: ModelCatalogItem[] = [
     name: "mimo-v2.5-asr",
     provider: "MiMo",
     description: {
-      "zh-CN": "小米 MiMo 语音识别，支持中英双语、方言、歌词转写及嘆杂环境。",
-      en: "Xiaomi MiMo ASR with bilingual, dialect, lyrics, and noisy-environment support.",
-      ja: "Xiaomi MiMo 音声認讀、中国語・英語・方言・歌詞・騒音環境対応。",
+      "zh-CN": "小米 MiMo 语音识别，支持中英双语、方言、歌词转写及嘈杂环境。",
+      en: "Xiaomi MiMo ASR with bilingual (CN/EN), dialect, lyrics, and noisy-environment support.",
+      ja: "Xiaomi MiMo 音声認識、中国語・英語・方言・歌詞・騒音環境対応。",
     },
     baseUrlHint: "https://api.xiaomimimo.com/v1",
   },
@@ -162,9 +162,49 @@ export const modelCatalog: ModelCatalogItem[] = [
     description: {
       "zh-CN": "小米 MiMo 语音识别，Token Plan 计费。",
       en: "Xiaomi MiMo ASR, Token Plan billing.",
-      ja: "Xiaomi MiMo 音声認讀、Token Plan 課金。",
+      ja: "Xiaomi MiMo 音声認識、Token Plan 課金。",
     },
     baseUrlHint: "https://token-plan-cn.xiaomimimo.com/v1",
+  },
+  {
+    name: "whisper-large-v3",
+    provider: "OpenAI-compatible",
+    description: {
+      "zh-CN": "Whisper Large V3 多语言模型，中文支持优秀，适合高质量中文转写。需配合自部署或兼容网关使用。",
+      en: "Whisper Large V3 multilingual model with excellent Chinese support. Best for high-quality Chinese transcription. Requires self-hosted or compatible gateway.",
+      ja: "Whisper Large V3 多言語モデル、中国語対応優秀。高品質な中国語文字起こしに最適。セルフホストまたは互換ゲートウェイが必要。",
+    },
+    baseUrlHint: "OpenAI-compatible URL",
+  },
+  {
+    name: "SenseVoiceSmall",
+    provider: "FunAudioLLM",
+    description: {
+      "zh-CN": "阿里通义 SenseVoice 小模型，中文语音识别效果极佳，支持粤语、闽南语等方言。速度快，适合实时场景。",
+      en: "Alibaba FunAudioLLM SenseVoice small model. Excellent Chinese ASR with Cantonese/Hokkien dialect support. Fast, ideal for real-time use.",
+      ja: "Alibaba FunAudioLLM SenseVoice 小モデル、中国語音声認識優秀、広東語・福建語などの方言対応。高速でリアルタイム向き。",
+    },
+    baseUrlHint: "OpenAI-compatible URL",
+  },
+  {
+    name: "SenseVoiceLarge",
+    provider: "FunAudioLLM",
+    description: {
+      "zh-CN": "阿里通义 SenseVoice 大模型，中文语音识别最高质量，支持粤语、闽南语等方言。速度较慢但精度更高。",
+      en: "Alibaba FunAudioLLM SenseVoice large model. Highest quality Chinese ASR with dialect support. Slower but more accurate.",
+      ja: "Alibaba FunAudioLLM SenseVoice 大モデル、中国語音声認識最高品質、方言対応。遅いが高精度。",
+    },
+    baseUrlHint: "OpenAI-compatible URL",
+  },
+  {
+    name: "paraformer-v2",
+    provider: "Alibaba DAMO",
+    description: {
+      "zh-CN": "阿里达摩院 Paraformer V2，中文转写专家级模型，非自回归架构速度极快，适合长音频。",
+      en: "Alibaba DAMO Paraformer V2 — Chinese transcription specialist. Non-autoregressive architecture, very fast for long audio.",
+      ja: "Alibaba DAMO Paraformer V2、中国語文字起こし専門モデル。非自己回帰アーキテクチャで長音声に最適。",
+    },
+    baseUrlHint: "OpenAI-compatible URL",
   },
 ];
 

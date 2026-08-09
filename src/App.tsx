@@ -1,7 +1,6 @@
 import { useApp } from "./hooks/useApp";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { SettingsApiPage } from "./pages/SettingsApiPage";
-import { SettingsPolishPage } from "./pages/SettingsPolishPage";
 import { SettingsRecordingPage } from "./pages/SettingsRecordingPage";
 import { SettingsBehaviorPage } from "./pages/SettingsBehaviorPage";
 import { SettingsAppPage } from "./pages/SettingsAppPage";
@@ -29,8 +28,6 @@ function App() {
       return <StatsPage {...app} />;
     case "settingsApi":
       return <SettingsApiPage {...app} />;
-    case "settingsPolish":
-      return <SettingsPolishPage {...app} />;
     case "settingsRecording":
       return <SettingsRecordingPage {...app} />;
     case "settingsBehavior":
