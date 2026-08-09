@@ -322,7 +322,8 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
     let model_dir = WhisperEngine::model_dir()?;
 
     // Check known models first
-    let url = if let Some((_, url, _, _, _, _)) = KNOWN_MODELS.iter().find(|(name, _, _, _, _, _)| *name == model_name) {
+    let url = if let Some((_, url, _, _, _, _)) = KNOWN_MODELS.iter().find(|(name, _, _, _, _, _)| *name == model_name)
+    {
         url
     } else {
         // Assume it's a direct URL or a known model name with default base URL
@@ -332,7 +333,11 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
             anyhow::bail!(
                 "Unknown model: {}. Available models: {}",
                 model_name,
-                KNOWN_MODELS.iter().map(|(n, _, _, _, _, _)| *n).collect::<Vec<_>>().join(", ")
+                KNOWN_MODELS
+                    .iter()
+                    .map(|(n, _, _, _, _, _)| *n)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
         }
     };
