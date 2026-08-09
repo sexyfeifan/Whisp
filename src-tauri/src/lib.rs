@@ -409,9 +409,6 @@ static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
-/// Cached recording-state tray icon (red dot) — superseded by orb animation below
-static RECORDING_ICON: std::sync::OnceLock<tauri::image::Image<'static>> = std::sync::OnceLock::new();
-
 /// Cached orb tray icon frame 0 (used as initial icon before animation thread starts)
 static ORB_ICON_0: std::sync::OnceLock<tauri::image::Image<'static>> = std::sync::OnceLock::new();
 

@@ -51,6 +51,8 @@ export interface AppSettings {
   device_name: string;
   summary_model: string;
   summary_enabled: boolean;
+  summary_api_key: string;
+  summary_api_base_url: string;
   streaming_enabled: boolean;
   streaming_chunk_duration_secs: number;
   diarization_enabled: boolean;

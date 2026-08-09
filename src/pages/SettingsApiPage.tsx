@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Shield, Plus, X } from "lucide-react";
+import { Shield, Plus, X, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -156,6 +156,24 @@ export function SettingsApiPage(app: AppState) {
                     <option value={0}>0</option><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option>
                   </select>
                 </div>
+              </div>
+            </SettingsSection>
+            <SettingsSection
+              icon={<Sparkles size={14} />}
+              title={m.aiSummary}
+              description="Configure a separate API endpoint for AI summaries. Leave empty to use the main transcription API."
+            >
+              <div>
+                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryApiUrl}</label>
+                <Input type="text" value={settings.summary_api_base_url} onChange={(event) => updateSettings({ summary_api_base_url: event.target.value })} placeholder={settings.api_base_url || "https://api.openai.com/v1"} />
+              </div>
+              <div>
+                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryApiKey}</label>
+                <Input type="password" value={settings.summary_api_key} onChange={(event) => updateSettings({ summary_api_key: event.target.value })} placeholder={m.summaryApiKey} />
+              </div>
+              <div>
+                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryModel}</label>
+                <Input type="text" value={settings.summary_model} onChange={(event) => updateSettings({ summary_model: event.target.value })} placeholder="gpt-4o-mini" />
               </div>
             </SettingsSection>
           </div>

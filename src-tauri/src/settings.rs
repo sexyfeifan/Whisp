@@ -88,6 +88,12 @@ pub struct AppSettings {
     /// AI summary enabled (default: true)
     #[serde(default = "default_summary_enabled")]
     pub summary_enabled: bool,
+    /// Summary-specific API key (falls back to main api_key if empty)
+    #[serde(default)]
+    pub summary_api_key: String,
+    /// Summary-specific API base URL (falls back to main api_base_url if empty)
+    #[serde(default)]
+    pub summary_api_base_url: String,
     /// Enable real-time chunked streaming transcription (default: false)
     #[serde(default)]
     pub streaming_enabled: bool,
@@ -192,6 +198,10 @@ struct DiskSettings {
     pub summary_model: String,
     #[serde(default = "default_summary_enabled")]
     pub summary_enabled: bool,
+    #[serde(default)]
+    pub summary_api_key: String,
+    #[serde(default)]
+    pub summary_api_base_url: String,
     #[serde(default)]
     pub streaming_enabled: bool,
     #[serde(default = "default_streaming_chunk_duration_secs")]
@@ -360,6 +370,8 @@ impl Default for AppSettings {
             device_name: default_device_name(),
             summary_model: default_summary_model(),
             summary_enabled: default_summary_enabled(),
+            summary_api_key: String::new(),
+            summary_api_base_url: String::new(),
             streaming_enabled: false,
             streaming_chunk_duration_secs: default_streaming_chunk_duration_secs(),
             diarization_enabled: false,
@@ -494,6 +506,8 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         device_name: settings.device_name.clone(),
         summary_model: settings.summary_model.clone(),
         summary_enabled: settings.summary_enabled,
+        summary_api_key: settings.summary_api_key.clone(),
+        summary_api_base_url: settings.summary_api_base_url.clone(),
         streaming_enabled: settings.streaming_enabled,
         streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
         diarization_enabled: settings.diarization_enabled,
@@ -545,6 +559,8 @@ pub fn get_settings() -> AppSettings {
         device_name: disk.device_name,
         summary_model: disk.summary_model,
         summary_enabled: disk.summary_enabled,
+        summary_api_key: disk.summary_api_key,
+        summary_api_base_url: disk.summary_api_base_url,
         streaming_enabled: disk.streaming_enabled,
         streaming_chunk_duration_secs: disk.streaming_chunk_duration_secs,
         diarization_enabled: disk.diarization_enabled,
@@ -676,6 +692,8 @@ mod tests {
             device_name: settings.device_name.clone(),
             summary_model: settings.summary_model.clone(),
             summary_enabled: settings.summary_enabled,
+            summary_api_key: settings.summary_api_key.clone(),
+            summary_api_base_url: settings.summary_api_base_url.clone(),
             streaming_enabled: settings.streaming_enabled,
             streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
             diarization_enabled: settings.diarization_enabled,
@@ -733,6 +751,8 @@ mod tests {
             device_name: settings.device_name.clone(),
             summary_model: settings.summary_model.clone(),
             summary_enabled: settings.summary_enabled,
+            summary_api_key: settings.summary_api_key.clone(),
+            summary_api_base_url: settings.summary_api_base_url.clone(),
             streaming_enabled: settings.streaming_enabled,
             streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
             diarization_enabled: settings.diarization_enabled,

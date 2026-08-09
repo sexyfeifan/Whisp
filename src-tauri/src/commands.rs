@@ -1805,11 +1805,22 @@ pub async fn generate_summary(
     let entry = entries.first().ok_or_else(|| "Entry not found".to_string())?;
 
     let settings = settings::get_settings();
+    // Use summary-specific API key/URL if set, otherwise fall back to main transcription key/URL
+    let summary_api_key = if settings.summary_api_key.trim().is_empty() {
+        settings.api_key.clone()
+    } else {
+        settings.summary_api_key.clone()
+    };
+    let summary_api_base_url = if settings.summary_api_base_url.trim().is_empty() {
+        settings.api_base_url.clone()
+    } else {
+        settings.summary_api_base_url.clone()
+    };
     let config = crate::summary::SummaryConfig {
         enabled: settings.summary_enabled,
         model: settings.summary_model.clone(),
-        api_key: settings.api_key.clone(),
-        api_base_url: settings.api_base_url.clone(),
+        api_key: summary_api_key,
+        api_base_url: summary_api_base_url,
         language: settings.ui_language.clone(),
     };
 
