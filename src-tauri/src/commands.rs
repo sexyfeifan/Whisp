@@ -218,21 +218,32 @@ fn sanitize_csv_field(field: &str) -> String {
 
 #[tauri::command]
 pub fn get_pricing_config() -> Result<serde_json::Value, String> {
-    let config = crate::cost::PricingConfig::load();
-    serde_json::to_value(&config).map_err(|e| e.to_string())
+    let config = crate::cost::load_prices();
+    serde_json::to_value(config).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn save_pricing_config(config_json: String) -> Result<(), String> {
-    let config: crate::cost::PricingConfig =
+    let config: crate::cost::PriceConfig =
         serde_json::from_str(&config_json).map_err(|e| format!("Invalid pricing config: {e}"))?;
-    config.save()
+    let path = crate::data_dir().join("prices.json");
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(&path, json).map_err(|e| e.to_string())?;
+    crate::cost::reset_prices_cache();
+    Ok(())
 }
 
 #[tauri::command]
 pub fn reset_pricing_config() -> Result<(), String> {
-    let config = crate::cost::PricingConfig::default();
-    config.save()
+    let path = crate::data_dir().join("prices.json");
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    crate::cost::reset_prices_cache();
+    Ok(())
 }
 
 /// Get waveform data from the pending recording for preview visualization.

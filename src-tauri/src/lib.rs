@@ -736,10 +736,9 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 };
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
-                let pricing_config = cost::PricingConfig::load();
-                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec, &pricing_config);
+                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
                 let polish_cost = if polish_tokens > 0 {
-                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens, &pricing_config)
+                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens)
                 } else {
                     0.0
                 };
@@ -996,10 +995,9 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                 let _ = handle.emit("transcription-done", &text);
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
-                let pricing_config = cost::PricingConfig::load();
-                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec, &pricing_config);
+                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
                 let polish_cost = if polish_tokens > 0 {
-                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens, &pricing_config)
+                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens)
                 } else {
                     0.0
                 };
