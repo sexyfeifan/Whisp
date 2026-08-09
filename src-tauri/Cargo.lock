@@ -6181,7 +6181,7 @@ dependencies = [
 
 [[package]]
 name = "whisp"
-version = "2.12.2"
+version = "2.12.6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
