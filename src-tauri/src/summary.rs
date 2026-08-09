@@ -495,7 +495,7 @@ mod tests {
     fn test_truncate_str() {
         assert_eq!(truncate_str("hello", 10), "hello");
         assert_eq!(truncate_str("hello world this is long", 10), "hello worl…");
-        assert_eq!(truncate_str("你好世界你好世界你好世界", 6), "你好世界你好世界…");
+        assert_eq!(truncate_str("你好世界你好世界你好世界", 6), "你好世界你好…");
     }
 
     #[test]
