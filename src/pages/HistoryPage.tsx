@@ -42,7 +42,6 @@ export function HistoryPage(app: AppState) {
   const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [syncProgress, setSyncProgress] = useState<Record<number, number>>({});
 
   if (!settings) return null;
 
