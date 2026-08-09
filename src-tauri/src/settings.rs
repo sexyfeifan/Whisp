@@ -21,6 +21,10 @@ pub struct AppSettings {
     pub ui_language: String,
     #[serde(default = "default_shortcut")]
     pub shortcut: String,
+    #[serde(default = "default_global_hotkey")]
+    pub global_hotkey: String,
+    #[serde(default = "default_global_hotkey_enabled")]
+    pub global_hotkey_enabled: bool,
     #[serde(default = "default_sound_enabled")]
     pub sound_enabled: bool,
     #[serde(default = "default_auto_paste_enabled")]
@@ -73,6 +77,30 @@ pub struct AppSettings {
     /// Device name for sync identification
     #[serde(default = "default_device_name")]
     pub device_name: String,
+    /// AI summary model (default: gpt-4o-mini)
+    #[serde(default = "default_summary_model")]
+    pub summary_model: String,
+    /// AI summary enabled (default: true)
+    #[serde(default = "default_summary_enabled")]
+    pub summary_enabled: bool,
+    /// Enable real-time chunked streaming transcription (default: false)
+    #[serde(default)]
+    pub streaming_enabled: bool,
+    /// Streaming chunk duration in seconds (default: 3)
+    #[serde(default = "default_streaming_chunk_duration_secs")]
+    pub streaming_chunk_duration_secs: u32,
+    /// Speaker diarization enabled (default: false)
+    #[serde(default)]
+    pub diarization_enabled: bool,
+    /// Diarization API key (stored in keychain, disk fallback)
+    #[serde(default)]
+    pub diarization_api_key: String,
+    /// Diarization API base URL (default: https://api.pyannote.ai/v1)
+    #[serde(default = "default_diarization_api_base_url")]
+    pub diarization_api_base_url: String,
+    /// Expected number of speakers (0 = auto-detect)
+    #[serde(default)]
+    pub diarization_num_speakers: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +122,10 @@ struct DiskSettings {
     pub ui_language: String,
     #[serde(default = "default_shortcut")]
     pub shortcut: String,
+    #[serde(default = "default_global_hotkey")]
+    pub global_hotkey: String,
+    #[serde(default = "default_global_hotkey_enabled")]
+    pub global_hotkey_enabled: bool,
     #[serde(default = "default_sound_enabled")]
     pub sound_enabled: bool,
     #[serde(default = "default_auto_paste_enabled")]
@@ -148,6 +180,22 @@ struct DiskSettings {
     pub sync_dir: String,
     #[serde(default = "default_device_name")]
     pub device_name: String,
+    #[serde(default = "default_summary_model")]
+    pub summary_model: String,
+    #[serde(default = "default_summary_enabled")]
+    pub summary_enabled: bool,
+    #[serde(default)]
+    pub streaming_enabled: bool,
+    #[serde(default = "default_streaming_chunk_duration_secs")]
+    pub streaming_chunk_duration_secs: u32,
+    #[serde(default)]
+    pub diarization_enabled: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub diarization_api_key: String,
+    #[serde(default = "default_diarization_api_base_url")]
+    pub diarization_api_base_url: String,
+    #[serde(default)]
+    pub diarization_num_speakers: u32,
 }
 
 fn default_api_key() -> String {
@@ -168,6 +216,14 @@ fn default_language() -> String {
 
 fn default_shortcut() -> String {
     String::new()
+}
+
+fn default_global_hotkey() -> String {
+    String::new()
+}
+
+fn default_global_hotkey_enabled() -> bool {
+    true
 }
 
 fn default_ui_language() -> String {
@@ -240,6 +296,22 @@ fn default_device_name() -> String {
         .unwrap_or_else(|_| "unknown-device".to_string())
 }
 
+fn default_summary_model() -> String {
+    "gpt-4o-mini".to_string()
+}
+
+fn default_summary_enabled() -> bool {
+    true
+}
+
+fn default_streaming_chunk_duration_secs() -> u32 {
+    3
+}
+
+fn default_diarization_api_base_url() -> String {
+    "https://api.pyannote.ai/v1".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -249,6 +321,8 @@ impl Default for AppSettings {
             language: default_language(),
             ui_language: default_ui_language(),
             shortcut: default_shortcut(),
+            global_hotkey: default_global_hotkey(),
+            global_hotkey_enabled: default_global_hotkey_enabled(),
             sound_enabled: default_sound_enabled(),
             auto_paste_enabled: default_auto_paste_enabled(),
             save_audio_files: default_save_audio_files(),
@@ -274,6 +348,14 @@ impl Default for AppSettings {
             waveform_preview_enabled: false,
             sync_dir: String::new(),
             device_name: default_device_name(),
+            summary_model: default_summary_model(),
+            summary_enabled: default_summary_enabled(),
+            streaming_enabled: false,
+            streaming_chunk_duration_secs: default_streaming_chunk_duration_secs(),
+            diarization_enabled: false,
+            diarization_api_key: String::new(),
+            diarization_api_base_url: default_diarization_api_base_url(),
+            diarization_num_speakers: 0,
         }
     }
 }
@@ -358,6 +440,8 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         language: settings.language.clone(),
         ui_language: settings.ui_language.clone(),
         shortcut: settings.shortcut.clone(),
+        global_hotkey: settings.global_hotkey.clone(),
+        global_hotkey_enabled: settings.global_hotkey_enabled,
         sound_enabled: settings.sound_enabled,
         auto_paste_enabled: settings.auto_paste_enabled,
         save_audio_files: settings.save_audio_files,
@@ -383,11 +467,21 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
             settings.api_key.clone()
         },
         whisper_config_json: settings.whisper_config_json.clone(),
+        vocabulary: settings.vocabulary.clone(),
+        vocabulary_enabled: settings.vocabulary_enabled,
         custom_endpoints: settings.custom_endpoints.clone(),
         translation_target: settings.translation_target.clone(),
         waveform_preview_enabled: settings.waveform_preview_enabled,
         sync_dir: settings.sync_dir.clone(),
         device_name: settings.device_name.clone(),
+        summary_model: settings.summary_model.clone(),
+        summary_enabled: settings.summary_enabled,
+        streaming_enabled: settings.streaming_enabled,
+        streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
+        diarization_enabled: settings.diarization_enabled,
+        diarization_api_key: settings.diarization_api_key.clone(),
+        diarization_api_base_url: settings.diarization_api_base_url.clone(),
+        diarization_num_speakers: settings.diarization_num_speakers,
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -402,6 +496,8 @@ pub fn get_settings() -> AppSettings {
         language: disk.language,
         ui_language: disk.ui_language,
         shortcut: disk.shortcut,
+        global_hotkey: disk.global_hotkey,
+        global_hotkey_enabled: disk.global_hotkey_enabled,
         sound_enabled: disk.sound_enabled,
         auto_paste_enabled: disk.auto_paste_enabled,
         save_audio_files: disk.save_audio_files,
@@ -427,6 +523,14 @@ pub fn get_settings() -> AppSettings {
         waveform_preview_enabled: disk.waveform_preview_enabled,
         sync_dir: disk.sync_dir,
         device_name: disk.device_name,
+        summary_model: disk.summary_model,
+        summary_enabled: disk.summary_enabled,
+        streaming_enabled: disk.streaming_enabled,
+        streaming_chunk_duration_secs: disk.streaming_chunk_duration_secs,
+        diarization_enabled: disk.diarization_enabled,
+        diarization_api_key: disk.diarization_api_key,
+        diarization_api_base_url: disk.diarization_api_base_url,
+        diarization_num_speakers: disk.diarization_num_speakers,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth

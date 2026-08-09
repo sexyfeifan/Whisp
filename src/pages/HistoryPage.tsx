@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Copy, Trash2,
   Play, Pause, Check, Volume2, Clock, FileAudio,
   RefreshCw, Loader2,
+  Download, FileText, ChevronDown, Sparkles, X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -248,6 +250,59 @@ export function HistoryPage(app: AppState) {
                             )}
                           </IconButton>
                         )}
+                        {!failed && (
+                          <div className="relative">
+                            <IconButton title={m.exportFormat} onClick={() => setExportDropdown(exportDropdown === entry.id ? null : entry.id)}>
+                              <Download size={14} />
+                            </IconButton>
+                            {exportDropdown === entry.id && (
+                              <div className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-lg border py-1 min-w-[160px]" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }}>
+                                {(["srt", "vtt", "markdown", "txt"] as const).map((fmt) => (
+                                  <button
+                                    key={fmt}
+                                    className="w-full text-left px-3 py-1.5 text-xs hover:bg-[hsl(var(--surface))] transition-colors flex items-center gap-2"
+                                    style={{ color: "hsl(var(--ink))" }}
+                                    onClick={async () => {
+                                      setExporting(`${entry.id}-${fmt}`);
+                                      setExportDropdown(null);
+                                      try {
+                                        const result = await invoke<{ content: string; format: string; filename: string }>("export_transcription", { entryId: entry.id, format: fmt });
+                                        const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = result.filename;
+                                        a.click();
+                                        URL.revokeObjectURL(url);
+                                      } catch (e) { console.error("Export failed:", e); }
+                                      finally { setExporting(null); }
+                                    }}
+                                  >
+                                    <FileText size={12} />
+                                    {fmt === "srt" ? m.exportSrt : fmt === "vtt" ? m.exportVtt : fmt === "markdown" ? m.exportMarkdown : m.exportTxt}
+                                    {exporting === `${entry.id}-${fmt}` && <Loader2 size={12} className="animate-spin ml-auto" />}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {!failed && (
+                          <IconButton
+                            title={m.aiSummary}
+                            onClick={async () => {
+                              setSummaryModal({ entry: { id: entry.id, text: entry.text }, loading: true });
+                              try {
+                                const result = await invoke<{ summary: string; key_points: string[]; action_items: string[] }>("generate_summary", { entryId: entry.id });
+                                setSummaryModal({ entry: { id: entry.id, text: entry.text }, result, loading: false });
+                              } catch (e: any) {
+                                setSummaryModal({ entry: { id: entry.id, text: entry.text }, loading: false, error: String(e) });
+                              }
+                            }}
+                          >
+                            <Sparkles size={14} />
+                          </IconButton>
+                        )}
                         <IconButton title={m.delete} onClick={() => deleteEntry(entry.id)}>
                           <Trash2 size={14} />
                         </IconButton>
@@ -289,3 +344,6 @@ export function HistoryPage(app: AppState) {
     </div>
   );
 }
+  const [exportDropdown, setExportDropdown] = useState<number | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: { summary: string; key_points: string[]; action_items: string[] }; loading: boolean; error?: string } | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);

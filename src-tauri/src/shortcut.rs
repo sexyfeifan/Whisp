@@ -98,3 +98,69 @@ pub fn unregister_escape(app_handle: &AppHandle) {
         let _ = app_handle.global_shortcut().unregister(escape);
     }
 }
+
+/// Register the global record hotkey (separate from user shortcut).
+/// This hotkey can start/stop recording from ANY application.
+pub fn register_global_record_hotkey(app_handle: &AppHandle, hotkey_str: &str) -> Result<(), String> {
+    if hotkey_str.is_empty() {
+        return Ok(()); // Nothing to register
+    }
+    let shortcut: Shortcut = hotkey_str
+        .parse()
+        .map_err(|e| format!("Invalid hotkey '{}': {}", hotkey_str, e))?;
+
+    let handle = app_handle.clone();
+    app_handle
+        .global_shortcut()
+        .on_shortcut(shortcut, move |_app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                // CAS guard: prevent concurrent toggle
+                if SHORTCUT_PROCESSING
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_err()
+                {
+                    return;
+                }
+
+                log::info!("Global record hotkey triggered: {}", hotkey_str);
+                let h = handle.clone();
+                std::thread::spawn(move || {
+                    crate::toggle_recording(&h);
+                    SHORTCUT_PROCESSING.store(false, Ordering::SeqCst);
+                });
+            }
+        })
+        .map_err(|e| format!("Failed to register global hotkey '{}': {}", hotkey_str, e))?;
+
+    Ok(())
+}
+
+/// Unregister the global record hotkey.
+pub fn unregister_global_record_hotkey(app_handle: &AppHandle, hotkey_str: &str) {
+    if hotkey_str.is_empty() {
+        return;
+    }
+    if let Ok(shortcut) = hotkey_str.parse::<Shortcut>() {
+        let _ = app_handle.global_shortcut().unregister(shortcut);
+        log::info!("Unregistered global record hotkey: {}", hotkey_str);
+    }
+}
+
+/// Re-register global record hotkey (when settings change).
+pub fn re_register_global_record_hotkey(
+    app_handle: &AppHandle,
+    old_hotkey_str: &str,
+    new_hotkey_str: &str,
+    enabled: bool,
+) {
+    // Unregister old
+    unregister_global_record_hotkey(app_handle, old_hotkey_str);
+
+    // Register new if enabled
+    if enabled && !new_hotkey_str.is_empty() {
+        if let Err(e) = register_global_record_hotkey(app_handle, new_hotkey_str) {
+            log::error!("{}", e);
+            let _ = app_handle.emit("shortcut-conflict", e);
+        }
+    }
+}

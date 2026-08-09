@@ -456,6 +456,264 @@ impl HistoryManager {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(entries)
     }
+
+    /// Full-text search using FTS5 with BM25 ranking.
+    ///
+    /// Creates the FTS5 virtual table lazily if it doesn't already exist
+    /// (e.g. if the migration that creates it was skipped or interrupted).
+    /// Falls back to a simple LIKE search if the FTS5 module is not available.
+    pub fn search_fulltext(&self, query: &str) -> Result<Vec<HistoryEntry>> {
+        let trimmed = query.trim();
+        if trimmed.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+
+        // Ensure the FTS5 table exists (lazy creation).
+        // The migration normally creates it, but this handles edge cases.
+        let fts_available = self.ensure_fts_table(&conn).is_ok();
+
+        // Build the FTS5 query: wrap each word in double-quotes with a trailing
+        // wildcard for prefix matching, and join them (AND semantics).
+        let fts_query = trimmed
+            .split_whitespace()
+            .filter_map(|w| {
+                let cleaned: String = w.chars().filter(|c| c.is_alphanumeric()).collect();
+                if cleaned.is_empty() {
+                    None
+                } else {
+                    Some(format!("\"{}\"*", cleaned))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        if fts_query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        if fts_available {
+            // Use FTS5 with BM25 ranking
+            match conn.prepare(
+                "SELECT
+                    t.id,
+                    t.text,
+                    t.model,
+                    t.timestamp,
+                    t.duration_ms,
+                    t.audio_path,
+                    t.status,
+                    t.error_message,
+                    t.provider,
+                    t.api_base_url,
+                    t.language,
+                    t.retry_of,
+                    t.asr_duration_sec,
+                    t.polish_tokens,
+                    t.estimated_cost
+                 FROM transcriptions t
+                 INNER JOIN transcriptions_fts fts ON t.id = fts.rowid
+                 WHERE transcriptions_fts MATCH ?1
+                 ORDER BY rank
+                 LIMIT 200",
+            ) {
+                Ok(mut stmt) => {
+                    let entries = stmt
+                        .query_map([&fts_query], row_to_history_entry)?
+                        .collect::<std::result::Result<Vec<_>, _>>()?;
+                    return Ok(entries);
+                }
+                Err(e) => {
+                    log::warn!("FTS5 search failed ({}), falling back to LIKE search", e);
+                }
+            }
+        }
+
+        // Fallback: simple LIKE search when FTS5 is unavailable
+        let like_pattern = format!("%{}%", trimmed.replace('%', "\\%").replace('_', "\\_"));
+        let mut stmt = conn.prepare(
+            "SELECT
+                id,
+                text,
+                model,
+                timestamp,
+                duration_ms,
+                audio_path,
+                status,
+                error_message,
+                provider,
+                api_base_url,
+                language,
+                retry_of,
+                asr_duration_sec,
+                polish_tokens,
+                estimated_cost
+             FROM transcriptions
+             WHERE text LIKE ?1 ESCAPE '\\'
+             ORDER BY timestamp DESC
+             LIMIT 200",
+        )?;
+        let entries = stmt
+            .query_map([&like_pattern], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
+    /// Ensure the FTS5 virtual table exists, creating and populating it if needed.
+    /// Returns Ok(()) if FTS5 is available, Err if the module is not compiled in.
+    fn ensure_fts_table(&self, conn: &Connection) -> Result<()> {
+        // Check if the table already exists
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='transcriptions_fts'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false);
+
+        if exists {
+            return Ok(());
+        }
+
+        // Create the FTS5 virtual table
+        conn.execute(
+            "CREATE VIRTUAL TABLE IF NOT EXISTS transcriptions_fts USING fts5(
+                text, model, provider, language,
+                content='transcriptions', content_rowid='id'
+            )",
+            [],
+        )?;
+
+        // Populate from existing entries
+        conn.execute(
+            "INSERT INTO transcriptions_fts(rowid, text, model, provider, language)
+             SELECT id, text, model, provider, language FROM transcriptions",
+            [],
+        )?;
+
+        // Create triggers to keep FTS in sync going forward
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS transcriptions_ai AFTER INSERT ON transcriptions BEGIN
+                INSERT INTO transcriptions_fts(rowid, text, model, provider, language)
+                VALUES (new.id, new.text, new.model, new.provider, new.language);
+            END",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS transcriptions_ad AFTER DELETE ON transcriptions BEGIN
+                INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)
+                VALUES('delete', old.id, old.text, old.model, old.provider, old.language);
+            END",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TRIGGER IF NOT EXISTS transcriptions_au AFTER UPDATE ON transcriptions BEGIN
+                INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)
+                VALUES('delete', old.id, old.text, old.model, old.provider, old.language);
+                INSERT INTO transcriptions_fts(rowid, text, model, provider, language)
+                VALUES (new.id, new.text, new.model, new.provider, new.language);
+            END",
+            [],
+        )?;
+
+        log::info!("FTS5 table created and populated lazily on first search");
+        Ok(())
+    }
+
+    /// Fetch entries by a list of IDs (preserving the order of the input list).
+    pub fn get_entries_by_ids(&self, ids: &[i64]) -> Result<Vec<HistoryEntry>> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let placeholders: String = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT
+                id, text, model, timestamp, duration_ms, audio_path,
+                status, error_message, provider, api_base_url, language,
+                retry_of, asr_duration_sec, polish_tokens, estimated_cost
+             FROM transcriptions
+             WHERE id IN ({})
+             ORDER BY timestamp ASC",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&query)?;
+        let entries = stmt
+            .query_map(rusqlite::params_from_iter(ids.iter()), row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
+    /// Export selected history entries as SRT subtitle format.
+    /// Each entry becomes one subtitle block with its timestamp as start time
+    /// and timestamp + duration as end time.
+    pub fn export_srt(&self, ids: &[i64]) -> Result<String> {
+        let entries = self.get_entries_by_ids(ids)?;
+        let mut srt = String::new();
+
+        for (i, entry) in entries.iter().enumerate() {
+            let index = i + 1;
+            let start_secs = entry.timestamp;
+            let duration_ms = entry.duration_ms.unwrap_or(3000);
+            let end_secs = start_secs + (duration_ms / 1000);
+            let end_nanos = ((duration_ms % 1000) * 1_000_000) as u32;
+
+            let start_dt = chrono::DateTime::from_timestamp(start_secs, 0).unwrap_or_default();
+            let end_dt = chrono::DateTime::from_timestamp(end_secs, end_nanos).unwrap_or_default();
+
+            srt.push_str(&format!("{}\n", index));
+            srt.push_str(&format!(
+                "{:02}:{:02}:{:02},000 --> {:02}:{:02}:{:02},{:03}\n",
+                start_dt.hour(),
+                start_dt.minute(),
+                start_dt.second(),
+                end_dt.hour(),
+                end_dt.minute(),
+                end_dt.second(),
+                end_dt.nanosecond() / 1_000_000,
+            ));
+            srt.push_str(&format!("{}\n\n", entry.text));
+        }
+
+        Ok(srt)
+    }
+
+    /// Export selected history entries as a Markdown document.
+    pub fn export_markdown(&self, ids: &[i64]) -> Result<String> {
+        let entries = self.get_entries_by_ids(ids)?;
+        let now = chrono::Utc::now().format("%Y-%m-%d %H:%M").to_string();
+
+        let mut md = format!("# Whisp Transcription Export\n\nGenerated: {}\n\n---\n\n", now);
+
+        for entry in &entries {
+            let dt = chrono::DateTime::from_timestamp(entry.timestamp, 0).unwrap_or_default();
+            let formatted = dt.format("%Y-%m-%d %H:%M").to_string();
+
+            md.push_str(&format!("## Entry {} ({})\n\n", entry.id, formatted));
+            md.push_str(&format!("{}\n\n", entry.text));
+
+            // Append metadata line
+            let duration_sec = entry.duration_ms.map(|d| d as f64 / 1000.0);
+            let dur_str = match duration_sec {
+                Some(sec) => format!("{:.1}s", sec),
+                None => "N/A".to_string(),
+            };
+            md.push_str(&format!(
+                "*Duration: {} | Model: {} | Provider: {} | Language: {}*\n\n",
+                dur_str, entry.model, entry.provider, entry.language,
+            ));
+            md.push_str("---\n\n");
+        }
+
+        Ok(md)
+    }
 }
 
 fn row_to_history_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntry> {

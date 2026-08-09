@@ -43,6 +43,12 @@ export interface AppSettings {
   ai_polish_prompt: string;
   audio_retention_limit: number;
   custom_endpoints: Array<{ label: string; url: string }>;
+  vocabulary: string[];
+  vocabulary_enabled: boolean;
+  translation_target: string;
+  waveform_preview_enabled: boolean;
+  sync_dir: string;
+  device_name: string;
 }
 
 export interface LogEntry {

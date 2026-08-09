@@ -1,7 +1,10 @@
 use crate::history::{HistoryEntry, HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
-use crate::shortcut::{re_register_shortcut, register_shortcut};
+use crate::shortcut::{
+    re_register_global_record_hotkey, re_register_shortcut, register_global_record_hotkey, register_shortcut,
+    unregister_global_record_hotkey,
+};
 
 fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     match ui_language {
@@ -72,6 +75,11 @@ pub fn search_history(history: State<'_, Arc<HistoryManager>>, query: String) ->
 }
 
 #[tauri::command]
+pub fn search_fulltext(history: State<'_, Arc<HistoryManager>>, query: String) -> Result<Vec<HistoryEntry>, String> {
+    history.search_fulltext(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_settings() -> AppSettings {
     settings::get_settings()
 }
@@ -85,6 +93,18 @@ pub fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String
     // Hot-reload shortcut if changed
     if settings.shortcut != old_settings.shortcut {
         re_register_shortcut(&app, &old_settings.shortcut, &settings);
+    }
+
+    // Hot-reload global record hotkey if changed
+    if settings.global_hotkey != old_settings.global_hotkey
+        || settings.global_hotkey_enabled != old_settings.global_hotkey_enabled
+    {
+        re_register_global_record_hotkey(
+            &app,
+            &old_settings.global_hotkey,
+            &settings.global_hotkey,
+            settings.global_hotkey_enabled,
+        );
     }
 
     // Apply launch-at-startup if changed
@@ -154,6 +174,150 @@ pub fn resume_shortcut(app: AppHandle) {
     log::info!("Shortcuts resumed");
 }
 
+/// Return a list of common hardware key names that can be used in hotkey combinations.
+/// These are the valid key identifiers recognized by tauri-plugin-global-shortcut.
+#[tauri::command]
+pub fn list_global_shortcuts() -> Vec<&'static str> {
+    vec![
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "S",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z",
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F10",
+        "F11",
+        "F12",
+        "Space",
+        "Escape",
+        "Enter",
+        "Tab",
+        "Backspace",
+        "Delete",
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowLeft",
+        "ArrowRight",
+        "Home",
+        "End",
+        "PageUp",
+        "PageDown",
+        "Insert",
+        "PrintScreen",
+        "ScrollLock",
+        "Pause",
+        "Num0",
+        "Num1",
+        "Num2",
+        "Num3",
+        "Num4",
+        "Num5",
+        "Num6",
+        "Num7",
+        "Num8",
+        "Num9",
+        "NumAdd",
+        "NumSubtract",
+        "NumMultiply",
+        "NumDivide",
+        "NumDecimal",
+        "Comma",
+        "Period",
+        "Slash",
+        "Backslash",
+        "Semicolon",
+        "Quote",
+        "Minus",
+        "Equal",
+        "BracketLeft",
+        "BracketRight",
+    ]
+}
+
+/// Set or update the global recording hotkey.
+/// The hotkey can start/stop recording from ANY application (not just when Whisp is focused).
+/// Example key: "Ctrl+Shift+R"
+#[tauri::command]
+pub fn set_global_record_hotkey(app: AppHandle, key: String) -> Result<(), String> {
+    log::info!("set_global_record_hotkey: {}", key);
+
+    // Unregister any existing hotkey first
+    let old_settings = settings::get_settings();
+    if !old_settings.global_hotkey.is_empty() {
+        unregister_global_record_hotkey(&app, &old_settings.global_hotkey);
+    }
+
+    // Register the new hotkey
+    if !key.is_empty() {
+        register_global_record_hotkey(&app, &key)?;
+    }
+
+    // Save to settings
+    let mut s = old_settings;
+    s.global_hotkey = key;
+    s.global_hotkey_enabled = true;
+    settings::save_settings(&s)?;
+
+    Ok(())
+}
+
+/// Clear (unregister) the global recording hotkey.
+#[tauri::command]
+pub fn clear_global_record_hotkey(app: AppHandle) -> Result<(), String> {
+    log::info!("clear_global_record_hotkey");
+
+    let old_settings = settings::get_settings();
+    if !old_settings.global_hotkey.is_empty() {
+        unregister_global_record_hotkey(&app, &old_settings.global_hotkey);
+    }
+
+    let mut s = old_settings;
+    s.global_hotkey = String::new();
+    s.global_hotkey_enabled = false;
+    settings::save_settings(&s)?;
+
+    Ok(())
+}
+
 #[tauri::command]
 pub fn save_overlay_position(x: f64, y: f64) {
     let mut s = settings::get_settings();
@@ -214,6 +378,16 @@ fn sanitize_csv_field(field: &str) -> String {
     } else {
         field.to_string()
     }
+}
+
+#[tauri::command]
+pub fn export_history_srt(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>) -> Result<String, String> {
+    history.export_srt(&ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_history_markdown(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>) -> Result<String, String> {
+    history.export_markdown(&ids).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1588,6 +1762,86 @@ pub fn import_full_backup(
         audio_files_copied,
         errors,
     })
+}
+
+// --- Export ---
+#[tauri::command]
+pub fn export_transcription(
+    history: State<'_, Arc<HistoryManager>>,
+    entry_id: i64,
+    format: String,
+) -> Result<String, String> {
+    let entries = history.get_entries_by_ids(&[entry_id]).map_err(|e| e.to_string())?;
+    let entry = entries.first().ok_or_else(|| "Entry not found".to_string())?;
+    match format.as_str() {
+        "srt" => history.export_srt(&[entry_id]).map_err(|e| e.to_string()),
+        "markdown" | "md" => history.export_markdown(&[entry_id]).map_err(|e| e.to_string()),
+        "csv" => {
+            let mut wtr = csv::Writer::from_writer(Vec::new());
+            wtr.write_record(&[
+                "ID",
+                "Text",
+                "Timestamp",
+                "Model",
+                "Provider",
+                "Language",
+                "Status",
+                "Duration (ms)",
+            ])
+            .map_err(|e| e.to_string())?;
+            wtr.write_record(&[
+                entry.id.to_string(),
+                sanitize_csv_field(&entry.text),
+                entry.timestamp.to_string(),
+                sanitize_csv_field(&entry.model),
+                sanitize_csv_field(&entry.provider),
+                sanitize_csv_field(&entry.language),
+                sanitize_csv_field(&entry.status),
+                entry.duration_ms.map(|d| d.to_string()).unwrap_or_default(),
+            ])
+            .map_err(|e| e.to_string())?;
+            let data = wtr.into_inner().map_err(|e| e.to_string())?;
+            String::from_utf8(data).map_err(|e| e.to_string())
+        }
+        _ => history.export_markdown(&[entry_id]).map_err(|e| e.to_string()),
+    }
+}
+
+// --- AI Summary ---
+
+#[tauri::command]
+pub async fn generate_summary(
+    history: State<'_, Arc<HistoryManager>>,
+    settings: State<'_, AppSettings>,
+    client: State<'_, reqwest::Client>,
+    entry_id: i64,
+) -> Result<crate::summary::SummaryResult, String> {
+    let entries = history.get_entries_by_ids(&[entry_id]).map_err(|e| e.to_string())?;
+    let entry = entries.first().ok_or_else(|| "Entry not found".to_string())?;
+
+    let config = crate::summary::SummaryConfig {
+        enabled: settings.summary_enabled,
+        model: settings.summary_model.clone(),
+        api_key: settings.api_key.clone(),
+        api_base_url: settings.api_base_url.clone(),
+        language: settings.ui_language.clone(),
+    };
+
+    crate::summary::generate_summary(&entry.text, &config, &client)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// --- Streaming Recording ---
+
+#[tauri::command]
+pub fn start_streaming_recording(app: AppHandle) -> Result<(), String> {
+    crate::streaming::start_streaming_recording(&app).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stop_streaming_recording(app: AppHandle) -> Result<(), String> {
+    crate::streaming::stop_streaming_recording(&app).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 mod commands;
 mod cost;
+mod diarization;
 mod history;
 mod hotkey;
 pub mod log_buffer;
@@ -11,6 +12,8 @@ mod recorder;
 mod settings;
 mod shortcut;
 mod sound;
+mod streaming;
+mod summary;
 mod sync;
 mod transcribe;
 mod translate;
@@ -129,6 +132,7 @@ pub fn run() {
             commands::delete_history_entries,
             commands::clear_history,
             commands::search_history,
+            commands::search_fulltext,
             commands::get_settings,
             commands::save_settings,
             commands::check_accessibility,
@@ -141,7 +145,16 @@ pub fn run() {
             commands::save_overlay_position,
             commands::pause_shortcut,
             commands::resume_shortcut,
+            commands::list_global_shortcuts,
+            commands::set_global_record_hotkey,
+            commands::clear_global_record_hotkey,
             commands::export_history,
+            commands::export_history_srt,
+            commands::export_history_markdown,
+            commands::export_transcription,
+            commands::generate_summary,
+            commands::start_streaming_recording,
+            commands::stop_streaming_recording,
             commands::toggle_autostart,
             commands::check_for_updates,
             commands::polish_text,
@@ -332,6 +345,13 @@ pub fn run() {
             // Register global shortcut (secondary, user-configurable)
             let settings = settings::get_settings();
             shortcut::register_shortcut(&app_handle, &settings);
+
+            // Register global record hotkey (Ctrl+Shift+R from any app)
+            if settings.global_hotkey_enabled && !settings.global_hotkey.is_empty() {
+                if let Err(e) = shortcut::register_global_record_hotkey(&app_handle, &settings.global_hotkey) {
+                    log::error!("Failed to register global record hotkey: {}", e);
+                }
+            }
 
             // Listen for silence auto-stop from recorder worker
             let silence_handle = app_handle.clone();
