@@ -579,46 +579,39 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                     continue;
                 }
 
-                let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                if state_guard.is_some() {
-                    // Call process_streaming_chunk with the global STREAMING_STATE
-                    drop(state_guard);
-                    match crate::streaming::process_streaming_chunk(
-                        state,
-                        &new_samples,
-                        sample_rate,
-                        &config,
-                        &http_client,
-                        &stream_api_key,
-                        &stream_api_url,
-                        &stream_model,
-                        &stream_handle,
-                        stream_timeout,
-                        stream_retry,
-                    )
-                    .await
-                    {
-                        Ok(text) => {
-                            consecutive_errors = 0;
-                            if !text.is_empty() {
-                                log::info!("Streaming partial: {}", &text[..text.len().min(80)]);
-                            }
-                        }
-                        Err(e) => {
-                            consecutive_errors += 1;
-                            log::warn!("Streaming chunk failed (attempt {}): {}", consecutive_errors, e);
-                            if consecutive_errors >= 3 {
-                                let msg = format!(
-                                    "Streaming transcription failed after {} attempts: {}. \
-                                     Check API key and network.",
-                                    consecutive_errors, e,
-                                );
-                                let _ = stream_handle.emit("streaming-error", msg);
-                            }
+                match crate::streaming::process_streaming_chunk(
+                    state,
+                    &new_samples,
+                    sample_rate,
+                    &config,
+                    &http_client,
+                    &stream_api_key,
+                    &stream_api_url,
+                    &stream_model,
+                    &stream_handle,
+                    stream_timeout,
+                    stream_retry,
+                )
+                .await
+                {
+                    Ok(text) => {
+                        consecutive_errors = 0;
+                        if !text.is_empty() {
+                            log::info!("Streaming partial: {}", &text[..text.len().min(80)]);
                         }
                     }
-                } else {
-                    drop(state_guard);
+                    Err(e) => {
+                        consecutive_errors += 1;
+                        log::warn!("Streaming chunk failed (attempt {}): {}", consecutive_errors, e);
+                        if consecutive_errors >= 3 {
+                            let msg = format!(
+                                "Streaming transcription failed after {} attempts: {}. \
+                                 Check API key and network.",
+                                consecutive_errors, e,
+                            );
+                            let _ = stream_handle.emit("streaming-error", msg);
+                        }
+                    }
                 }
             }
         });
