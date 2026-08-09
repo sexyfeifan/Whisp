@@ -16,7 +16,6 @@ import { FilterChip } from "../components/FilterChip";
 import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
-import { AudioPlayer } from "../components/AudioPlayer";
 import type { AppState } from "../hooks/useApp";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage } from "../lib/utils";
 
@@ -33,7 +32,7 @@ export function HistoryPage(app: AppState) {
     settingsFeedback, searchQuery, setSearchQuery, statusFilter, setStatusFilter,
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
-    retryEntry, copyText, playAudio, playingAudioId, audioUrls, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
+    retryEntry, copyText, playAudio, playingAudioId, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -366,21 +365,7 @@ export function HistoryPage(app: AppState) {
                     </div>
 
                     {/* Audio player */}
-                    {entry.audio_path && audioUrls[entry.id] && (
-                      <div className="mt-2">
-                        <AudioPlayer
-                          entryId={entry.id}
-                          audioPath={entry.audio_path}
-                          durationMs={entry.duration_ms}
-                          onTimeUpdate={(currentTime, duration) => {
-                            if (duration > 0) {
-                              setSyncProgress(prev => ({ ...prev, [entry.id]: currentTime / duration }));
-                            }
-                          }}
-                        />
-                      </div>
-                    )}
-                    {entry.audio_path && !audioUrls[entry.id] && (
+                    {entry.audio_path && (
                       <div className="mt-2">
                         <button
                           onClick={() => playAudio(entry.audio_path!, entry.id)}
