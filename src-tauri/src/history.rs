@@ -1,5 +1,5 @@
-use chrono::Timelike;
 use anyhow::Result;
+use chrono::Timelike;
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
 use serde::{Deserialize, Serialize};
