@@ -102,6 +102,9 @@ function Overlay() {
     const unlisten8 = listen("streaming-final", () => {
       setStreamingText("");
     });
+    const unlisten9 = listen<string>("streaming-error", (e) => {
+      console.warn("Streaming error:", e.payload);
+    });
     return () => {
       unlisten1.then((f) => f());
       unlisten2.then((f) => f());
@@ -111,6 +114,7 @@ function Overlay() {
       unlisten6.then((f) => f());
       unlisten7.then((f) => f());
       unlisten8.then((f) => f());
+      unlisten9.then((f) => f());
     };
   }, []);
 

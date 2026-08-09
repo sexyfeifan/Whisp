@@ -241,7 +241,8 @@ pub async fn generate_summary(
                 "content": transcript
             }
         ],
-        "temperature": 0.3
+        "temperature": 0.3,
+        "max_tokens": 4096
     });
 
     let timeout = Duration::from_secs(60);

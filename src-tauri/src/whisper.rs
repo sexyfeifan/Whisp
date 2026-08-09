@@ -346,7 +346,7 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
                 model_name,
                 KNOWN_MODELS
                     .iter()
-                    .map(|(n, _, _, _, _, _)| *n)
+                    .map(|(n, _, _, _, _, _, _)| *n)
                     .collect::<Vec<_>>()
                     .join(", ")
             );

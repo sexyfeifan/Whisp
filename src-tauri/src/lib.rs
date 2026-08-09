@@ -409,6 +409,9 @@ static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
+/// Cached recording-state tray icon (red dot)
+static RECORDING_ICON: std::sync::OnceLock<tauri::image::Image<'static>> = std::sync::OnceLock::new();
+
 pub(crate) fn toggle_recording(app_handle: &tauri::AppHandle) {
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
 
@@ -501,6 +504,13 @@ fn start_recording(app_handle: &tauri::AppHandle) {
     // Update tray to show recording state
     if let Some(tray) = app_handle.tray_by_id("main") {
         let _ = tray.set_tooltip(Some("● Recording..."));
+        // Switch to recording icon (red dot)
+        let rec_icon = RECORDING_ICON.get_or_init(|| {
+            let bytes = include_bytes!("../icons/tray_icon_recording.png");
+            tauri::image::Image::from_bytes(bytes).expect("Failed to load recording icon")
+        });
+        let _ = tray.set_icon(Some(rec_icon.clone()));
+        let _ = tray.set_icon_as_template(false);
     }
 
     // Start streaming transcription task if enabled
@@ -528,6 +538,13 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let stream_retry = saved.retry_count;
 
         tauri::async_runtime::spawn(async move {
+            // Validate API key before starting streaming
+            if stream_api_key.trim().is_empty() {
+                log::warn!("Streaming enabled but API key is empty — streaming will not work");
+                let _ = stream_handle.emit("streaming-error", "API key is not configured. Streaming transcription disabled.");
+                return;
+            }
+
             let config = crate::streaming::StreamingConfig {
                 enabled: true,
                 chunk_duration_secs: stream_chunk_dur,
@@ -543,6 +560,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
             let http_client = stream_handle.state::<reqwest::Client>().inner().clone();
             let recorder = stream_handle.state::<Arc<AudioRecorder>>().inner().clone();
 
+            let mut consecutive_errors: u8 = 0;
             // Poll for new samples every second
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -578,12 +596,20 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                     .await
                     {
                         Ok(text) => {
+                            consecutive_errors = 0;
                             if !text.is_empty() {
                                 log::info!("Streaming partial: {}", &text[..text.len().min(80)]);
                             }
                         }
                         Err(e) => {
-                            log::warn!("Streaming chunk failed: {}", e);
+                            consecutive_errors += 1;
+                            log::warn!("Streaming chunk failed (attempt {}): {}", consecutive_errors, e);
+                            if consecutive_errors >= 3 {
+                                let _ = stream_handle.emit(
+                                    "streaming-error",
+                                    format!("Streaming transcription failed after {} attempts: {}. Check API key and network.", consecutive_errors, e),
+                                );
+                            }
                         }
                     }
                 } else {
@@ -966,9 +992,19 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         // Notify main window to refresh (both success and failure)
         let _ = handle.emit("history-updated", ());
 
-        // Reset tray tooltip
+        // Reset tray tooltip and icon
         if let Some(tray) = handle.tray_by_id("main") {
             let _ = tray.set_tooltip(Some("Whisp"));
+            // Restore normal tray icon
+            #[cfg(target_os = "macos")]
+            {
+                let normal_icon = {
+                    let bytes = include_bytes!("../icons/tray_icon_template.png");
+                    tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
+                };
+                let _ = tray.set_icon(Some(normal_icon));
+                let _ = tray.set_icon_as_template(true);
+            }
         }
 
         // Clear transcription guard
@@ -984,6 +1020,19 @@ pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
         recorder.cancel();
         // Notify overlay so it can show brief "cancelled" feedback before self-closing
         let _ = app_handle.emit("recording-cancelled", ());
+        // Reset tray icon back to normal
+        if let Some(tray) = app_handle.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some("Whisp"));
+            #[cfg(target_os = "macos")]
+            {
+                let normal_icon = {
+                    let bytes = include_bytes!("../icons/tray_icon_template.png");
+                    tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
+                };
+                let _ = tray.set_icon(Some(normal_icon));
+                let _ = tray.set_icon_as_template(true);
+            }
+        }
         // Fallback: close overlay after delay in case the frontend missed the event
         let handle = app_handle.clone();
         std::thread::spawn(move || {

@@ -29,11 +29,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--overlay-bg);
+  background: transparent;
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
   backdrop-filter: blur(24px) saturate(1.8);
   border: none;
-  border-radius: 12px;
+  border-radius: 0;
   box-shadow: none;
   cursor: grab;
   user-select: none;
