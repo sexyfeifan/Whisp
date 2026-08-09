@@ -633,12 +633,11 @@ mod tests {
     }
 
     #[test]
-    fn test_disk_settings_skips_api_key_when_keychain_ok() {
+    fn test_disk_settings_always_includes_api_key() {
         let mut settings = AppSettings::default();
-        settings.api_key = "sk-secret-key".to_string();
-        settings.ai_polish_api_key = "sk-polish-key".to_string();
+        settings.api_key = "«redacted:sk-…»".to_string();
 
-        // Simulate saving with keychain success — api_key should be empty on disk
+        // api_key is always written to disk (belt-and-suspenders alongside keychain)
         let disk = DiskSettings {
             api_base_url: settings.api_base_url.clone(),
             model: settings.model.clone(),
@@ -664,7 +663,7 @@ mod tests {
             ai_polish_model: settings.ai_polish_model.clone(),
             ai_polish_prompt: settings.ai_polish_prompt.clone(),
             audio_retention_limit: settings.audio_retention_limit,
-            api_key: String::new(), // keychain_ok = true
+            api_key: settings.api_key.clone(),
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
@@ -686,8 +685,9 @@ mod tests {
         };
 
         let json = serde_json::to_string(&disk).unwrap();
-        // api_key should not appear in JSON when empty (skip_serializing_if)
-        assert!(!json.contains("\"api_key\""));
+        // api_key is always present in JSON (belt-and-suspenders fallback)
+        assert!(json.contains("\"api_key\""));
+        assert!(json.contains("«redacted:sk-…»"));
     }
 
     #[test]
