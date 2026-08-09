@@ -540,8 +540,13 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         tauri::async_runtime::spawn(async move {
             // Validate API key before starting streaming
             if stream_api_key.trim().is_empty() {
-                log::warn!("Streaming enabled but API key is empty — streaming will not work");
-                let _ = stream_handle.emit("streaming-error", "API key is not configured. Streaming transcription disabled.");
+                log::warn!(
+                    "Streaming enabled but API key is empty — streaming will not work"
+                );
+                let _ = stream_handle.emit(
+                    "streaming-error",
+                    "API key is not configured. Streaming transcription disabled.",
+                );
                 return;
             }
 
@@ -605,10 +610,12 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                             consecutive_errors += 1;
                             log::warn!("Streaming chunk failed (attempt {}): {}", consecutive_errors, e);
                             if consecutive_errors >= 3 {
-                                let _ = stream_handle.emit(
-                                    "streaming-error",
-                                    format!("Streaming transcription failed after {} attempts: {}. Check API key and network.", consecutive_errors, e),
+                                let msg = format!(
+                                    "Streaming transcription failed after {} attempts: {}. \
+                                     Check API key and network.",
+                                    consecutive_errors, e,
                                 );
+                                let _ = stream_handle.emit("streaming-error", msg);
                             }
                         }
                     }
@@ -1005,6 +1012,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 let _ = tray.set_icon(Some(normal_icon));
                 let _ = tray.set_icon_as_template(true);
             }
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(icon) = handle.default_window_icon() {
+                    let _ = tray.set_icon(Some(icon.to_owned()));
+                }
+            }
         }
 
         // Clear transcription guard
@@ -1031,6 +1044,12 @@ pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
                 };
                 let _ = tray.set_icon(Some(normal_icon));
                 let _ = tray.set_icon_as_template(true);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                if let Some(icon) = app_handle.default_window_icon() {
+                    let _ = tray.set_icon(Some(icon.to_owned()));
+                }
             }
         }
         // Fallback: close overlay after delay in case the frontend missed the event
