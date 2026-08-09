@@ -71,6 +71,11 @@ pub struct AppSettings {
     pub translation_target: String,
     #[serde(default)]
     pub waveform_preview_enabled: bool,
+    /// Custom vocabulary terms to prepend as whisper prompt context
+    #[serde(default)]
+    pub vocabulary: Vec<String>,
+    #[serde(default)]
+    pub vocabulary_enabled: bool,
     /// Sync directory path (e.g., ~/Dropbox/Whisp-sync/)
     #[serde(default)]
     pub sync_dir: String,
@@ -176,6 +181,10 @@ struct DiskSettings {
     pub translation_target: String,
     #[serde(default)]
     pub waveform_preview_enabled: bool,
+    #[serde(default)]
+    pub vocabulary: Vec<String>,
+    #[serde(default)]
+    pub vocabulary_enabled: bool,
     #[serde(default)]
     pub sync_dir: String,
     #[serde(default = "default_device_name")]
@@ -346,6 +355,8 @@ impl Default for AppSettings {
             custom_endpoints: Vec::new(),
             translation_target: default_translation_target(),
             waveform_preview_enabled: false,
+            vocabulary: Vec::new(),
+            vocabulary_enabled: false,
             sync_dir: String::new(),
             device_name: default_device_name(),
             summary_model: default_summary_model(),
@@ -521,6 +532,8 @@ pub fn get_settings() -> AppSettings {
         custom_endpoints: disk.custom_endpoints,
         translation_target: disk.translation_target,
         waveform_preview_enabled: disk.waveform_preview_enabled,
+        vocabulary: disk.vocabulary,
+        vocabulary_enabled: disk.vocabulary_enabled,
         sync_dir: disk.sync_dir,
         device_name: disk.device_name,
         summary_model: disk.summary_model,

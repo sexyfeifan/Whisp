@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
-import { Keyboard, Settings as SettingsIcon, Download, Check, ExternalLink } from "lucide-react";
+import { Keyboard, Settings as SettingsIcon, Download, Check, ExternalLink, X, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { Input } from "../components/ui/input";
 import { ToggleRow } from "../components/ToggleRow";
 import { ShortcutInput } from "../components/ShortcutInput";
 import { SettingsSection } from "../components/SettingsSection";
@@ -203,6 +204,52 @@ export function SettingsAppPage(app: AppState) {
               </div>
             </SettingsSection>
 
+            <SettingsSection icon={<FileText size={18} className="text-[hsl(var(--primary))]" />} title={m.vocabulary} description={m.vocabularyDesc}>
+              <div className="space-y-3">
+                <ToggleRow
+                  label={m.vocabularyEnabled}
+                  description={m.vocabularyEnabledDesc}
+                  value={settings.vocabulary_enabled}
+                  onChange={(v) => updateSettings({ vocabulary_enabled: v })}
+                />
+                {settings.vocabulary_enabled && (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder={m.vocabularyPlaceholder}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && e.currentTarget.value.trim()) {
+                            const term = e.currentTarget.value.trim();
+                            if (!settings.vocabulary.includes(term)) {
+                              updateSettings({ vocabulary: [...settings.vocabulary, term] });
+                            }
+                            e.currentTarget.value = "";
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {settings.vocabulary.length === 0 ? (
+                        <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>—</span>
+                      ) : (
+                        settings.vocabulary.map((term, i) => (
+                          <Badge key={i} variant="default" className="flex items-center gap-1 pr-1">
+                            {term}
+                            <button
+                              className="ml-1 p-0.5 rounded hover:bg-[hsl(var(--destructive) / 0.2)] transition-colors"
+                              onClick={() => updateSettings({ vocabulary: settings.vocabulary.filter((_, idx) => idx !== i) })}
+                            >
+                              <X size={10} />
+                            </button>
+                          </Badge>
+                        ))
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </SettingsSection>
             {settingsFeedback && (
               <p className="text-xs" style={{ color: settingsFeedback.tone === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>{settingsFeedback.message}</p>
             )}

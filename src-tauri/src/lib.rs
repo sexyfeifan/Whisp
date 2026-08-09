@@ -664,7 +664,19 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let paste_delay_ms = settings.paste_delay_ms;
     let request_timeout_sec = settings.request_timeout_sec;
     let retry_count = settings.retry_count;
-    let whisper_prompt = settings.whisper_prompt.clone();
+    let whisper_prompt = {
+        let base = settings.whisper_prompt.clone();
+        if settings.vocabulary_enabled && !settings.vocabulary.is_empty() {
+            let vocab = settings.vocabulary.join(", ");
+            if base.trim().is_empty() {
+                format!("Vocabulary: {}", vocab)
+            } else {
+                format!("{}\nVocabulary: {}", base, vocab)
+            }
+        } else {
+            base
+        }
+    };
     let ai_polish_enabled = settings.ai_polish_enabled;
     let ai_polish_api_key = settings.ai_polish_api_key.clone();
     let ai_polish_api_url = settings.ai_polish_api_url.clone();
@@ -910,7 +922,19 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
     let paste_delay_ms = settings.paste_delay_ms;
     let request_timeout_sec = settings.request_timeout_sec;
     let retry_count = settings.retry_count;
-    let whisper_prompt = settings.whisper_prompt.clone();
+    let whisper_prompt = {
+        let base = settings.whisper_prompt.clone();
+        if settings.vocabulary_enabled && !settings.vocabulary.is_empty() {
+            let vocab = settings.vocabulary.join(", ");
+            if base.trim().is_empty() {
+                format!("Vocabulary: {}", vocab)
+            } else {
+                format!("{}\nVocabulary: {}", base, vocab)
+            }
+        } else {
+            base
+        }
+    };
     let ai_polish_enabled = settings.ai_polish_enabled;
     let ai_polish_api_key = settings.ai_polish_api_key.clone();
     let ai_polish_api_url = settings.ai_polish_api_url.clone();

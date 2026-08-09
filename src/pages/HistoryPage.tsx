@@ -4,7 +4,7 @@ import {
   Mic, Search, Copy, Trash2,
   Play, Pause, Check, Volume2, Clock, FileAudio,
   RefreshCw, Loader2,
-  Download, FileText, ChevronDown, Sparkles, X,
+  Download, FileText, Sparkles, X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -19,6 +19,12 @@ import { Sidebar } from "../components/Sidebar";
 import type { AppState } from "../hooks/useApp";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage } from "../lib/utils";
 
+interface SummaryResult {
+  summary: string;
+  key_points: string[];
+  action_items: string[];
+}
+
 export function HistoryPage(app: AppState) {
   const {
     settings, filteredHistory, stats, todayCount, errorMsg, polishErrorMsg,
@@ -30,7 +36,40 @@ export function HistoryPage(app: AppState) {
     flushAutoSave, setView, history,
   } = app;
 
+  const [exportDropdown, setExportDropdown] = useState<number | null>(null);
+  const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
+  const [exporting, setExporting] = useState<string | null>(null);
+
   if (!settings) return null;
+
+  const handleExport = async (entryId: number, fmt: string) => {
+    setExporting(`${entryId}-${fmt}`);
+    setExportDropdown(null);
+    try {
+      const content = await invoke<string>("export_transcription", { entryId, format: fmt });
+      const ext = fmt === "srt" ? "srt" : fmt === "vtt" ? "vtt" : fmt === "csv" ? "csv" : fmt === "markdown" ? "md" : "txt";
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const filename = `whisp_${ts}.${ext}`;
+      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.error("Export failed:", e); }
+    finally { setExporting(null); }
+  };
+
+  const handleSummary = async (entryId: number, text: string) => {
+    setSummaryModal({ entry: { id: entryId, text }, loading: true });
+    try {
+      const result = await invoke<SummaryResult>("generate_summary", { entryId });
+      setSummaryModal({ entry: { id: entryId, text }, result, loading: false });
+    } catch (e: any) {
+      setSummaryModal({ entry: { id: entryId, text }, loading: false, error: String(e) });
+    }
+  };
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
@@ -241,15 +280,7 @@ export function HistoryPage(app: AppState) {
                             <Copy size={14} />
                           </IconButton>
                         )}
-                        {canRetry && (
-                          <IconButton title={m.retry} onClick={() => retryEntry(entry.id)}>
-                            {retrying === entry.id ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <RefreshCw size={14} />
-                            )}
-                          </IconButton>
-                        )}
+                        {/* Export dropdown */}
                         {!failed && (
                           <div className="relative">
                             <IconButton title={m.exportFormat} onClick={() => setExportDropdown(exportDropdown === entry.id ? null : entry.id)}>
@@ -257,29 +288,15 @@ export function HistoryPage(app: AppState) {
                             </IconButton>
                             {exportDropdown === entry.id && (
                               <div className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-lg border py-1 min-w-[160px]" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }}>
-                                {(["srt", "vtt", "markdown", "txt"] as const).map((fmt) => (
+                                {(["srt", "markdown", "csv", "txt"] as const).map((fmt) => (
                                   <button
                                     key={fmt}
                                     className="w-full text-left px-3 py-1.5 text-xs hover:bg-[hsl(var(--surface))] transition-colors flex items-center gap-2"
                                     style={{ color: "hsl(var(--ink))" }}
-                                    onClick={async () => {
-                                      setExporting(`${entry.id}-${fmt}`);
-                                      setExportDropdown(null);
-                                      try {
-                                        const result = await invoke<{ content: string; format: string; filename: string }>("export_transcription", { entryId: entry.id, format: fmt });
-                                        const blob = new Blob([result.content], { type: "text/plain;charset=utf-8" });
-                                        const url = URL.createObjectURL(blob);
-                                        const a = document.createElement("a");
-                                        a.href = url;
-                                        a.download = result.filename;
-                                        a.click();
-                                        URL.revokeObjectURL(url);
-                                      } catch (e) { console.error("Export failed:", e); }
-                                      finally { setExporting(null); }
-                                    }}
+                                    onClick={() => handleExport(entry.id, fmt)}
                                   >
                                     <FileText size={12} />
-                                    {fmt === "srt" ? m.exportSrt : fmt === "vtt" ? m.exportVtt : fmt === "markdown" ? m.exportMarkdown : m.exportTxt}
+                                    {fmt === "srt" ? m.exportSrt : fmt === "markdown" ? m.exportMarkdown : fmt === "csv" ? "CSV" : m.exportTxt}
                                     {exporting === `${entry.id}-${fmt}` && <Loader2 size={12} className="animate-spin ml-auto" />}
                                   </button>
                                 ))}
@@ -287,20 +304,19 @@ export function HistoryPage(app: AppState) {
                             )}
                           </div>
                         )}
+                        {/* AI Summary */}
                         {!failed && (
-                          <IconButton
-                            title={m.aiSummary}
-                            onClick={async () => {
-                              setSummaryModal({ entry: { id: entry.id, text: entry.text }, loading: true });
-                              try {
-                                const result = await invoke<{ summary: string; key_points: string[]; action_items: string[] }>("generate_summary", { entryId: entry.id });
-                                setSummaryModal({ entry: { id: entry.id, text: entry.text }, result, loading: false });
-                              } catch (e: any) {
-                                setSummaryModal({ entry: { id: entry.id, text: entry.text }, loading: false, error: String(e) });
-                              }
-                            }}
-                          >
+                          <IconButton title={m.aiSummary} onClick={() => handleSummary(entry.id, entry.text)}>
                             <Sparkles size={14} />
+                          </IconButton>
+                        )}
+                        {canRetry && (
+                          <IconButton title={m.retry} onClick={() => retryEntry(entry.id)}>
+                            {retrying === entry.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <RefreshCw size={14} />
+                            )}
                           </IconButton>
                         )}
                         <IconButton title={m.delete} onClick={() => deleteEntry(entry.id)}>
@@ -341,9 +357,76 @@ export function HistoryPage(app: AppState) {
           )}
         </div>
       </div>
+
+      {/* Summary Modal */}
+      {summaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSummaryModal(null)}>
+          <div className="max-w-lg w-full mx-4 rounded-xl shadow-2xl border p-6 max-h-[80vh] overflow-y-auto" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} style={{ color: "hsl(var(--primary))" }} />
+                <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>{m.aiSummary}</h2>
+              </div>
+              <button onClick={() => setSummaryModal(null)} className="p-1 rounded-lg hover:bg-[hsl(var(--surface))] transition-colors" style={{ color: "hsl(var(--steel))" }}>
+                <X size={18} />
+              </button>
+            </div>
+            {summaryModal.loading && (
+              <div className="flex items-center justify-center py-8 gap-2" style={{ color: "hsl(var(--steel))" }}>
+                <Loader2 size={20} className="animate-spin" />
+                <span className="text-sm">{m.generating}</span>
+              </div>
+            )}
+            {summaryModal.error && (
+              <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
+                {summaryModal.error}
+              </div>
+            )}
+            {summaryModal.result && (
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.summaryOverview}</h3>
+                  <p className="text-sm" style={{ color: "hsl(var(--ink))" }}>{summaryModal.result.summary}</p>
+                </div>
+                {summaryModal.result.key_points.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.keyPoints}</h3>
+                    <ul className="space-y-1">
+                      {summaryModal.result.key_points.map((point, i) => (
+                        <li key={i} className="text-sm flex gap-2" style={{ color: "hsl(var(--ink))" }}>
+                          <span style={{ color: "hsl(var(--primary))" }}>•</span>
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {summaryModal.result.action_items.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.actionItems}</h3>
+                    <ul className="space-y-1">
+                      {summaryModal.result.action_items.map((item, i) => (
+                        <li key={i} className="text-sm flex gap-2" style={{ color: "hsl(var(--ink))" }}>
+                          <span style={{ color: "hsl(var(--warning))" }}>☐</span>
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
+                  <Button variant="secondary" size="sm" onClick={async () => {
+                    if (summaryModal.result) {
+                      const text = `# ${m.summaryOverview}\n${summaryModal.result.summary}\n\n## ${m.keyPoints}\n${summaryModal.result.key_points.map(p => `- ${p}`).join("\n")}\n\n## ${m.actionItems}\n${summaryModal.result.action_items.map(a => `- [ ] ${a}`).join("\n")}`;
+                      await writeText(text);
+                    }
+                  }}>{m.copy}</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-  const [exportDropdown, setExportDropdown] = useState<number | null>(null);
-  const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: { summary: string; key_points: string[]; action_items: string[] }; loading: boolean; error?: string } | null>(null);
-  const [exporting, setExporting] = useState<string | null>(null);
