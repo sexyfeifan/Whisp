@@ -110,6 +110,26 @@ impl HistoryManager {
 
         let db_path = data_dir.join("history.db");
         let mut conn = Connection::open(&db_path)?;
+
+        // Enable WAL mode for better crash resistance
+        conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+
+        // Check database integrity
+        let integrity_ok: String = conn
+            .query_row("PRAGMA integrity_check", [], |row| row.get(0))
+            .unwrap_or_else(|_| "ok".to_string());
+
+        if integrity_ok != "ok" {
+            log::warn!("Database integrity check failed: {}. Recreating...", integrity_ok);
+            drop(conn);
+            let _ = std::fs::remove_file(&db_path);
+            // Also remove WAL and SHM files
+            let _ = std::fs::remove_file(db_path.with_extension("db-wal"));
+            let _ = std::fs::remove_file(db_path.with_extension("db-shm"));
+            conn = Connection::open(&db_path)?;
+            conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")?;
+        }
+
         let migrations = Migrations::new(MIGRATIONS.to_vec());
         migrations.to_latest(&mut conn)?;
 
@@ -401,8 +421,64 @@ impl HistoryManager {
             let _ = std::fs::create_dir_all(&audio_dir);
         }
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        conn.execute("DELETE FROM transcriptions", [])?;
-        Ok(())
+
+        // Try DELETE first; if DB is corrupted, drop and recreate tables
+        match conn.execute("DELETE FROM transcriptions", []) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                log::warn!("DELETE failed ({}), attempting DROP+recreate...", e);
+                // Drop everything in correct order (triggers depend on FTS table)
+                conn.execute_batch(
+                    "DROP TRIGGER IF EXISTS transcriptions_ai;
+                     DROP TRIGGER IF EXISTS transcriptions_ad;
+                     DROP TRIGGER IF EXISTS transcriptions_au;
+                     DROP TABLE IF EXISTS transcriptions_fts;
+                     DROP TABLE IF EXISTS transcriptions;",
+                )?;
+                // Recreate the base table with all columns
+                conn.execute_batch(
+                    "CREATE TABLE IF NOT EXISTS transcriptions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        text TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        duration_ms INTEGER,
+                        audio_path TEXT,
+                        status TEXT NOT NULL DEFAULT 'success',
+                        error_message TEXT,
+                        provider TEXT NOT NULL DEFAULT 'Unknown',
+                        api_base_url TEXT NOT NULL DEFAULT '',
+                        language TEXT NOT NULL DEFAULT 'auto',
+                        retry_of INTEGER,
+                        asr_duration_sec REAL,
+                        polish_tokens INTEGER,
+                        estimated_cost REAL
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_transcriptions_timestamp ON transcriptions(timestamp DESC);
+                    CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
+                    CREATE VIRTUAL TABLE IF NOT EXISTS transcriptions_fts USING fts5(
+                        text, model, provider, language,
+                        content='transcriptions', content_rowid='id'
+                    );
+                    CREATE TRIGGER IF NOT EXISTS transcriptions_ai AFTER INSERT ON transcriptions BEGIN
+                        INSERT INTO transcriptions_fts(rowid, text, model, provider, language)
+                        VALUES (new.id, new.text, new.model, new.provider, new.language);
+                    END;
+                    CREATE TRIGGER IF NOT EXISTS transcriptions_ad AFTER DELETE ON transcriptions BEGIN
+                        INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)
+                        VALUES('delete', old.id, old.text, old.model, old.provider, old.language);
+                    END;
+                    CREATE TRIGGER IF NOT EXISTS transcriptions_au AFTER UPDATE ON transcriptions BEGIN
+                        INSERT INTO transcriptions_fts(transcriptions_fts, rowid, text, model, provider, language)
+                        VALUES('delete', old.id, old.text, old.model, old.provider, old.language);
+                        INSERT INTO transcriptions_fts(rowid, text, model, provider, language)
+                        VALUES (new.id, new.text, new.model, new.provider, new.language);
+                    END;",
+                )?;
+                log::info!("Database tables recreated after corruption");
+                Ok(())
+            }
+        }
     }
 
     pub fn search_history(&self, query: &str) -> Result<Vec<HistoryEntry>> {

@@ -1415,7 +1415,8 @@ pub fn list_offline_models() -> Result<Vec<crate::whisper::ModelInfo>, String> {
 
 #[tauri::command]
 pub fn list_known_models() -> Vec<crate::whisper::KnownModel> {
-    crate::whisper::list_known_models()
+    let settings = settings::get_settings();
+    crate::whisper::list_known_models(&settings.ui_language)
 }
 
 #[tauri::command]

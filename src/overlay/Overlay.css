@@ -32,9 +32,9 @@ html, body {
   background: var(--overlay-bg);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
   backdrop-filter: blur(24px) saturate(1.8);
-  border: 0.5px solid var(--overlay-border);
+  border: none;
   border-radius: 12px;
-  box-shadow: rgba(15, 15, 15, 0.06) 0px 2px 8px;
+  box-shadow: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;

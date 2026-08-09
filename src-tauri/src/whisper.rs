@@ -241,12 +241,14 @@ pub struct ModelInfo {
 }
 
 /// Known Whisper models and their download URLs
-const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
+/// Tuple: (name, url, size, description_en, description_zh, languages, params)
+const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str, &str)] = &[
     (
         "ggml-tiny.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
         77_871_433,
         "Smallest model, English only. Fast but less accurate.",
+        "最小模型，仅英文。速度快但准确率较低。",
         "English",
         "39M",
     ),
@@ -255,6 +257,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
         77_871_713,
         "Smallest multilingual model. Fast, basic accuracy. Good for real-time.",
+        "最小型多语言模型。速度快，基础准确率。适合实时转写。",
         "97 languages",
         "39M",
     ),
@@ -263,6 +266,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
         147_964_741,
         "English only. Better accuracy than tiny, moderate speed.",
+        "仅英文。比 tiny 准确率更高，速度适中。",
         "English",
         "74M",
     ),
@@ -271,6 +275,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
         147_964_461,
         "Multilingual. Good balance of speed and accuracy. Supports Chinese.",
+        "多语言。速度与准确率平衡。支持中文。",
         "97 languages",
         "74M",
     ),
@@ -279,6 +284,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin",
         483_629_333,
         "English only. Good accuracy for clean audio.",
+        "仅英文。对清晰音频有较好的准确率。",
         "English",
         "244M",
     ),
@@ -287,6 +293,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
         483_630_133,
         "Multilingual. Decent accuracy, supports Chinese. Recommended minimum.",
+        "多语言。准确率良好，支持中文。推荐最低配置。",
         "97 languages",
         "244M",
     ),
@@ -295,6 +302,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin",
         1_539_325_485,
         "English only. Strong accuracy, larger model.",
+        "仅英文。准确率强，模型较大。",
         "English",
         "769M",
     ),
@@ -303,6 +311,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
         1_539_325_205,
         "Multilingual. Strong accuracy. Good for Chinese transcription. ★ Recommended.",
+        "多语言。准确率强。中文转写效果好。★ 推荐。",
         "97 languages",
         "769M",
     ),
@@ -311,6 +320,7 @@ const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
         1_625_682_453,
         "Large model, 8x faster than large-v3. Excellent Chinese accuracy. ★ Best for Chinese.",
+        "大型模型，比 large-v3 快 8 倍。中文准确率极高。★ 中文最佳。",
         "97 languages",
         "809M",
     ),
@@ -322,7 +332,8 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
     let model_dir = WhisperEngine::model_dir()?;
 
     // Check known models first
-    let url = if let Some((_, url, _, _, _, _)) = KNOWN_MODELS.iter().find(|(name, _, _, _, _, _)| *name == model_name)
+    let url = if let Some((_, url, _, _, _, _, _)) =
+        KNOWN_MODELS.iter().find(|(name, _, _, _, _, _, _)| *name == model_name)
     {
         url
     } else {
@@ -417,14 +428,19 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
 }
 
 /// List available models that can be downloaded
-pub fn list_known_models() -> Vec<KnownModel> {
+pub fn list_known_models(ui_language: &str) -> Vec<KnownModel> {
+    let is_zh = ui_language.starts_with("zh");
     KNOWN_MODELS
         .iter()
-        .map(|(name, url, size, description, languages, params)| KnownModel {
+        .map(|(name, url, size, desc_en, desc_zh, languages, params)| KnownModel {
             name: name.to_string(),
             url: url.to_string(),
             size_bytes: *size,
-            description: description.to_string(),
+            description: if is_zh {
+                desc_zh.to_string()
+            } else {
+                desc_en.to_string()
+            },
             languages: languages.to_string(),
             params: params.to_string(),
         })

@@ -200,7 +200,9 @@ pub fn run() {
                 let db_path = data_dir().join("history.db");
                 if db_path.exists() {
                     let _ = std::fs::remove_file(&db_path);
-                    log::warn!("Removed corrupted history DB, recreating...");
+                    let _ = std::fs::remove_file(db_path.with_extension("db-wal"));
+                    let _ = std::fs::remove_file(db_path.with_extension("db-shm"));
+                    log::warn!("Removed corrupted history DB (+WAL/SHM), recreating...");
                 }
                 HistoryManager::new().expect("Failed to init history DB even after recovery")
             }));
@@ -495,6 +497,101 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         return;
     }
     log::info!("Recording started, model={}", saved.model);
+
+    // Update tray to show recording state
+    if let Some(tray) = app_handle.tray_by_id("main") {
+        let _ = tray.set_tooltip(Some("● Recording..."));
+    }
+
+    // Start streaming transcription task if enabled
+    if saved.streaming_enabled {
+        let stream_handle = app_handle.clone();
+        let stream_chunk_dur = saved.streaming_chunk_duration_secs;
+        let stream_lang = saved.language.clone();
+        let stream_prompt = {
+            let base = saved.whisper_prompt.clone();
+            if saved.vocabulary_enabled && !saved.vocabulary.is_empty() {
+                let vocab = saved.vocabulary.join(", ");
+                if base.trim().is_empty() {
+                    format!("Vocabulary: {}", vocab)
+                } else {
+                    format!("{}\nVocabulary: {}", base, vocab)
+                }
+            } else {
+                base
+            }
+        };
+        let stream_api_key = saved.api_key.clone();
+        let stream_api_url = saved.api_base_url.clone();
+        let stream_model = saved.model.clone();
+        let stream_timeout = saved.request_timeout_sec;
+        let stream_retry = saved.retry_count;
+
+        tauri::async_runtime::spawn(async move {
+            let config = crate::streaming::StreamingConfig {
+                enabled: true,
+                chunk_duration_secs: stream_chunk_dur,
+                language: stream_lang,
+                prompt: stream_prompt,
+            };
+            let state = crate::streaming::STREAMING_STATE.get_or_init(|| std::sync::Mutex::new(None));
+            {
+                let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                *guard = Some(crate::streaming::StreamingState::new(16000));
+            }
+
+            let http_client = stream_handle.state::<reqwest::Client>().inner().clone();
+            let recorder = stream_handle.state::<Arc<AudioRecorder>>().inner().clone();
+
+            // Poll for new samples every second
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+                if !recorder.is_recording() {
+                    // Recording stopped — emit final event
+                    let _ = stream_handle.emit("streaming-final", "");
+                    break;
+                }
+
+                let (new_samples, sample_rate) = recorder.take_streaming_samples();
+                if new_samples.is_empty() {
+                    continue;
+                }
+
+                let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(ref streaming_state) = *state_guard {
+                    // We need to call process_streaming_chunk but it needs &Mutex<StreamingState>
+                    drop(state_guard);
+                    match crate::streaming::process_streaming_chunk(
+                        state,
+                        &new_samples,
+                        sample_rate,
+                        &config,
+                        &http_client,
+                        &stream_api_key,
+                        &stream_api_url,
+                        &stream_model,
+                        &stream_handle,
+                        stream_timeout,
+                        stream_retry,
+                    )
+                    .await
+                    {
+                        Ok(text) => {
+                            if !text.is_empty() {
+                                log::info!("Streaming partial: {}", &text[..text.len().min(80)]);
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("Streaming chunk failed: {}", e);
+                        }
+                    }
+                } else {
+                    drop(state_guard);
+                }
+            }
+        });
+    }
 
     // Register Escape only while recording
     shortcut::register_escape(app_handle);
@@ -868,6 +965,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
         // Notify main window to refresh (both success and failure)
         let _ = handle.emit("history-updated", ());
+
+        // Reset tray tooltip
+        if let Some(tray) = handle.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some("Whisp"));
+        }
 
         // Clear transcription guard
         TRANSCRIBING.store(false, Ordering::SeqCst);

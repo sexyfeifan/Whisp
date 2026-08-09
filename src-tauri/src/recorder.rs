@@ -23,6 +23,8 @@ pub struct AudioRecorder {
     worker: Mutex<Option<JoinHandle<()>>>,
     is_recording: Arc<Mutex<bool>>,
     auto_stop_rx: Mutex<Option<mpsc::Receiver<RecordedAudio>>>,
+    /// Shared buffer for streaming: worker writes samples here during recording.
+    streaming_buffer: Arc<Mutex<(Vec<f32>, u32)>>,
 }
 
 impl AudioRecorder {
@@ -32,11 +34,21 @@ impl AudioRecorder {
             worker: Mutex::new(None),
             is_recording: Arc::new(Mutex::new(false)),
             auto_stop_rx: Mutex::new(None),
+            streaming_buffer: Arc::new(Mutex::new((Vec::new(), 0))),
         }
     }
 
     pub fn is_recording(&self) -> bool {
         *self.is_recording.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Get current streaming samples and sample rate. Returns (samples_since_last_call, sample_rate).
+    /// This is used by the streaming transcription pipeline.
+    pub fn take_streaming_samples(&self) -> (Vec<f32>, u32) {
+        let mut buf = self.streaming_buffer.lock().unwrap_or_else(|e| e.into_inner());
+        let samples = std::mem::take(&mut buf.0);
+        let rate = buf.1;
+        (samples, rate)
     }
 
     pub fn start(&self, app_handle: AppHandle, silence_timeout_sec: u64, silence_threshold: f32) -> Result<()> {
@@ -47,6 +59,14 @@ impl AudioRecorder {
         let (cmd_tx, cmd_rx) = mpsc::channel::<Cmd>();
         let (auto_stop_tx, auto_stop_rx) = mpsc::channel::<RecordedAudio>();
         let is_recording = self.is_recording.clone();
+        let streaming_buf = self.streaming_buffer.clone();
+
+        // Clear streaming buffer
+        {
+            let mut buf = streaming_buf.lock().unwrap_or_else(|e| e.into_inner());
+            buf.0.clear();
+            buf.1 = 0;
+        }
 
         // Mark as recording before spawning thread to prevent double-start
         *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = true;
@@ -102,6 +122,7 @@ impl AudioRecorder {
 
             let mut buffer: Vec<f32> = Vec::new();
             let mut total_chunks: u64 = 0;
+            let mut last_streaming_write: usize = 0;
 
             // Silence auto-stop tracking: count consecutive silent 512-sample chunks
             let silence_chunks_limit = if silence_timeout_sec == 0 {
@@ -152,6 +173,15 @@ impl AudioRecorder {
                     &mut silent_chunks,
                     &mut total_chunks,
                 );
+
+                // Copy new samples to streaming buffer for real-time transcription
+                if buffer.len() > last_streaming_write {
+                    if let Ok(mut sb) = streaming_buf.lock() {
+                        sb.0.extend_from_slice(&buffer[last_streaming_write..]);
+                        sb.1 = sample_rate;
+                    }
+                    last_streaming_write = buffer.len();
+                }
 
                 // Silence auto-stop
                 if silent_chunks >= silence_chunks_limit {

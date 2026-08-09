@@ -20,9 +20,10 @@ import type { AppState } from "../hooks/useApp";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage } from "../lib/utils";
 
 interface SummaryResult {
+  title: string;
   summary: string;
-  key_points: string[];
-  action_items: string[];
+  todos: string[];
+  keywords: string[];
 }
 
 export function HistoryPage(app: AppState) {
@@ -399,28 +400,30 @@ export function HistoryPage(app: AppState) {
             )}
             {summaryModal.result && (
               <div className="space-y-4">
+                {summaryModal.result.title && (
+                  <div>
+                    <h3 className="text-base font-semibold mb-1" style={{ color: "hsl(var(--ink))" }}>{summaryModal.result.title}</h3>
+                  </div>
+                )}
                 <div>
                   <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.summaryOverview}</h3>
                   <p className="text-sm" style={{ color: "hsl(var(--ink))" }}>{summaryModal.result.summary}</p>
                 </div>
-                {summaryModal.result.key_points.length > 0 && (
+                {summaryModal.result.keywords.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.keyPoints}</h3>
-                    <ul className="space-y-1">
-                      {summaryModal.result.key_points.map((point, i) => (
-                        <li key={i} className="text-sm flex gap-2" style={{ color: "hsl(var(--ink))" }}>
-                          <span style={{ color: "hsl(var(--primary))" }}>•</span>
-                          {point}
-                        </li>
+                    <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.keywords || "Keywords"}</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {summaryModal.result.keywords.map((kw, i) => (
+                        <Badge key={i}>{kw}</Badge>
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
-                {summaryModal.result.action_items.length > 0 && (
+                {summaryModal.result.todos.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.actionItems}</h3>
                     <ul className="space-y-1">
-                      {summaryModal.result.action_items.map((item, i) => (
+                      {summaryModal.result.todos.map((item, i) => (
                         <li key={i} className="text-sm flex gap-2" style={{ color: "hsl(var(--ink))" }}>
                           <span style={{ color: "hsl(var(--warning))" }}>☐</span>
                           {item}
@@ -432,7 +435,7 @@ export function HistoryPage(app: AppState) {
                 <div className="flex justify-end gap-2 pt-2 border-t" style={{ borderColor: "hsl(var(--hairline))" }}>
                   <Button variant="secondary" size="sm" onClick={async () => {
                     if (summaryModal.result) {
-                      const text = `# ${m.summaryOverview}\n${summaryModal.result.summary}\n\n## ${m.keyPoints}\n${summaryModal.result.key_points.map(p => `- ${p}`).join("\n")}\n\n## ${m.actionItems}\n${summaryModal.result.action_items.map(a => `- [ ] ${a}`).join("\n")}`;
+                      const text = `# ${summaryModal.result.title || m.summaryOverview}\n${summaryModal.result.summary}\n\n## ${m.keywords || "Keywords"}\n${summaryModal.result.keywords.map(k => `- ${k}`).join("\n")}\n\n## ${m.actionItems}\n${summaryModal.result.todos.map(a => `- [ ] ${a}`).join("\n")}`;
                       await writeText(text);
                     }
                   }}>{m.copy}</Button>

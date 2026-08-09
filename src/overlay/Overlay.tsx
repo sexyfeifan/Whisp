@@ -44,6 +44,7 @@ function Overlay() {
   const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [discarding, setDiscarding] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const levelRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<number[]>([]);
@@ -92,6 +93,15 @@ function Overlay() {
         console.error("Failed to get waveform data:", e);
       }
     });
+    const unlisten7 = listen<string>("streaming-partial", (e) => {
+      setStreamingText((prev) => {
+        if (!prev && e.payload) return e.payload;
+        return e.payload;
+      });
+    });
+    const unlisten8 = listen("streaming-final", () => {
+      setStreamingText("");
+    });
     return () => {
       unlisten1.then((f) => f());
       unlisten2.then((f) => f());
@@ -99,6 +109,8 @@ function Overlay() {
       unlisten4.then((f) => f());
       unlisten5.then((f) => f());
       unlisten6.then((f) => f());
+      unlisten7.then((f) => f());
+      unlisten8.then((f) => f());
     };
   }, []);
 
@@ -263,7 +275,13 @@ function Overlay() {
       ) : (
         <div className="recording-row">
           <ThinkingOrb state="listening" size={20} speed={0.75} />
-          <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
+          {streamingText ? (
+            <span className="orb-label" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {streamingText.length > 60 ? streamingText.slice(-60) : streamingText}
+            </span>
+          ) : (
+            <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
+          )}
           <span className="orb-timer">{elapsedSec}s</span>
         </div>
       )}
