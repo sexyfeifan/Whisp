@@ -973,22 +973,9 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
-                    let target_bundle_id: Option<String> = {
-                        #[cfg(target_os = "macos")]
-                        {
-                            LAST_FRONTMOST_APP_BUNDLE_ID
-                                .lock()
-                                .unwrap_or_else(|e| e.into_inner())
-                                .clone()
-                        }
-                        #[cfg(not(target_os = "macos"))]
-                        {
-                            None
-                        }
-                    };
                     std::thread::spawn(move || {
                         std::thread::sleep(Duration::from_millis(paste_delay_ms));
-                        paste::simulate_paste_with_target(&handle, target_bundle_id.as_deref());
+                        paste::simulate_paste(&handle).ok();
                     });
                 }
 
