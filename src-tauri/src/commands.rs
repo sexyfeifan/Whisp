@@ -235,6 +235,51 @@ pub fn reset_pricing_config() -> Result<(), String> {
     config.save()
 }
 
+/// Get waveform data from the pending recording for preview visualization.
+/// Returns downsampled amplitude values (0.0-1.0) suitable for drawing a waveform.
+#[tauri::command]
+pub fn get_pending_waveform() -> Result<Option<serde_json::Value>, String> {
+    let pending = crate::PENDING_AUDIO.get_or_init(|| std::sync::Mutex::new(None));
+    let guard = pending.lock().unwrap_or_else(|e| e.into_inner());
+    match guard.as_ref() {
+        Some(audio) => {
+            // Downsample to ~200 bars for visualization
+            let target_bars = 200usize;
+            let samples = &audio.samples;
+            let chunk_size = (samples.len() / target_bars).max(1);
+            let mut amplitudes: Vec<f32> = Vec::with_capacity(target_bars);
+            for chunk in samples.chunks(chunk_size) {
+                let rms: f32 = chunk.iter().map(|s| s * s).sum::<f32>();
+                let rms = (rms / chunk.len() as f32).sqrt();
+                amplitudes.push((rms * 8.0).min(1.0)); // Scale for visibility
+            }
+            Ok(Some(serde_json::json!({
+                "amplitudes": amplitudes,
+                "duration_ms": audio.duration_ms,
+                "sample_rate": audio.sample_rate,
+            })))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Confirm the pending recording and proceed with transcription.
+#[tauri::command]
+pub fn confirm_pending_transcription(app: AppHandle) -> Result<(), String> {
+    crate::confirm_pending_transcription_impl(&app)
+}
+
+/// Discard the pending recording without transcribing.
+#[tauri::command]
+pub fn discard_pending_recording(app: AppHandle) -> Result<(), String> {
+    let pending = crate::PENDING_AUDIO.get_or_init(|| std::sync::Mutex::new(None));
+    let mut guard = pending.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = None;
+    crate::close_overlay(&app);
+    let _ = app.emit("recording-cancelled", ());
+    Ok(())
+}
+
 #[tauri::command]
 pub fn toggle_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     let autolaunch = app.autolaunch();
@@ -300,6 +345,9 @@ pub async fn retry_transcription(
     )
     .await
     .map_err(|e| e.to_string())?;
+
+    // Run post-transcription plugins
+    let (text, _plugin_results) = crate::plugin::run_plugin_hook("post-transcription", &text).await;
 
     let polished_text = if settings.ai_polish_enabled && !settings.ai_polish_api_key.is_empty() {
         match crate::polish::polish_text(
@@ -392,6 +440,37 @@ pub async fn test_polish_connection(
     crate::polish::validate_polish_key(&client, &api_key, &api_base_url, &model)
         .await
         .map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+pub struct TranslateOutput {
+    pub text: String,
+    pub tokens_used: i64,
+    pub target: String,
+}
+
+#[tauri::command]
+pub async fn translate_text(
+    app: AppHandle,
+    api_key: String,
+    api_base_url: String,
+    model: String,
+    text: String,
+    target: String,
+) -> Result<TranslateOutput, String> {
+    log::info!("Translation requested to target: {}", target);
+    let client = app
+        .try_state::<reqwest::Client>()
+        .ok_or("HTTP client not initialized")?;
+    let timeout = settings::get_settings().request_timeout_sec;
+    let result = crate::translate::translate_text(&client, &api_key, &api_base_url, &model, &text, &target, timeout)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(TranslateOutput {
+        text: result.text,
+        tokens_used: result.tokens_used,
+        target: result.target,
+    })
 }
 
 fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
@@ -549,6 +628,255 @@ pub fn read_audio_file(path: String) -> Result<String, String> {
         .map_err(|e| e.to_string())
 }
 
+// --- Batch File Transcription ---
+
+/// Result for a single file in a batch transcription.
+#[derive(Clone, Serialize)]
+pub struct BatchFileResult {
+    pub file_path: String,
+    pub file_name: String,
+    pub success: bool,
+    pub text: Option<String>,
+    pub error: Option<String>,
+    pub duration_ms: Option<i64>,
+}
+
+/// Progress event emitted during batch transcription.
+#[derive(Clone, Serialize)]
+pub struct BatchProgress {
+    pub current: usize,
+    pub total: usize,
+    pub file_name: String,
+    pub file_path: String,
+    pub status: String, // "processing", "success", "failed"
+    pub error: Option<String>,
+}
+
+/// Transcribe multiple WAV audio files sequentially.
+/// Each file is processed independently — failures in one file
+/// do not abort the batch. Progress events are emitted via
+/// `batch-transcribe-progress` for every file, and a final
+/// `batch-transcribe-complete` event carries the full results.
+#[tauri::command]
+pub async fn batch_transcribe(
+    app: AppHandle,
+    history: State<'_, Arc<HistoryManager>>,
+    file_paths: Vec<String>,
+) -> Result<Vec<BatchFileResult>, String> {
+    log::info!("Batch transcription requested for {} files", file_paths.len());
+
+    let settings = crate::settings::get_settings();
+    if settings.api_key.is_empty() {
+        return Err(match settings.ui_language.as_str() {
+            "en" => "API key not configured".into(),
+            "ja" => "API キーが未設定です".into(),
+            _ => "尚未配置 API Key".into(),
+        });
+    }
+
+    let client = app
+        .try_state::<reqwest::Client>()
+        .ok_or("HTTP client not initialized")?;
+
+    let lang = if settings.language == "auto" {
+        None
+    } else {
+        Some(settings.language.as_str())
+    };
+
+    let prompt = if settings.whisper_prompt.trim().is_empty() {
+        None
+    } else {
+        Some(settings.whisper_prompt.as_str())
+    };
+
+    let provider = crate::transcribe::provider_name(&settings.api_base_url);
+    let total = file_paths.len();
+    let mut results: Vec<BatchFileResult> = Vec::with_capacity(total);
+
+    for (index, file_path) in file_paths.iter().enumerate() {
+        let path = std::path::Path::new(file_path);
+        let file_name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| file_path.clone());
+
+        // Emit "processing" progress
+        let _ = app.emit(
+            "batch-transcribe-progress",
+            BatchProgress {
+                current: index + 1,
+                total,
+                file_name: file_name.clone(),
+                file_path: file_path.clone(),
+                status: "processing".to_string(),
+                error: None,
+            },
+        );
+
+        // Read file
+        let wav_data = match std::fs::read(file_path) {
+            Ok(data) => data,
+            Err(e) => {
+                let err_msg = format!("Failed to read file: {}", e);
+                log::warn!("Batch: {} — {}", file_name, err_msg);
+                let result = BatchFileResult {
+                    file_path: file_path.clone(),
+                    file_name: file_name.clone(),
+                    success: false,
+                    text: None,
+                    error: Some(err_msg.clone()),
+                    duration_ms: None,
+                };
+                let _ = app.emit(
+                    "batch-transcribe-progress",
+                    BatchProgress {
+                        current: index + 1,
+                        total,
+                        file_name: file_name.clone(),
+                        file_path: file_path.clone(),
+                        status: "failed".to_string(),
+                        error: Some(err_msg),
+                    },
+                );
+                results.push(result);
+                continue;
+            }
+        };
+
+        // Try to read duration from WAV header (best-effort, non-fatal)
+        let duration_ms: Option<i64> = hound::WavReader::new(std::io::Cursor::new(&wav_data))
+            .ok()
+            .map(|reader| {
+                let spec = reader.spec();
+                let sample_count = reader.duration() as i64;
+                if spec.sample_rate > 0 {
+                    sample_count * 1000 / spec.sample_rate as i64
+                } else {
+                    0
+                }
+            });
+
+        // Transcribe
+        match crate::transcribe::transcribe_audio(
+            &client,
+            &settings.api_key,
+            &settings.api_base_url,
+            &settings.model,
+            &wav_data,
+            lang,
+            prompt,
+            settings.request_timeout_sec,
+            settings.retry_count,
+        )
+        .await
+        {
+            Ok(text) => {
+                log::info!("Batch [{}]: {} — success, {} chars", index + 1, file_name, text.len());
+
+                let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
+                let estimated_cost =
+                    crate::cost::estimate_asr_cost(&settings.api_base_url, &settings.model, asr_duration_sec);
+
+                // Save to history
+                let entry = NewHistoryEntry {
+                    text: text.clone(),
+                    model: settings.model.clone(),
+                    duration_ms,
+                    audio_path: Some(file_path.clone()),
+                    status: STATUS_SUCCESS.to_string(),
+                    error_message: None,
+                    provider: provider.clone(),
+                    api_base_url: settings.api_base_url.clone(),
+                    language: settings.language.clone(),
+                    retry_of: None,
+                    asr_duration_sec: Some(asr_duration_sec),
+                    polish_tokens: None,
+                    estimated_cost: Some(estimated_cost),
+                };
+                let _ = history.add_entry(&entry);
+
+                let result = BatchFileResult {
+                    file_path: file_path.clone(),
+                    file_name: file_name.clone(),
+                    success: true,
+                    text: Some(text),
+                    error: None,
+                    duration_ms,
+                };
+                let _ = app.emit(
+                    "batch-transcribe-progress",
+                    BatchProgress {
+                        current: index + 1,
+                        total,
+                        file_name: file_name.clone(),
+                        file_path: file_path.clone(),
+                        status: "success".to_string(),
+                        error: None,
+                    },
+                );
+                results.push(result);
+            }
+            Err(e) => {
+                let err_msg = e.to_string();
+                log::warn!("Batch [{}]: {} — failed: {}", index + 1, file_name, err_msg);
+
+                // Save failed entry to history
+                let entry = NewHistoryEntry {
+                    text: format!("转写失败: {}", &err_msg.chars().take(100).collect::<String>()),
+                    model: settings.model.clone(),
+                    duration_ms,
+                    audio_path: Some(file_path.clone()),
+                    status: STATUS_FAILED.to_string(),
+                    error_message: Some(err_msg.clone()),
+                    provider: provider.clone(),
+                    api_base_url: settings.api_base_url.clone(),
+                    language: settings.language.clone(),
+                    retry_of: None,
+                    asr_duration_sec: None,
+                    polish_tokens: None,
+                    estimated_cost: None,
+                };
+                let _ = history.add_entry(&entry);
+
+                let result = BatchFileResult {
+                    file_path: file_path.clone(),
+                    file_name: file_name.clone(),
+                    success: false,
+                    text: None,
+                    error: Some(err_msg.clone()),
+                    duration_ms,
+                };
+                let _ = app.emit(
+                    "batch-transcribe-progress",
+                    BatchProgress {
+                        current: index + 1,
+                        total,
+                        file_name: file_name.clone(),
+                        file_path: file_path.clone(),
+                        status: "failed".to_string(),
+                        error: Some(err_msg),
+                    },
+                );
+                results.push(result);
+            }
+        }
+    }
+
+    // Notify frontend to refresh history
+    let _ = app.emit("history-updated", ());
+    // Emit completion event with full results
+    let _ = app.emit("batch-transcribe-complete", &results);
+
+    log::info!(
+        "Batch transcription complete: {}/{} succeeded",
+        results.iter().filter(|r| r.success).count(),
+        total
+    );
+
+    Ok(results)
+}
+
 #[tauri::command]
 pub fn get_default_polish_prompt() -> String {
     crate::polish::DEFAULT_SYSTEM_PROMPT.to_string()
@@ -580,6 +908,7 @@ pub fn export_settings_json() -> Result<String, String> {
         "ai_polish_model": s.ai_polish_model,
         "ai_polish_prompt": s.ai_polish_prompt,
         "audio_retention_limit": s.audio_retention_limit,
+        "translation_target": s.translation_target,
     });
     serde_json::to_string_pretty(&map).map_err(|e| e.to_string())
 }
@@ -662,6 +991,9 @@ pub fn import_settings_json(app: AppHandle, json: String) -> Result<String, Stri
     }
     if let Some(v) = obj.get("audio_retention_limit").and_then(|v| v.as_u64()) {
         s.audio_retention_limit = v as usize;
+    }
+    if let Some(v) = obj.get("translation_target").and_then(|v| v.as_str()) {
+        s.translation_target = v.to_string();
     }
 
     let old_settings = settings::get_settings();
@@ -915,6 +1247,311 @@ pub fn delete_model(model_name: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_model_disk_usage() -> Result<u64, String> {
     crate::whisper::WhisperEngine::total_model_size().map_err(|e| e.to_string())
+}
+
+// --- Plugin System ---
+
+#[tauri::command]
+pub fn list_plugins() -> Vec<crate::plugin::Plugin> {
+    crate::plugin::list_plugins()
+}
+
+// --- Full Backup / Restore ---
+
+/// Summary returned by import_full_backup.
+#[derive(Serialize)]
+pub struct BackupImportSummary {
+    pub settings_imported: bool,
+    pub entries_imported: usize,
+    pub entries_skipped: usize,
+    pub audio_files_copied: usize,
+    pub errors: Vec<String>,
+}
+
+/// Export a complete backup as a ZIP archive containing settings, history, and audio files.
+#[tauri::command]
+pub fn export_full_backup(history: State<'_, Arc<HistoryManager>>, target_path: String) -> Result<String, String> {
+    use std::io::Write;
+
+    let settings = settings::get_settings();
+    let settings_json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+
+    let entries = history.get_entries().map_err(|e| e.to_string())?;
+    let history_json = serde_json::to_string_pretty(&entries).map_err(|e| e.to_string())?;
+
+    let file = std::fs::File::create(&target_path).map_err(|e| format!("Failed to create backup file: {e}"))?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+
+    // Write settings.json
+    zip_writer
+        .start_file("settings.json", opts)
+        .map_err(|e| format!("Failed to write settings.json: {e}"))?;
+    zip_writer
+        .write_all(settings_json.as_bytes())
+        .map_err(|e| format!("Failed to write settings.json content: {e}"))?;
+
+    // Write history.json
+    zip_writer
+        .start_file("history.json", opts)
+        .map_err(|e| format!("Failed to write history.json: {e}"))?;
+    zip_writer
+        .write_all(history_json.as_bytes())
+        .map_err(|e| format!("Failed to write history.json content: {e}"))?;
+
+    // Write audio files
+    for entry in &entries {
+        if let Some(audio_path) = &entry.audio_path {
+            let audio_file = std::path::Path::new(audio_path);
+            if audio_file.exists() {
+                let file_name = audio_file
+                    .file_name()
+                    .map(|n| format!("audio/{}", n.to_string_lossy()))
+                    .unwrap_or_else(|| format!("audio/audio_{}.wav", entry.id));
+                let audio_data =
+                    std::fs::read(audio_path).map_err(|e| format!("Failed to read audio file {}: {e}", audio_path))?;
+                zip_writer
+                    .start_file(&file_name, opts)
+                    .map_err(|e| format!("Failed to create zip entry {file_name}: {e}"))?;
+                zip_writer
+                    .write_all(&audio_data)
+                    .map_err(|e| format!("Failed to write {file_name}: {e}"))?;
+            }
+        }
+    }
+
+    zip_writer
+        .finish()
+        .map_err(|e| format!("Failed to finalize backup: {e}"))?;
+
+    log::info!("Full backup exported to {}", target_path);
+    Ok(target_path)
+}
+
+/// Import a complete backup from a ZIP archive: merge settings, deduplicate history, and copy audio files.
+#[tauri::command]
+pub fn import_full_backup(
+    app: AppHandle,
+    history: State<'_, Arc<HistoryManager>>,
+    source_path: String,
+) -> Result<BackupImportSummary, String> {
+    let file = std::fs::File::open(&source_path).map_err(|e| format!("Failed to open backup file: {e}"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Failed to read backup archive: {e}"))?;
+
+    let mut errors: Vec<String> = Vec::new();
+    let mut settings_imported = false;
+    let mut entries_imported: usize = 0;
+    let mut entries_skipped: usize = 0;
+    let mut audio_files_copied: usize = 0;
+
+    let mut backup_settings_json: Option<String> = None;
+    let mut backup_entries: Option<Vec<HistoryEntry>> = None;
+    // Map: zip file name (e.g. "audio/foo.wav") -> raw bytes
+    let mut audio_files: std::collections::HashMap<String, Vec<u8>> = std::collections::HashMap::new();
+
+    // --- Pass 1: read all entries from the ZIP ---
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("Failed to read zip entry {i}: {e}"))?;
+        let name = entry.name().to_string();
+
+        if name == "settings.json" {
+            let mut buf = String::new();
+            std::io::Read::read_to_string(&mut entry, &mut buf)
+                .map_err(|e| format!("Failed to read settings.json: {e}"))?;
+            backup_settings_json = Some(buf);
+        } else if name == "history.json" {
+            let mut buf = String::new();
+            std::io::Read::read_to_string(&mut entry, &mut buf)
+                .map_err(|e| format!("Failed to read history.json: {e}"))?;
+            backup_entries = serde_json::from_str::<Vec<HistoryEntry>>(&buf).ok();
+        } else if name.starts_with("audio/") && !name.ends_with('/') {
+            let mut buf = Vec::new();
+            std::io::Read::read_to_end(&mut entry, &mut buf).map_err(|e| format!("Failed to read {name}: {e}"))?;
+            audio_files.insert(name, buf);
+        }
+    }
+
+    // --- Import settings (merge with existing) ---
+    if let Some(json_str) = backup_settings_json {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&json_str) {
+            if let Some(obj) = value.as_object() {
+                let mut s = settings::get_settings();
+                // Merge: only overwrite fields present in the backup
+                if let Some(v) = obj.get("api_base_url").and_then(|v| v.as_str()) {
+                    s.api_base_url = v.to_string();
+                }
+                if let Some(v) = obj.get("api_key").and_then(|v| v.as_str()) {
+                    s.api_key = v.to_string();
+                }
+                if let Some(v) = obj.get("model").and_then(|v| v.as_str()) {
+                    s.model = v.to_string();
+                }
+                if let Some(v) = obj.get("language").and_then(|v| v.as_str()) {
+                    s.language = v.to_string();
+                }
+                if let Some(v) = obj.get("shortcut").and_then(|v| v.as_str()) {
+                    s.shortcut = v.to_string();
+                }
+                if let Some(v) = obj.get("auto_paste_enabled").and_then(|v| v.as_bool()) {
+                    s.auto_paste_enabled = v;
+                }
+                if let Some(v) = obj.get("paste_delay_ms").and_then(|v| v.as_u64()) {
+                    s.paste_delay_ms = v;
+                }
+                if let Some(v) = obj.get("save_audio_files").and_then(|v| v.as_bool()) {
+                    s.save_audio_files = v;
+                }
+                if let Some(v) = obj.get("sound_enabled").and_then(|v| v.as_bool()) {
+                    s.sound_enabled = v;
+                }
+                if let Some(v) = obj.get("ui_language").and_then(|v| v.as_str()) {
+                    s.ui_language = v.to_string();
+                }
+                if let Some(v) = obj.get("request_timeout_sec").and_then(|v| v.as_u64()) {
+                    s.request_timeout_sec = v;
+                }
+                if let Some(v) = obj.get("retry_count").and_then(|v| v.as_u64()) {
+                    s.retry_count = v as u8;
+                }
+                if let Some(v) = obj.get("silence_timeout_sec").and_then(|v| v.as_u64()) {
+                    s.silence_timeout_sec = v;
+                }
+                if let Some(v) = obj.get("silence_threshold").and_then(|v| v.as_f64()) {
+                    s.silence_threshold = v;
+                }
+                if let Some(v) = obj.get("trim_silence_enabled").and_then(|v| v.as_bool()) {
+                    s.trim_silence_enabled = v;
+                }
+                if let Some(v) = obj.get("whisper_prompt").and_then(|v| v.as_str()) {
+                    s.whisper_prompt = v.to_string();
+                }
+                if let Some(v) = obj.get("whisper_config_json").and_then(|v| v.as_str()) {
+                    s.whisper_config_json = v.to_string();
+                }
+                if let Some(v) = obj.get("launch_at_startup").and_then(|v| v.as_bool()) {
+                    s.launch_at_startup = v;
+                }
+                if let Some(v) = obj.get("ai_polish_enabled").and_then(|v| v.as_bool()) {
+                    s.ai_polish_enabled = v;
+                }
+                if let Some(v) = obj.get("ai_polish_api_url").and_then(|v| v.as_str()) {
+                    s.ai_polish_api_url = v.to_string();
+                }
+                if let Some(v) = obj.get("ai_polish_api_key").and_then(|v| v.as_str()) {
+                    s.ai_polish_api_key = v.to_string();
+                }
+                if let Some(v) = obj.get("ai_polish_model").and_then(|v| v.as_str()) {
+                    s.ai_polish_model = v.to_string();
+                }
+                if let Some(v) = obj.get("ai_polish_prompt").and_then(|v| v.as_str()) {
+                    s.ai_polish_prompt = v.to_string();
+                }
+                if let Some(v) = obj.get("audio_retention_limit").and_then(|v| v.as_u64()) {
+                    s.audio_retention_limit = v as usize;
+                }
+                if let Some(v) = obj.get("translation_target").and_then(|v| v.as_str()) {
+                    s.translation_target = v.to_string();
+                }
+                if let Some(v) = obj.get("waveform_preview_enabled").and_then(|v| v.as_bool()) {
+                    s.waveform_preview_enabled = v;
+                }
+                // Apply shortcut changes
+                let old_settings = settings::get_settings();
+                settings::save_settings(&s).map_err(|e| format!("Failed to save imported settings: {e}"))?;
+                if s.shortcut != old_settings.shortcut {
+                    re_register_shortcut(&app, &old_settings.shortcut, &s);
+                }
+                settings_imported = true;
+            }
+        } else {
+            errors.push("settings.json is not valid JSON".to_string());
+        }
+    }
+
+    // --- Import history entries (dedup by timestamp + text) ---
+    if let Some(entries) = backup_entries {
+        let existing = history.get_entries().map_err(|e| e.to_string())?;
+
+        // Build a set of (timestamp, text) for existing entries
+        let existing_keys: std::collections::HashSet<(i64, String)> =
+            existing.iter().map(|e| (e.timestamp, e.text.clone())).collect();
+
+        let audio_dir = history.audio_dir();
+        std::fs::create_dir_all(&audio_dir).map_err(|e| format!("Failed to create audio directory: {e}"))?;
+
+        for entry in &entries {
+            let key = (entry.timestamp, entry.text.clone());
+            if existing_keys.contains(&key) {
+                entries_skipped += 1;
+                continue;
+            }
+
+            // Try to copy the audio file from the backup if it exists
+            let mut new_audio_path: Option<String> = None;
+            if let Some(ref old_path) = entry.audio_path {
+                let file_name = std::path::Path::new(old_path)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string());
+                if let Some(name) = file_name {
+                    let zip_key = format!("audio/{}", name);
+                    if let Some(audio_data) = audio_files.get(&zip_key) {
+                        let dest = audio_dir.join(&name);
+                        if std::fs::write(&dest, audio_data).is_ok() {
+                            new_audio_path = Some(dest.to_string_lossy().to_string());
+                            audio_files_copied += 1;
+                        } else {
+                            errors.push(format!("Failed to copy audio file: {name}"));
+                        }
+                    }
+                }
+            }
+
+            let new_entry = NewHistoryEntry {
+                text: entry.text.clone(),
+                model: entry.model.clone(),
+                duration_ms: entry.duration_ms,
+                audio_path: new_audio_path,
+                status: entry.status.clone(),
+                error_message: entry.error_message.clone(),
+                provider: entry.provider.clone(),
+                api_base_url: entry.api_base_url.clone(),
+                language: entry.language.clone(),
+                retry_of: entry.retry_of,
+                asr_duration_sec: entry.asr_duration_sec,
+                polish_tokens: entry.polish_tokens,
+                estimated_cost: entry.estimated_cost,
+            };
+
+            if let Err(e) = history.add_entry(&new_entry) {
+                errors.push(format!("Failed to import entry id={}: {e}", entry.id));
+            } else {
+                entries_imported += 1;
+            }
+        }
+    }
+
+    if entries_imported > 0 || settings_imported {
+        let _ = app.emit("history-updated", ());
+    }
+
+    log::info!(
+        "Backup imported: {} settings, {} entries ({} skipped), {} audio, {} errors",
+        settings_imported,
+        entries_imported,
+        entries_skipped,
+        audio_files_copied,
+        errors.len()
+    );
+
+    Ok(BackupImportSummary {
+        settings_imported,
+        entries_imported,
+        entries_skipped,
+        audio_files_copied,
+        errors,
+    })
 }
 
 #[cfg(test)]

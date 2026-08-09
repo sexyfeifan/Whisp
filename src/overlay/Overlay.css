@@ -123,3 +123,124 @@ html, body {
   display: block;
   pointer-events: none;
 }
+
+/* ═══════════════════════════════════════════
+   Waveform Preview Layout
+   ═══════════════════════════════════════════ */
+
+/* When in preview state, the overlay body gets extra height.
+   Layout: vertical column — waveform canvas on top, meta row below. */
+.overlay-body[data-state="preview"] {
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: default;
+}
+
+.preview-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 8px;
+}
+
+.preview-waveform {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  background: transparent;
+}
+
+.waveform-preview-canvas {
+  display: block;
+  border-radius: 6px;
+}
+
+/* Meta row: duration on left, action buttons on right */
+.preview-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.preview-duration {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--overlay-dim);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.preview-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 0.5px solid var(--overlay-border);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  background: transparent;
+  color: var(--overlay-fg);
+  transition: background 0.15s, opacity 0.15s;
+  letter-spacing: -0.011em;
+}
+
+.preview-btn:hover:not(:disabled) {
+  background: rgba(128, 128, 128, 0.1);
+}
+
+.preview-btn:active:not(:disabled) {
+  background: rgba(128, 128, 128, 0.18);
+}
+
+.preview-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.preview-btn-confirm {
+  background: hsl(260, 62%, 48%);
+  color: #fff;
+  border-color: transparent;
+}
+
+.preview-btn-confirm:hover:not(:disabled) {
+  background: hsl(260, 62%, 42%);
+}
+
+.preview-btn-confirm:active:not(:disabled) {
+  background: hsl(260, 62%, 36%);
+}
+
+.preview-btn-discard {
+  color: var(--overlay-dim);
+}
+
+.preview-btn-discard:hover:not(:disabled) {
+  color: var(--overlay-fg);
+  background: rgba(128, 128, 128, 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .preview-btn-confirm {
+    background: hsl(260, 60%, 62%);
+    color: hsl(0, 0%, 5%);
+  }
+
+  .preview-btn-confirm:hover:not(:disabled) {
+    background: hsl(260, 60%, 56%);
+  }
+
+  .preview-btn-confirm:active:not(:disabled) {
+    background: hsl(260, 60%, 50%);
+  }
+}

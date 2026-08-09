@@ -5,12 +5,14 @@ mod hotkey;
 pub mod log_buffer;
 pub mod paste;
 mod permissions;
+mod plugin;
 mod polish;
 mod recorder;
 mod settings;
 mod shortcut;
 mod sound;
 mod transcribe;
+mod translate;
 mod tray;
 mod whisper;
 
@@ -87,6 +89,19 @@ const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
 const SILENCE_TRIM_PADDING_MS: u32 = 120;
 const MIN_TRANSCRIBE_MS: i64 = 100;
 
+// Pending audio for waveform preview flow.
+// When preview mode is enabled, recording stops here instead of auto-transcribing.
+// The user sees a waveform preview and can confirm or discard.
+static PENDING_AUDIO: std::sync::OnceLock<Mutex<Option<PendingAudio>>> = std::sync::OnceLock::new();
+
+struct PendingAudio {
+    wav_data: Vec<u8>,
+    samples: Vec<f32>,
+    sample_rate: u32,
+    duration_ms: i64,
+    audio_path: Option<String>,
+}
+
 fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     match ui_language {
         "en" => en.to_string(),
@@ -130,9 +145,11 @@ pub fn run() {
             commands::check_for_updates,
             commands::polish_text,
             commands::test_polish_connection,
+            commands::translate_text,
             commands::get_logs,
             commands::clear_logs,
             commands::read_audio_file,
+            commands::batch_transcribe,
             commands::get_default_polish_prompt,
             commands::download_and_install_update,
             commands::export_settings_json,
@@ -151,6 +168,12 @@ pub fn run() {
             commands::get_pricing_config,
             commands::save_pricing_config,
             commands::reset_pricing_config,
+            commands::get_pending_waveform,
+            commands::confirm_pending_transcription,
+            commands::discard_pending_recording,
+            commands::export_full_backup,
+            commands::import_full_backup,
+            commands::list_plugins,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();
@@ -565,6 +588,24 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         None
     };
 
+    // Waveform preview mode: store audio and let user confirm before transcribing
+    if settings.waveform_preview_enabled {
+        let pending = PENDING_AUDIO.get_or_init(|| Mutex::new(None));
+        {
+            let mut guard = pending.lock().unwrap_or_else(|e| e.into_inner());
+            *guard = Some(PendingAudio {
+                wav_data,
+                samples: processed_audio.samples.clone(),
+                sample_rate: processed_audio.sample_rate,
+                duration_ms: duration_ms.unwrap_or(0),
+                audio_path: audio_path_str,
+            });
+        }
+        log::info!("Preview mode: audio stored, waiting for user confirmation");
+        let _ = app_handle.emit("preview-ready", ());
+        return;
+    }
+
     if settings.api_key.is_empty() {
         log::error!("API key not configured!");
         let _ = app_handle.emit(
@@ -648,6 +689,21 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         {
             Ok(text) => {
                 log::info!("Transcription succeeded, text_length={}", text.len());
+
+                // Run post-transcription plugins
+                let (text, plugin_results) = plugin::run_plugin_hook("post-transcription", &text).await;
+                for result in &plugin_results {
+                    if let Some(ref err) = result.error {
+                        log::warn!("Plugin {} failed: {}", result.plugin_name, err);
+                        let _ = handle.emit(
+                            "plugin-error",
+                            serde_json::json!({
+                                "plugin": result.plugin_name,
+                                "error": err,
+                            }),
+                        );
+                    }
+                }
 
                 let (text, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
                     log::info!("Polishing text with AI...");
@@ -802,8 +858,202 @@ pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
     }
 }
 
-fn close_overlay(app_handle: &tauri::AppHandle) {
+pub fn close_overlay(app_handle: &tauri::AppHandle) {
     if let Some(w) = app_handle.get_webview_window("overlay") {
         let _ = w.close();
     }
+}
+
+/// Implementation of confirm_pending_transcription (called from commands.rs).
+pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    let pending = PENDING_AUDIO.get_or_init(|| Mutex::new(None));
+    let pending_audio = {
+        let mut guard = pending.lock().unwrap_or_else(|e| e.into_inner());
+        guard.take()
+    };
+
+    let audio = pending_audio.ok_or("No pending recording to confirm")?;
+    let _ = app_handle.emit("transcribing", ());
+
+    let settings = settings::get_settings();
+    let history = app_handle.state::<Arc<HistoryManager>>();
+    let history_clone = history.inner().clone();
+    let handle = app_handle.clone();
+    let model = settings.model.clone();
+    let language = settings.language.clone();
+    let api_key = settings.api_key.clone();
+    let api_base_url = settings.api_base_url.clone();
+    let provider = transcribe::provider_name(&api_base_url);
+    let auto_paste_enabled = settings.auto_paste_enabled;
+    let paste_delay_ms = settings.paste_delay_ms;
+    let request_timeout_sec = settings.request_timeout_sec;
+    let retry_count = settings.retry_count;
+    let whisper_prompt = settings.whisper_prompt.clone();
+    let ai_polish_enabled = settings.ai_polish_enabled;
+    let ai_polish_api_key = settings.ai_polish_api_key.clone();
+    let ai_polish_api_url = settings.ai_polish_api_url.clone();
+    let ai_polish_model = settings.ai_polish_model.clone();
+    let ai_polish_prompt = settings.ai_polish_prompt.clone();
+    let audio_retention_limit = settings.audio_retention_limit;
+    let ui_language = settings.ui_language.clone();
+    let http_client = app_handle.state::<reqwest::Client>().inner().clone();
+    let wav_data = audio.wav_data;
+    let audio_path = audio.audio_path;
+    let duration_ms = Some(audio.duration_ms);
+
+    tauri::async_runtime::spawn(async move {
+        let lang = if language == "auto" {
+            None
+        } else {
+            Some(language.as_str())
+        };
+        let prompt = if whisper_prompt.trim().is_empty() {
+            None
+        } else {
+            Some(whisper_prompt.as_str())
+        };
+
+        match transcribe::transcribe_audio(
+            &http_client,
+            &api_key,
+            &api_base_url,
+            &model,
+            &wav_data,
+            lang,
+            prompt,
+            request_timeout_sec,
+            retry_count,
+        )
+        .await
+        {
+            Ok(text) => {
+                log::info!("Transcription succeeded (preview confirm), text_length={}", text.len());
+
+                // Run post-transcription plugins
+                let (text, plugin_results) = plugin::run_plugin_hook("post-transcription", &text).await;
+                for result in &plugin_results {
+                    if let Some(ref err) = result.error {
+                        log::warn!("Plugin {} failed: {}", result.plugin_name, err);
+                        let _ = handle.emit(
+                            "plugin-error",
+                            serde_json::json!({
+                                "plugin": result.plugin_name,
+                                "error": err,
+                            }),
+                        );
+                    }
+                }
+
+                let (text, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
+                    match polish::polish_text(
+                        &http_client,
+                        &ai_polish_api_key,
+                        &ai_polish_api_url,
+                        &ai_polish_model,
+                        &text,
+                        &ai_polish_prompt,
+                        request_timeout_sec,
+                    )
+                    .await
+                    {
+                        Ok(result) => (result.text, result.tokens_used),
+                        Err(e) => {
+                            log::info!("AI polish failed: {}", e);
+                            let _ = handle.emit("polish-error", e.to_string());
+                            (text, 0i64)
+                        }
+                    }
+                } else {
+                    (text, 0i64)
+                };
+
+                let _ = handle.clipboard().write_text(&text);
+                close_overlay(&handle);
+
+                if auto_paste_enabled {
+                    let target_bundle_id: Option<String> = {
+                        #[cfg(target_os = "macos")]
+                        {
+                            LAST_FRONTMOST_APP_BUNDLE_ID
+                                .lock()
+                                .unwrap_or_else(|e| e.into_inner())
+                                .clone()
+                        }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            None
+                        }
+                    };
+                    std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(paste_delay_ms));
+                        paste::simulate_paste_with_target(&handle, target_bundle_id.as_deref());
+                    });
+                }
+
+                let _ = handle.emit("transcription-done", &text);
+
+                let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
+                let pricing_config = cost::PricingConfig::load();
+                let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec, &pricing_config);
+                let polish_cost = if polish_tokens > 0 {
+                    cost::estimate_polish_cost(&ai_polish_api_url, &ai_polish_model, polish_tokens, &pricing_config)
+                } else {
+                    0.0
+                };
+                let estimated_cost = asr_cost + polish_cost;
+
+                let entry = history_clone.add_entry(&NewHistoryEntry {
+                    text: text.clone(),
+                    model: model.clone(),
+                    duration_ms,
+                    audio_path,
+                    status: STATUS_SUCCESS.to_string(),
+                    error_message: None,
+                    provider: provider.clone(),
+                    api_base_url: api_base_url.clone(),
+                    language: language.clone(),
+                    retry_of: None,
+                    asr_duration_sec: Some(asr_duration_sec),
+                    polish_tokens: Some(polish_tokens),
+                    estimated_cost: Some(estimated_cost),
+                });
+
+                match entry {
+                    Ok(entry) => {
+                        let _ = history_clone.cleanup_old_audio(audio_retention_limit);
+                        let _ = handle.emit("history-updated", entry.id);
+                    }
+                    Err(e) => log::error!("Failed to save history: {}", e),
+                }
+            }
+            Err(e) => {
+                log::error!("Transcription failed: {}", e);
+                let error_msg = e.to_string();
+                let _ = handle.emit("transcription-error", error_msg.clone());
+                let _ = history_clone.add_entry(&NewHistoryEntry {
+                    text: String::new(),
+                    model: model.clone(),
+                    duration_ms,
+                    audio_path,
+                    status: STATUS_FAILED.to_string(),
+                    error_message: Some(error_msg),
+                    provider: provider.clone(),
+                    api_base_url: api_base_url.clone(),
+                    language: language.clone(),
+                    retry_of: None,
+                    asr_duration_sec: None,
+                    polish_tokens: None,
+                    estimated_cost: None,
+                });
+                let handle2 = handle.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(3000));
+                    close_overlay(&handle2);
+                });
+            }
+        }
+        TRANSCRIBING.store(false, Ordering::SeqCst);
+    });
+
+    Ok(())
 }

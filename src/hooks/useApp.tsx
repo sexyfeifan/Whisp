@@ -8,7 +8,7 @@ import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
-import { History, Settings, Mic, Shield, Zap, Activity, BarChart3, Terminal } from "lucide-react";
+import { History, Settings, Mic, Shield, Zap, Activity, BarChart3, Terminal, Box } from "lucide-react";
 
 export interface UpdateInfo {
   latestVersion: string; releaseUrl: string; releaseNotes: string;
@@ -574,6 +574,7 @@ export function useApp(): AppState {
     { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
     { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
     { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
+    { id: "settingsModels", icon: <Box size={16} />, label: (m as Record<string, string>).modelsManagement ?? "Models", group: "config" },
     { id: "diagnostics", icon: <Terminal size={16} />, label: m.diagnostics, group: "footer" },
   ], [m]);
 

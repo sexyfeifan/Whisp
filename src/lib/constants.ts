@@ -1,6 +1,6 @@
 import type { AppSettings } from "../types";
 
-export type View = "onboarding" | "history" | "stats" | "settingsApi" | "settingsPolish" | "settingsRecording" | "settingsBehavior" | "settingsApp" | "diagnostics";
+export type View = "onboarding" | "history" | "stats" | "settingsApi" | "settingsPolish" | "settingsRecording" | "settingsBehavior" | "settingsApp" | "settingsModels" | "diagnostics";
 export type StatusFilter = "all" | "success" | "failed";
 export type UiLanguage = AppSettings["ui_language"];
 

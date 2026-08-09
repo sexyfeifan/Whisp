@@ -63,6 +63,10 @@ pub struct AppSettings {
     pub audio_retention_limit: usize,
     #[serde(default)]
     pub custom_endpoints: Vec<CustomEndpoint>,
+    #[serde(default = "default_translation_target")]
+    pub translation_target: String,
+    #[serde(default)]
+    pub waveform_preview_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +134,10 @@ struct DiskSettings {
     pub api_key: String,
     #[serde(default)]
     pub custom_endpoints: Vec<CustomEndpoint>,
+    #[serde(default = "default_translation_target")]
+    pub translation_target: String,
+    #[serde(default)]
+    pub waveform_preview_enabled: bool,
 }
 
 fn default_api_key() -> String {
@@ -212,6 +220,10 @@ fn default_audio_retention_limit() -> usize {
     100
 }
 
+fn default_translation_target() -> String {
+    "none".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -242,6 +254,8 @@ impl Default for AppSettings {
             whisper_config_json: String::new(),
             audio_retention_limit: default_audio_retention_limit(),
             custom_endpoints: Vec::new(),
+            translation_target: default_translation_target(),
+            waveform_preview_enabled: false,
         }
     }
 }
@@ -352,6 +366,8 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         },
         whisper_config_json: settings.whisper_config_json.clone(),
         custom_endpoints: settings.custom_endpoints.clone(),
+        translation_target: settings.translation_target.clone(),
+        waveform_preview_enabled: settings.waveform_preview_enabled,
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -387,6 +403,8 @@ pub fn get_settings() -> AppSettings {
         whisper_config_json: disk.whisper_config_json,
         audio_retention_limit: disk.audio_retention_limit,
         custom_endpoints: disk.custom_endpoints,
+        translation_target: disk.translation_target,
+        waveform_preview_enabled: disk.waveform_preview_enabled,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
@@ -446,6 +464,7 @@ mod tests {
         assert_eq!(settings.ai_polish_api_url, "https://api.openai.com/v1");
         assert_eq!(settings.ai_polish_model, "gpt-4o-mini");
         assert_eq!(settings.audio_retention_limit, 100);
+        assert_eq!(settings.translation_target, "none");
     }
 
     #[test]
@@ -499,6 +518,8 @@ mod tests {
             api_key: String::new(), // keychain_ok = true
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
+            translation_target: settings.translation_target.clone(),
+            waveform_preview_enabled: settings.waveform_preview_enabled,
         };
 
         let json = serde_json::to_string(&disk).unwrap();
@@ -536,9 +557,11 @@ mod tests {
             ai_polish_model: settings.ai_polish_model.clone(),
             ai_polish_prompt: settings.ai_polish_prompt.clone(),
             audio_retention_limit: settings.audio_retention_limit,
-            api_key: "sk-secret-key".to_string(), // keychain_ok = false
+            api_key: "«redacted:sk-…»".to_string(), // keychain_ok = false
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
+            translation_target: settings.translation_target.clone(),
+            waveform_preview_enabled: settings.waveform_preview_enabled,
         };
 
         let json = serde_json::to_string(&disk).unwrap();

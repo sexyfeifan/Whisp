@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { ThinkingOrb } from "thinking-orbs";
+import WaveformPreview, { type WaveformData } from "../components/WaveformPreview";
 
-type OverlayState = "recording" | "transcribing" | "silence-stopping" | "error" | "cancelled";
+type OverlayState = "recording" | "transcribing" | "silence-stopping" | "error" | "cancelled" | "preview";
 
 const lang = new URLSearchParams(window.location.search).get("lang") ?? "zh-CN";
 
@@ -13,6 +14,11 @@ const STRINGS = {
   cancelled: lang === "en" ? "Cancelled" : lang === "ja" ? "キャンセル" : "已取消",
   failed: lang === "en" ? "Transcription failed" : lang === "ja" ? "転写に失敗しました" : "转录失败",
   silenceStopping: lang === "en" ? "Silence detected..." : lang === "ja" ? "無音検出中..." : "检测到静音...",
+  // Waveform preview strings
+  previewTitle: lang === "en" ? "Review Recording" : lang === "ja" ? "録音を確認" : "确认录音",
+  confirmTranscribe: lang === "en" ? "Transcribe" : lang === "ja" ? "文字起こし" : "转写",
+  discard: lang === "en" ? "Discard" : lang === "ja" ? "破棄" : "丢弃",
+  duration: lang === "en" ? "Duration" : lang === "ja" ? "長さ" : "时长",
 };
 
 const COL_WIDTH = 2;
@@ -21,10 +27,23 @@ const CANVAS_HEIGHT = 24;
 const SAMPLE_EVERY_N_FRAMES = 3;
 const AMPLITUDE_SCALE = 8;
 
+/** Format duration in ms to a human-readable string (e.g. "3.2s" or "1m 5s"). */
+function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${(ms / 1000).toFixed(1)}s`;
+  const totalSec = Math.round(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min === 0) return `${sec}s`;
+  return `${min}m ${sec}s`;
+}
+
 function Overlay() {
   const [state, setState] = useState<OverlayState>("recording");
   const [errorMsg, setErrorMsg] = useState("");
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [waveformData, setWaveformData] = useState<WaveformData | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const levelRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<number[]>([]);
@@ -32,6 +51,7 @@ function Overlay() {
   const animRef = useRef<number>(0);
   const saveTimerRef = useRef<number>(0);
   const timerRef = useRef<number>(0);
+  const previewHeight = 48;
 
   useEffect(() => {
     timerRef.current = window.setInterval(() => {
@@ -61,12 +81,24 @@ function Overlay() {
       window.setTimeout(() => getCurrentWindow().close(), 800);
     });
     const unlisten5 = listen("silence-stopping", () => setState("silence-stopping"));
+    const unlisten6 = listen("preview-ready", async () => {
+      try {
+        const data = await invoke<WaveformData | null>("get_pending_waveform");
+        if (data) {
+          setWaveformData(data);
+          setState("preview");
+        }
+      } catch (e) {
+        console.error("Failed to get waveform data:", e);
+      }
+    });
     return () => {
       unlisten1.then((f) => f());
       unlisten2.then((f) => f());
       unlisten3.then((f) => f());
       unlisten4.then((f) => f());
       unlisten5.then((f) => f());
+      unlisten6.then((f) => f());
     };
   }, []);
 
@@ -90,7 +122,7 @@ function Overlay() {
     };
   }, []);
 
-  // Waveform animation
+  // Waveform animation (recording state)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || state !== "recording") return;
@@ -148,8 +180,37 @@ function Overlay() {
     if (e.button === 0) getCurrentWindow().startDragging();
   };
 
+  const handleConfirm = async () => {
+    setConfirming(true);
+    try {
+      await invoke("confirm_pending_transcription");
+    } catch (e) {
+      console.error("Failed to confirm transcription:", e);
+      setState("error");
+      setErrorMsg(String(e));
+    }
+    // State will be updated by transcribing/error events from backend
+  };
+
+  const handleDiscard = async () => {
+    setDiscarding(true);
+    try {
+      await invoke("discard_pending_recording");
+    } catch (e) {
+      console.error("Failed to discard recording:", e);
+      setDiscarding(false);
+    }
+    // discard_pending_recording already closes the overlay
+  };
+
+  // --- Preview: resize overlay to accommodate waveform ---
+  useEffect(() => {
+    if (state !== "preview") return;
+    getCurrentWindow().setSize(new LogicalSize(320, previewHeight + 64));
+  }, [state, previewHeight]);
+
   return (
-    <div className="overlay-body" onPointerDown={handlePointerDown}>
+    <div className="overlay-body" onPointerDown={handlePointerDown} data-state={state}>
       {state === "transcribing" ? (
         <div className="orb-row">
           <ThinkingOrb state="composing" size={20} speed={0.75} />
@@ -169,6 +230,35 @@ function Overlay() {
         <div className="status-message cancelled-message">
           <span className="status-icon">✕</span>
           <span className="status-text">{STRINGS.cancelled}</span>
+        </div>
+      ) : state === "preview" ? (
+        <div className="preview-layout">
+          {/* Waveform visualization */}
+          <div className="preview-waveform">
+            <WaveformPreview data={waveformData} width={296} height={previewHeight} />
+          </div>
+          {/* Meta row: duration + action buttons */}
+          <div className="preview-meta">
+            <span className="preview-duration">
+              {STRINGS.duration}: {waveformData ? fmtDuration(waveformData.duration_ms) : "—"}
+            </span>
+            <div className="preview-actions">
+              <button
+                className="preview-btn preview-btn-discard"
+                onClick={handleDiscard}
+                disabled={discarding || confirming}
+              >
+                {discarding ? "…" : STRINGS.discard}
+              </button>
+              <button
+                className="preview-btn preview-btn-confirm"
+                onClick={handleConfirm}
+                disabled={confirming || discarding}
+              >
+                {confirming ? "…" : STRINGS.confirmTranscribe}
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="recording-row">
