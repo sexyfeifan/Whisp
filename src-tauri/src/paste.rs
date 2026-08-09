@@ -56,6 +56,8 @@ pub fn request_accessibility_with_prompt() -> bool {
 
 /// Simulate Cmd+V (macOS) or Ctrl+V (Windows/Linux) to paste clipboard content.
 /// Must be called from a dedicated OS thread, NOT from tokio async context.
+///
+/// On Linux, falls back to xdotool/ydotool/wtype if enigo fails.
 pub fn simulate_paste(app_handle: &AppHandle) -> Result<(), String> {
     // Auto-initialize if not yet done but accessibility is granted
     if app_handle.try_state::<EnigoState>().is_none() {
@@ -82,20 +84,87 @@ pub fn simulate_paste(app_handle: &AppHandle) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     let (modifier, v_key) = (Key::Control, Key::Unicode('v'));
 
-    enigo
-        .key(modifier, Direction::Press)
-        .map_err(|e| format!("Failed to press modifier: {}", e))?;
-    std::thread::sleep(std::time::Duration::from_millis(20));
-    enigo
-        .key(v_key, Direction::Click)
-        .map_err(|e| format!("Failed to click V: {}", e))?;
-    std::thread::sleep(std::time::Duration::from_millis(20));
-    enigo
-        .key(modifier, Direction::Release)
-        .map_err(|e| format!("Failed to release modifier: {}", e))?;
+    let enigo_result = (|| -> Result<(), String> {
+        enigo
+            .key(modifier, Direction::Press)
+            .map_err(|e| format!("Failed to press modifier: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        enigo
+            .key(v_key, Direction::Click)
+            .map_err(|e| format!("Failed to click V: {}", e))?;
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        enigo
+            .key(modifier, Direction::Release)
+            .map_err(|e| format!("Failed to release modifier: {}", e))?;
+        Ok(())
+    })();
 
-    log::info!("Paste simulated");
-    Ok(())
+    match enigo_result {
+        Ok(()) => {
+            log::info!("Paste simulated via enigo");
+            Ok(())
+        }
+        Err(enigo_err) => {
+            log::warn!("Enigo paste failed: {} — trying fallback", enigo_err);
+            #[cfg(target_os = "linux")]
+            {
+                if let Err(fallback_err) = paste_linux_fallback() {
+                    log::error!(
+                        "All paste methods failed. Enigo: {}, Fallback: {}",
+                        enigo_err,
+                        fallback_err
+                    );
+                    return Err(format!(
+                        "Paste failed (enigo: {}, xdotool: {}). On Wayland install ydotool/wtype, on X11 install xdotool.",
+                        enigo_err, fallback_err
+                    ));
+                }
+                log::info!("Paste simulated via xdotool/ydotool fallback");
+                return Ok(());
+            }
+            #[cfg(not(target_os = "linux"))]
+            Err(format!("Paste failed: {}", enigo_err))
+        }
+    }
+}
+
+/// Linux fallback: try xdotool (X11), ydotool (Wayland), or wtype (Wayland).
+#[cfg(target_os = "linux")]
+fn paste_linux_fallback() -> Result<(), String> {
+    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
+    log::info!("Paste fallback: XDG_SESSION_TYPE={}", session_type);
+
+    // Try xdotool first (works on X11 and XWayland)
+    if let Ok(output) = std::process::Command::new("xdotool").args(["key", "ctrl+v"]).output() {
+        if output.status.success() {
+            return Ok(());
+        }
+        log::warn!("xdotool failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    // Try ydotool (works on Wayland)
+    if let Ok(output) = std::process::Command::new("ydotool")
+        .args(["key", "29:1", "47:1", "47:0", "29:0"])
+        .output()
+    {
+        if output.status.success() {
+            return Ok(());
+        }
+        log::warn!("ydotool failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    // Try wtype (Wayland native)
+    if let Ok(output) = std::process::Command::new("wtype")
+        .args(["-M", "ctrl", "-P", "v", "-p", "v", "-m", "ctrl"])
+        .output()
+    {
+        if output.status.success() {
+            return Ok(());
+        }
+        log::warn!("wtype failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    Err("No working paste method found (tried xdotool, ydotool, wtype)".into())
 }
 
 #[cfg(target_os = "macos")]

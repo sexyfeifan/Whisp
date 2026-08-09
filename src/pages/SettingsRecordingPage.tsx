@@ -60,7 +60,7 @@ export function SettingsRecordingPage(app: AppState) {
                   <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>
                     {m.streamingChunkDuration ?? "Chunk Duration (seconds)"}
                   </label>
-                  <Input type="number" min={1} max={30} step={1} value={settings.streaming_chunk_duration_secs} onChange={(event) => updateSettings({ streaming_chunk_duration_secs: Math.min(30, Math.max(1, Number(event.target.value) || 3)) })} />
+                  <Input type="number" min={1} max={30} step={1} value={settings.streaming_chunk_duration_secs} onChange={(event) => updateSettings({ streaming_chunk_duration_secs: Math.min(30, Math.max(1, Number(event.target.value) || 2)) })} />
                 </div>
               )}
               <div>

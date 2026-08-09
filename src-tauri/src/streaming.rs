@@ -41,7 +41,7 @@ impl Default for StreamingConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            chunk_duration_secs: 3,
+            chunk_duration_secs: 2,
             language: "auto".to_string(),
             prompt: String::new(),
         }
@@ -321,7 +321,7 @@ mod tests {
     fn test_streaming_config_default() {
         let cfg = StreamingConfig::default();
         assert!(!cfg.enabled);
-        assert_eq!(cfg.chunk_duration_secs, 3);
+        assert_eq!(cfg.chunk_duration_secs, 2);
         assert_eq!(cfg.language, "auto");
         assert!(cfg.prompt.is_empty());
     }

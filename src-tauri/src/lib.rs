@@ -281,23 +281,17 @@ pub fn run() {
 
             let tray_recent = recent_texts.clone();
 
-            #[cfg(target_os = "macos")]
+            // Use orb icon frame 0 as default idle tray icon (purple orb, looks better than monochrome template)
             let tray_icon = {
-                let bytes = include_bytes!("../icons/tray_icon_template.png");
-                tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb tray icon")
             };
-            #[cfg(not(target_os = "macos"))]
-            let tray_icon = app
-                .default_window_icon()
-                .cloned()
-                .expect("No default window icon configured")
-                .to_owned();
 
             tauri::tray::TrayIconBuilder::with_id("main")
                 .icon(tray_icon)
                 .menu(&menu)
                 .show_menu_on_left_click(true)
-                .icon_as_template(true)
+                .icon_as_template(false)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("main") {
@@ -601,7 +595,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
             let mut consecutive_errors: u8 = 0;
             // Poll for new samples every second
             loop {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
                 if !recorder.is_recording() {
                     // Recording stopped — emit final event
@@ -1033,25 +1027,15 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         // Notify main window to refresh (both success and failure)
         let _ = handle.emit("history-updated", ());
 
-        // Reset tray tooltip and icon
+        // Reset tray tooltip and icon — restore to idle orb icon
         if let Some(tray) = handle.tray_by_id("main") {
             let _ = tray.set_tooltip(Some("Whisp"));
-            // Restore normal tray icon
-            #[cfg(target_os = "macos")]
-            {
-                let normal_icon = {
-                    let bytes = include_bytes!("../icons/tray_icon_template.png");
-                    tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
-                };
-                let _ = tray.set_icon(Some(normal_icon));
-                let _ = tray.set_icon_as_template(true);
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                if let Some(icon) = handle.default_window_icon() {
-                    let _ = tray.set_icon(Some(icon.to_owned()));
-                }
-            }
+            let idle_icon = ORB_ICON_0.get_or_init(|| {
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb idle icon")
+            });
+            let _ = tray.set_icon(Some(idle_icon.clone()));
+            let _ = tray.set_icon_as_template(false);
         }
 
         // Clear transcription guard
@@ -1071,24 +1055,15 @@ pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
         }
         // Notify overlay so it can show brief "cancelled" feedback before self-closing
         let _ = app_handle.emit("recording-cancelled", ());
-        // Reset tray icon back to normal
+        // Reset tray icon back to idle orb
         if let Some(tray) = app_handle.tray_by_id("main") {
             let _ = tray.set_tooltip(Some("Whisp"));
-            #[cfg(target_os = "macos")]
-            {
-                let normal_icon = {
-                    let bytes = include_bytes!("../icons/tray_icon_template.png");
-                    tauri::image::Image::from_bytes(bytes).expect("Failed to load tray template icon")
-                };
-                let _ = tray.set_icon(Some(normal_icon));
-                let _ = tray.set_icon_as_template(true);
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                if let Some(icon) = app_handle.default_window_icon() {
-                    let _ = tray.set_icon(Some(icon.to_owned()));
-                }
-            }
+            let idle_icon = ORB_ICON_0.get_or_init(|| {
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb idle icon")
+            });
+            let _ = tray.set_icon(Some(idle_icon.clone()));
+            let _ = tray.set_icon_as_template(false);
         }
         // Fallback: close overlay after delay in case the frontend missed the event
         let handle = app_handle.clone();

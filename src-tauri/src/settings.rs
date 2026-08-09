@@ -323,7 +323,7 @@ fn default_summary_enabled() -> bool {
 }
 
 fn default_streaming_chunk_duration_secs() -> u32 {
-    3
+    2
 }
 
 fn default_diarization_api_base_url() -> String {

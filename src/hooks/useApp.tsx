@@ -426,13 +426,17 @@ export function useApp(): AppState {
         stopAudio();
       });
 
+      // Reset progress before starting new playback (prevents stale highlight on text)
+      setAudioProgress(0);
+      setAudioDuration(0);
       await audio.play();
       setPlayingAudioId(id);
 
-      // Animation loop for progress tracking
+      // Animation loop for progress tracking — scoped to this entry id to prevent
+      // cross-entry state leakage when rapidly switching between audio entries.
       const tick = () => {
-        if (audioElRef.current) {
-          setAudioProgress(audioElRef.current.currentTime);
+        if (audioElRef.current && audioElRef.current === audio) {
+          setAudioProgress(audio.currentTime);
           audioAnimRef.current = requestAnimationFrame(tick);
         }
       };

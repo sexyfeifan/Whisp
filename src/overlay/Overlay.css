@@ -12,6 +12,11 @@
     --overlay-dim: rgba(164, 160, 151, 0.6);
     --overlay-border: rgba(255, 255, 255, 0.08);
   }
+  .overlay-body {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 95, 199, 0.08));
+    border-color: rgba(139, 92, 246, 0.18);
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  }
 }
 
 html, body {
@@ -29,12 +34,12 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: transparent;
+  background: linear-gradient(135deg, rgba(99, 95, 199, 0.10), rgba(139, 92, 246, 0.06));
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
   backdrop-filter: blur(24px) saturate(1.8);
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  border: 1px solid rgba(139, 92, 246, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 4px 24px rgba(99, 95, 199, 0.10), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -133,8 +138,9 @@ html, body {
 .overlay-body[data-state="preview"] {
   flex-direction: column;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 16px;
   cursor: default;
+  border-radius: 20px;
 }
 
 .preview-layout {

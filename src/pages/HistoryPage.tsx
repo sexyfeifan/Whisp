@@ -282,7 +282,7 @@ export function HistoryPage(app: AppState) {
                               const highlightIdx = Math.floor(displayText.length * progressRatio);
                               return (
                                 <>
-                                  <span style={{ background: "hsl(var(--primary) / 0.15)", borderRadius: 2, padding: 0 }}>
+                                  <span style={{ background: "hsl(260, 62%, 48% / 0.18)", borderRadius: 2, padding: 0, transition: "background 0.1s" }}>
                                     {displayText.slice(0, highlightIdx)}
                                   </span>
                                   <span>{displayText.slice(highlightIdx)}</span>
