@@ -176,6 +176,10 @@ pub async fn process_streaming_chunk(
         Ok(chunk_text) => {
             // Append this chunk's text to the accumulated partial text.
             let mut st = state.lock().unwrap_or_else(|e| e.into_inner());
+            let st = match st.as_mut() {
+                Some(s) => s,
+                None => return Ok(String::new()),
+            };
             if !chunk_text.is_empty() {
                 if !st.partial_text.is_empty() && !st.partial_text.ends_with(' ') {
                     st.partial_text.push(' ');
