@@ -178,35 +178,61 @@ pub fn initialize_enigo(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn export_history(history: State<'_, Arc<HistoryManager>>) -> Result<String, String> {
     let entries = history.get_entries().map_err(|e| e.to_string())?;
-    let mut csv = String::from("id,timestamp,text,model,provider,language,status,duration_ms\n");
+    let mut wtr = csv::Writer::from_writer(vec![]);
+    wtr.write_record([
+        "id",
+        "timestamp",
+        "text",
+        "model",
+        "provider",
+        "language",
+        "status",
+        "duration_ms",
+    ])
+    .map_err(|e| e.to_string())?;
     for entry in entries {
-        csv.push_str(&format!(
-            "{},{},{},{},{},{},{},{}\n",
-            entry.id,
-            entry.timestamp,
-            csv_escape(&entry.text),
-            csv_escape(&entry.model),
-            csv_escape(&entry.provider),
-            csv_escape(&entry.language),
-            csv_escape(&entry.status),
-            entry.duration_ms.map(|d| d.to_string()).unwrap_or_default()
-        ));
+        wtr.write_record(&[
+            entry.id.to_string(),
+            entry.timestamp.to_string(),
+            sanitize_csv_field(&entry.text),
+            sanitize_csv_field(&entry.model),
+            sanitize_csv_field(&entry.provider),
+            sanitize_csv_field(&entry.language),
+            sanitize_csv_field(&entry.status),
+            entry.duration_ms.map(|d| d.to_string()).unwrap_or_default(),
+        ])
+        .map_err(|e| e.to_string())?;
     }
-    Ok(csv)
+    let data = wtr.into_inner().map_err(|e| e.to_string())?;
+    String::from_utf8(data).map_err(|e| e.to_string())
 }
 
-fn csv_escape(field: &str) -> String {
-    // Prevent CSV formula injection: prefix dangerous leading chars with a single quote
-    let sanitized = if field.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+/// Prevent CSV formula injection by prefixing dangerous leading chars with a single quote.
+fn sanitize_csv_field(field: &str) -> String {
+    if field.starts_with(['=', '+', '-', '@', '\t', '\r']) {
         format!("'{}", field)
     } else {
         field.to_string()
-    };
-    if sanitized.contains(',') || sanitized.contains('"') || sanitized.contains('\n') || sanitized.contains('\r') {
-        format!("\"{}\"", sanitized.replace('"', "\"\""))
-    } else {
-        sanitized
     }
+}
+
+#[tauri::command]
+pub fn get_pricing_config() -> Result<serde_json::Value, String> {
+    let config = crate::cost::PricingConfig::load();
+    serde_json::to_value(&config).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_pricing_config(config_json: String) -> Result<(), String> {
+    let config: crate::cost::PricingConfig =
+        serde_json::from_str(&config_json).map_err(|e| format!("Invalid pricing config: {e}"))?;
+    config.save()
+}
+
+#[tauri::command]
+pub fn reset_pricing_config() -> Result<(), String> {
+    let config = crate::cost::PricingConfig::default();
+    config.save()
 }
 
 #[tauri::command]
@@ -896,27 +922,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_csv_escape_normal() {
-        assert_eq!(csv_escape("hello"), "hello");
+    fn test_sanitize_csv_field_normal() {
+        assert_eq!(sanitize_csv_field("hello"), "hello");
     }
 
     #[test]
-    fn test_csv_escape_with_comma() {
-        assert_eq!(csv_escape("hello, world"), "\"hello, world\"");
-    }
-
-    #[test]
-    fn test_csv_escape_with_quotes() {
-        assert_eq!(csv_escape("say \"hi\""), "\"say \"\"hi\"\"\"");
-    }
-
-    #[test]
-    fn test_csv_escape_formula_injection() {
+    fn test_sanitize_csv_field_formula_injection() {
         // Formula injection attempts should be prefixed with single quote
-        assert_eq!(csv_escape("=cmd|' /C calc'!A0"), "'=cmd|' /C calc'!A0");
-        assert_eq!(csv_escape("+SUM(A1)"), "'+SUM(A1)");
-        assert_eq!(csv_escape("-SUM(A1)"), "'-SUM(A1)");
-        assert_eq!(csv_escape("@SUM(A1)"), "'@SUM(A1)");
+        assert_eq!(sanitize_csv_field("=cmd|' /C calc'!A0"), "'=cmd|' /C calc'!A0");
+        assert_eq!(sanitize_csv_field("+SUM(A1)"), "'+SUM(A1)");
+        assert_eq!(sanitize_csv_field("-SUM(A1)"), "'-SUM(A1)");
+        assert_eq!(sanitize_csv_field("@SUM(A1)"), "'@SUM(A1)");
     }
 
     #[test]

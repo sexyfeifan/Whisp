@@ -420,3 +420,141 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     // Only persist API key to disk when keychain fails
     save_disk_settings(settings, keychain_ok)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_settings() {
+        let settings = AppSettings::default();
+        assert_eq!(settings.api_base_url, "https://api.openai.com/v1");
+        assert_eq!(settings.model, "gpt-4o-transcribe");
+        assert_eq!(settings.language, "auto");
+        assert_eq!(settings.ui_language, "zh-CN");
+        assert!(settings.sound_enabled);
+        assert!(settings.auto_paste_enabled);
+        assert!(!settings.save_audio_files);
+        assert!(settings.trim_silence_enabled);
+        assert_eq!(settings.request_timeout_sec, 90);
+        assert_eq!(settings.retry_count, 2);
+        assert_eq!(settings.paste_delay_ms, 350);
+        assert_eq!(settings.silence_timeout_sec, 60);
+        assert!(!settings.launch_at_startup);
+        assert!((settings.silence_threshold - 0.01).abs() < f64::EPSILON);
+        assert!(!settings.ai_polish_enabled);
+        assert_eq!(settings.ai_polish_api_url, "https://api.openai.com/v1");
+        assert_eq!(settings.ai_polish_model, "gpt-4o-mini");
+        assert_eq!(settings.audio_retention_limit, 100);
+    }
+
+    #[test]
+    fn test_settings_serialization_roundtrip() {
+        let settings = AppSettings::default();
+        let json = serde_json::to_string(&settings).unwrap();
+        let restored: AppSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.api_base_url, settings.api_base_url);
+        assert_eq!(restored.model, settings.model);
+        assert_eq!(restored.language, settings.language);
+        assert_eq!(restored.ui_language, settings.ui_language);
+        assert_eq!(restored.shortcut, settings.shortcut);
+        assert_eq!(restored.sound_enabled, settings.sound_enabled);
+        assert_eq!(restored.auto_paste_enabled, settings.auto_paste_enabled);
+        assert_eq!(restored.request_timeout_sec, settings.request_timeout_sec);
+        assert_eq!(restored.retry_count, settings.retry_count);
+    }
+
+    #[test]
+    fn test_disk_settings_skips_api_key_when_keychain_ok() {
+        let mut settings = AppSettings::default();
+        settings.api_key = "sk-secret-key".to_string();
+        settings.ai_polish_api_key = "sk-polish-key".to_string();
+
+        // Simulate saving with keychain success — api_key should be empty on disk
+        let disk = DiskSettings {
+            api_base_url: settings.api_base_url.clone(),
+            model: settings.model.clone(),
+            language: settings.language.clone(),
+            ui_language: settings.ui_language.clone(),
+            shortcut: settings.shortcut.clone(),
+            sound_enabled: settings.sound_enabled,
+            auto_paste_enabled: settings.auto_paste_enabled,
+            save_audio_files: settings.save_audio_files,
+            trim_silence_enabled: settings.trim_silence_enabled,
+            request_timeout_sec: settings.request_timeout_sec,
+            retry_count: settings.retry_count,
+            paste_delay_ms: settings.paste_delay_ms,
+            silence_timeout_sec: settings.silence_timeout_sec,
+            overlay_x: settings.overlay_x,
+            overlay_y: settings.overlay_y,
+            launch_at_startup: settings.launch_at_startup,
+            whisper_prompt: settings.whisper_prompt.clone(),
+            silence_threshold: settings.silence_threshold,
+            ai_polish_enabled: settings.ai_polish_enabled,
+            ai_polish_api_key: settings.ai_polish_api_key.clone(),
+            ai_polish_api_url: settings.ai_polish_api_url.clone(),
+            ai_polish_model: settings.ai_polish_model.clone(),
+            ai_polish_prompt: settings.ai_polish_prompt.clone(),
+            audio_retention_limit: settings.audio_retention_limit,
+            api_key: String::new(), // keychain_ok = true
+            whisper_config_json: settings.whisper_config_json.clone(),
+            custom_endpoints: settings.custom_endpoints.clone(),
+        };
+
+        let json = serde_json::to_string(&disk).unwrap();
+        // api_key should not appear in JSON when empty (skip_serializing_if)
+        assert!(!json.contains("\"api_key\""));
+    }
+
+    #[test]
+    fn test_disk_settings_includes_api_key_when_keychain_fails() {
+        let mut settings = AppSettings::default();
+        settings.api_key = "sk-secret-key".to_string();
+
+        let disk = DiskSettings {
+            api_base_url: settings.api_base_url.clone(),
+            model: settings.model.clone(),
+            language: settings.language.clone(),
+            ui_language: settings.ui_language.clone(),
+            shortcut: settings.shortcut.clone(),
+            sound_enabled: settings.sound_enabled,
+            auto_paste_enabled: settings.auto_paste_enabled,
+            save_audio_files: settings.save_audio_files,
+            trim_silence_enabled: settings.trim_silence_enabled,
+            request_timeout_sec: settings.request_timeout_sec,
+            retry_count: settings.retry_count,
+            paste_delay_ms: settings.paste_delay_ms,
+            silence_timeout_sec: settings.silence_timeout_sec,
+            overlay_x: settings.overlay_x,
+            overlay_y: settings.overlay_y,
+            launch_at_startup: settings.launch_at_startup,
+            whisper_prompt: settings.whisper_prompt.clone(),
+            silence_threshold: settings.silence_threshold,
+            ai_polish_enabled: settings.ai_polish_enabled,
+            ai_polish_api_key: settings.ai_polish_api_key.clone(),
+            ai_polish_api_url: settings.ai_polish_api_url.clone(),
+            ai_polish_model: settings.ai_polish_model.clone(),
+            ai_polish_prompt: settings.ai_polish_prompt.clone(),
+            audio_retention_limit: settings.audio_retention_limit,
+            api_key: "sk-secret-key".to_string(), // keychain_ok = false
+            whisper_config_json: settings.whisper_config_json.clone(),
+            custom_endpoints: settings.custom_endpoints.clone(),
+        };
+
+        let json = serde_json::to_string(&disk).unwrap();
+        assert!(json.contains("\"api_key\""));
+        assert!(json.contains("sk-secret-key"));
+    }
+
+    #[test]
+    fn test_disk_settings_deserialization_with_missing_fields() {
+        // Minimal JSON — all fields should get defaults
+        let json = r#"{"api_base_url": "https://custom.api/v1"}"#;
+        let disk: DiskSettings = serde_json::from_str(json).unwrap();
+        assert_eq!(disk.api_base_url, "https://custom.api/v1");
+        assert_eq!(disk.model, "gpt-4o-transcribe");
+        assert_eq!(disk.language, "auto");
+        assert!(disk.sound_enabled);
+        assert_eq!(disk.request_timeout_sec, 90);
+    }
+}

@@ -477,3 +477,207 @@ fn row_to_history_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntr
         estimated_cost: row.get(14)?,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    fn create_test_history() -> (Arc<HistoryManager>, tempfile::TempDir) {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let old_home = std::env::var("HOME").unwrap_or_default();
+        std::env::set_var("HOME", tmp.path().to_str().unwrap());
+        let hm = Arc::new(HistoryManager::new().unwrap());
+        std::env::set_var("HOME", old_home);
+        (hm, tmp)
+    }
+
+    #[test]
+    fn test_add_and_get_entry() {
+        let (hm, _tmp) = create_test_history();
+        let entry = hm
+            .add_entry(&NewHistoryEntry {
+                text: "Hello world".into(),
+                model: "whisper-1".into(),
+                duration_ms: Some(5000),
+                audio_path: None,
+                status: STATUS_SUCCESS.into(),
+                error_message: None,
+                provider: "OpenAI".into(),
+                api_base_url: "https://api.openai.com/v1".into(),
+                language: "en".into(),
+                retry_of: None,
+                asr_duration_sec: Some(5.0),
+                polish_tokens: None,
+                estimated_cost: Some(0.03),
+            })
+            .unwrap();
+
+        assert!(entry.id > 0);
+        assert_eq!(entry.text, "Hello world");
+        assert_eq!(entry.model, "whisper-1");
+        assert_eq!(entry.status, STATUS_SUCCESS);
+
+        let fetched = hm.get_entry_by_id(entry.id).unwrap();
+        assert!(fetched.is_some());
+        let fetched = fetched.unwrap();
+        assert_eq!(fetched.text, "Hello world");
+        assert_eq!(fetched.duration_ms, Some(5000));
+    }
+
+    #[test]
+    fn test_get_entries_empty() {
+        let (hm, _tmp) = create_test_history();
+        let entries = hm.get_entries().unwrap();
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_delete_entry() {
+        let (hm, _tmp) = create_test_history();
+        let entry = hm
+            .add_entry(&NewHistoryEntry {
+                text: "To be deleted".into(),
+                model: "whisper-1".into(),
+                duration_ms: None,
+                audio_path: None,
+                status: STATUS_SUCCESS.into(),
+                error_message: None,
+                provider: "OpenAI".into(),
+                api_base_url: "https://api.openai.com/v1".into(),
+                language: "auto".into(),
+                retry_of: None,
+                asr_duration_sec: None,
+                polish_tokens: None,
+                estimated_cost: None,
+            })
+            .unwrap();
+
+        hm.delete_entry(entry.id).unwrap();
+        let fetched = hm.get_entry_by_id(entry.id).unwrap();
+        assert!(fetched.is_none());
+    }
+
+    #[test]
+    fn test_search_history() {
+        let (hm, _tmp) = create_test_history();
+        hm.add_entry(&NewHistoryEntry {
+            text: "The quick brown fox".into(),
+            model: "whisper-1".into(),
+            duration_ms: Some(1000),
+            audio_path: None,
+            status: STATUS_SUCCESS.into(),
+            error_message: None,
+            provider: "OpenAI".into(),
+            api_base_url: "https://api.openai.com/v1".into(),
+            language: "en".into(),
+            retry_of: None,
+            asr_duration_sec: Some(1.0),
+            polish_tokens: None,
+            estimated_cost: None,
+        })
+        .unwrap();
+
+        hm.add_entry(&NewHistoryEntry {
+            text: "Hello world test".into(),
+            model: "whisper-1".into(),
+            duration_ms: Some(2000),
+            audio_path: None,
+            status: STATUS_SUCCESS.into(),
+            error_message: None,
+            provider: "OpenAI".into(),
+            api_base_url: "https://api.openai.com/v1".into(),
+            language: "en".into(),
+            retry_of: None,
+            asr_duration_sec: Some(2.0),
+            polish_tokens: None,
+            estimated_cost: None,
+        })
+        .unwrap();
+
+        let results = hm.search_history("quick").unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].text.contains("quick"));
+
+        let results = hm.search_history("hello").unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].text.contains("Hello"));
+
+        let results = hm.search_history("").unwrap();
+        assert!(results.is_empty());
+
+        let results = hm.search_history("nonexistent").unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_get_entries_page() {
+        let (hm, _tmp) = create_test_history();
+        for i in 0..5 {
+            hm.add_entry(&NewHistoryEntry {
+                text: format!("Entry {i}"),
+                model: "whisper-1".into(),
+                duration_ms: Some(i * 1000),
+                audio_path: None,
+                status: STATUS_SUCCESS.into(),
+                error_message: None,
+                provider: "OpenAI".into(),
+                api_base_url: "https://api.openai.com/v1".into(),
+                language: "en".into(),
+                retry_of: None,
+                asr_duration_sec: None,
+                polish_tokens: None,
+                estimated_cost: None,
+            })
+            .unwrap();
+        }
+
+        let page1 = hm.get_entries_page(2, 0).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = hm.get_entries_page(2, 2).unwrap();
+        assert_eq!(page2.len(), 2);
+
+        let page3 = hm.get_entries_page(2, 4).unwrap();
+        assert_eq!(page3.len(), 1);
+    }
+
+    #[test]
+    fn test_update_entry() {
+        let (hm, _tmp) = create_test_history();
+        let entry = hm
+            .add_entry(&NewHistoryEntry {
+                text: "Original text".into(),
+                model: "whisper-1".into(),
+                duration_ms: Some(1000),
+                audio_path: None,
+                status: STATUS_SUCCESS.into(),
+                error_message: None,
+                provider: "OpenAI".into(),
+                api_base_url: "https://api.openai.com/v1".into(),
+                language: "en".into(),
+                retry_of: None,
+                asr_duration_sec: None,
+                polish_tokens: None,
+                estimated_cost: None,
+            })
+            .unwrap();
+
+        hm.update_entry(
+            entry.id,
+            "Updated text",
+            "whisper-large-v3",
+            STATUS_SUCCESS,
+            None,
+            "Groq",
+            "https://api.groq.com/v1",
+            "zh",
+        )
+        .unwrap();
+
+        let updated = hm.get_entry_by_id(entry.id).unwrap().unwrap();
+        assert_eq!(updated.text, "Updated text");
+        assert_eq!(updated.model, "whisper-large-v3");
+        assert_eq!(updated.provider, "Groq");
+    }
+}

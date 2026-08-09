@@ -24,6 +24,7 @@ reqwest = { version = "0.12", features = ["json", "multipart"] }
 rusqlite = { version = "0.37", features = ["bundled-full"] }
 rusqlite_migration = "2.3"
 anyhow = "1"
+csv = "1"
 chrono = "0.4"
 dirs = "6.0"
 dotenvy = "0.15"
@@ -63,3 +64,6 @@ unimplemented = "warn"
 too_many_arguments = "allow"
 needless_return = "allow"
 module_inception = "allow"
+
+[dev-dependencies]
+tempfile = "3"
