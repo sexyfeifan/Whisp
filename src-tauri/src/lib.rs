@@ -513,7 +513,40 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let _ = tray.set_icon_as_template(false);
     }
 
-    // Auto-hide overlay after 1.5s — keep recording in background, tray icon alone indicates state
+    // Animate tray icon with orb pulse frames during recording
+    let tray_anim_handle = app_handle.clone();
+    std::thread::spawn(move || {
+        let frames: Vec<tauri::image::Image> = (0..8)
+            .map(|i| {
+                let bytes: &[u8] = match i {
+                    0 => include_bytes!("../icons/tray_orb_0.png"),
+                    1 => include_bytes!("../icons/tray_orb_1.png"),
+                    2 => include_bytes!("../icons/tray_orb_2.png"),
+                    3 => include_bytes!("../icons/tray_orb_3.png"),
+                    4 => include_bytes!("../icons/tray_orb_4.png"),
+                    5 => include_bytes!("../icons/tray_orb_5.png"),
+                    6 => include_bytes!("../icons/tray_orb_6.png"),
+                    _ => include_bytes!("../icons/tray_orb_7.png"),
+                };
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb frame")
+            })
+            .collect();
+        let mut frame_idx: usize = 0;
+        loop {
+            std::thread::sleep(Duration::from_millis(400));
+            let recorder_state = tray_anim_handle.state::<Arc<AudioRecorder>>();
+            if !recorder_state.is_recording() {
+                break;
+            }
+            if let Some(tray) = tray_anim_handle.tray_by_id("main") {
+                let _ = tray.set_icon(Some(frames[frame_idx % frames.len()].clone()));
+                let _ = tray.set_icon_as_template(false);
+                frame_idx += 1;
+            }
+        }
+    });
+
+    // Auto-hide overlay after 1.5s — keep recording in background, tray orb icon alone indicates state
     let hide_handle = app_handle.clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(1500));
@@ -566,6 +599,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
             let state = crate::streaming::STREAMING_STATE.get_or_init(|| std::sync::Mutex::new(None));
             {
                 let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                // StreamingState sample_rate will be updated on first sample poll
                 *guard = Some(crate::streaming::StreamingState::new(16000));
             }
 
@@ -586,6 +620,14 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                 let (new_samples, sample_rate) = recorder.take_streaming_samples();
                 if new_samples.is_empty() {
                     continue;
+                }
+
+                // Update StreamingState sample rate to match actual device rate
+                {
+                    let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(ref mut st) = *guard {
+                        st.set_sample_rate(sample_rate);
+                    }
                 }
 
                 match crate::streaming::process_streaming_chunk(

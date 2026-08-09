@@ -74,6 +74,13 @@ impl StreamingState {
         }
     }
 
+    /// Update the sample rate (called when actual device rate is known).
+    pub fn set_sample_rate(&mut self, rate: u32) {
+        if rate > 0 {
+            self.sample_rate = rate;
+        }
+    }
+
     /// Total accumulated duration in seconds.
     fn total_duration_secs(&self) -> f64 {
         if self.sample_rate == 0 {
