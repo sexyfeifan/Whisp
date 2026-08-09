@@ -232,7 +232,7 @@ pub fn save_pricing_config(config_json: String) -> Result<(), String> {
     }
     let json = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())?;
-    crate::cost::reset_prices_cache();
+    // Prices will take effect after app restart (cached in OnceLock)
     Ok(())
 }
 
@@ -242,7 +242,7 @@ pub fn reset_pricing_config() -> Result<(), String> {
     if path.exists() {
         std::fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
-    crate::cost::reset_prices_cache();
+    // Prices will take effect after app restart (cached in OnceLock)
     Ok(())
 }
 
