@@ -881,6 +881,16 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
     Ok(path.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+pub fn delete_model(model_name: String) -> Result<(), String> {
+    crate::whisper::WhisperEngine::delete_model(&model_name).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_model_disk_usage() -> Result<u64, String> {
+    crate::whisper::WhisperEngine::total_model_size().map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

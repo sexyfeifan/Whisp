@@ -146,6 +146,8 @@ pub fn run() {
             commands::list_offline_models,
             commands::list_known_models,
             commands::download_whisper_model,
+            commands::delete_model,
+            commands::get_model_disk_usage,
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

@@ -85,6 +85,25 @@ impl WhisperEngine {
         Ok(dir)
     }
 
+    /// Get total disk usage of all downloaded models in bytes
+    pub fn total_model_size() -> Result<u64> {
+        let models = Self::list_models()?;
+        Ok(models.iter().map(|m| m.size_bytes).sum())
+    }
+
+    /// Delete a downloaded model file by name
+    pub fn delete_model(model_name: &str) -> Result<()> {
+        let dir = Self::model_dir()?;
+        let path = dir.join(format!("{}.bin", model_name));
+        if path.exists() {
+            std::fs::remove_file(&path).with_context(|| format!("Failed to delete model: {}", path.display()))?;
+            log::info!("Deleted model: {}", path.display());
+            Ok(())
+        } else {
+            anyhow::bail!("Model file not found: {}", path.display());
+        }
+    }
+
     /// List available GGML model files
     pub fn list_models() -> Result<Vec<ModelInfo>> {
         let dir = Self::model_dir()?;
