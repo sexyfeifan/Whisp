@@ -540,9 +540,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         tauri::async_runtime::spawn(async move {
             // Validate API key before starting streaming
             if stream_api_key.trim().is_empty() {
-                log::warn!(
-                    "Streaming enabled but API key is empty — streaming will not work"
-                );
+                log::warn!("Streaming enabled but API key is empty — streaming will not work");
                 let _ = stream_handle.emit(
                     "streaming-error",
                     "API key is not configured. Streaming transcription disabled.",
