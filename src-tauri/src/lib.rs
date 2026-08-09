@@ -580,8 +580,8 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                 }
 
                 let state_guard = state.lock().unwrap_or_else(|e| e.into_inner());
-                if let Some(ref streaming_state) = *state_guard {
-                    // We need to call process_streaming_chunk but it needs &Mutex<StreamingState>
+                if state_guard.is_some() {
+                    // Call process_streaming_chunk with the global STREAMING_STATE
                     drop(state_guard);
                     match crate::streaming::process_streaming_chunk(
                         state,

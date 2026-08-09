@@ -98,7 +98,7 @@ impl StreamingState {
 /// Returns the newly transcribed text for this chunk, or an empty string if no
 /// chunk was ready yet or if chunk transcription failed gracefully.
 pub async fn process_streaming_chunk(
-    state: &Mutex<StreamingState>,
+    state: &Mutex<Option<StreamingState>>,
     new_samples: &[f32],
     sample_rate: u32,
     config: &StreamingConfig,
@@ -114,6 +114,10 @@ pub async fn process_streaming_chunk(
     let chunk_samples: Vec<f32>;
     {
         let mut st = state.lock().unwrap_or_else(|e| e.into_inner());
+        let st = match st.as_mut() {
+            Some(s) => s,
+            None => return Ok(String::new()),
+        };
         st.samples.extend_from_slice(new_samples);
 
         let duration_since = st.duration_since_last_sent();
@@ -205,7 +209,7 @@ pub async fn process_streaming_chunk(
 ///
 /// Consumes the state (takes ownership of `samples`).
 pub async fn finalize_streaming(
-    state: &Mutex<StreamingState>,
+    state: &Mutex<Option<StreamingState>>,
     client: &reqwest::Client,
     api_key: &str,
     api_base_url: &str,
@@ -220,6 +224,10 @@ pub async fn finalize_streaming(
     let sample_rate: u32;
     {
         let mut st = state.lock().unwrap_or_else(|e| e.into_inner());
+        let st = match st.as_mut() {
+            Some(s) => s,
+            None => return Ok(String::new()),
+        };
         all_samples = std::mem::take(&mut st.samples);
         sample_rate = st.sample_rate;
     }
