@@ -513,6 +513,15 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let _ = tray.set_icon_as_template(false);
     }
 
+    // Auto-hide overlay after 1.5s — keep recording in background, tray icon alone indicates state
+    let hide_handle = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(1500));
+        if let Some(w) = hide_handle.get_webview_window("overlay") {
+            let _ = w.hide();
+        }
+    });
+
     // Start streaming transcription task if enabled
     if saved.streaming_enabled {
         let stream_handle = app_handle.clone();
@@ -642,6 +651,12 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let _guard = TranscribeGuard;
 
     shortcut::unregister_escape(app_handle);
+
+    // Show overlay if it was auto-hidden during recording
+    if let Some(w) = app_handle.get_webview_window("overlay") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
 
     let recorder = app_handle.state::<Arc<AudioRecorder>>();
     let history = app_handle.state::<Arc<HistoryManager>>();
@@ -1022,6 +1037,10 @@ pub(crate) fn cancel_recording(app_handle: &tauri::AppHandle) {
         log::info!("Recording cancelled by user");
         shortcut::unregister_escape(app_handle);
         recorder.cancel();
+        // Show overlay if it was auto-hidden, so user sees cancelled feedback
+        if let Some(w) = app_handle.get_webview_window("overlay") {
+            let _ = w.show();
+        }
         // Notify overlay so it can show brief "cancelled" feedback before self-closing
         let _ = app_handle.emit("recording-cancelled", ());
         // Reset tray icon back to normal

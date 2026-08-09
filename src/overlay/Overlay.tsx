@@ -93,11 +93,10 @@ function Overlay() {
         console.error("Failed to get waveform data:", e);
       }
     });
-    const unlisten7 = listen<string>("streaming-partial", (e) => {
-      setStreamingText((prev) => {
-        if (!prev && e.payload) return e.payload;
-        return e.payload;
-      });
+    const unlisten7 = listen<{ text: string; chunk_text: string }>("streaming-partial", (e) => {
+      if (e.payload.text) {
+        setStreamingText(e.payload.text);
+      }
     });
     const unlisten8 = listen("streaming-final", () => {
       setStreamingText("");
