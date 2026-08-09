@@ -13,7 +13,7 @@ pub fn translation_prompt(target: &str) -> &'static str {
 }
 
 /// Human-readable target language name for display.
-pub fn target_language_name(target: &str) -> &'static str {
+pub fn target_language_name(target: &str) -> &str {
     match target {
         "zh-CN" => "简体中文",
         "en" => "English",
