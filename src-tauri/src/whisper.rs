@@ -241,46 +241,78 @@ pub struct ModelInfo {
 }
 
 /// Known Whisper models and their download URLs
-const KNOWN_MODELS: &[(&str, &str, u64)] = &[
+const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str)] = &[
     (
         "ggml-tiny.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
         77_871_433,
+        "Smallest model, English only. Fast but less accurate.",
+        "English",
+        "39M",
     ),
     (
         "ggml-tiny",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
         77_871_713,
+        "Smallest multilingual model. Fast, basic accuracy. Good for real-time.",
+        "97 languages",
+        "39M",
     ),
     (
         "ggml-base.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
         147_964_741,
+        "English only. Better accuracy than tiny, moderate speed.",
+        "English",
+        "74M",
     ),
     (
         "ggml-base",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
         147_964_461,
+        "Multilingual. Good balance of speed and accuracy. Supports Chinese.",
+        "97 languages",
+        "74M",
     ),
     (
         "ggml-small.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin",
         483_629_333,
+        "English only. Good accuracy for clean audio.",
+        "English",
+        "244M",
     ),
     (
         "ggml-small",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
         483_630_133,
+        "Multilingual. Decent accuracy, supports Chinese. Recommended minimum.",
+        "97 languages",
+        "244M",
     ),
     (
         "ggml-medium.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin",
         1_539_325_485,
+        "English only. Strong accuracy, larger model.",
+        "English",
+        "769M",
     ),
     (
         "ggml-medium",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
         1_539_325_205,
+        "Multilingual. Strong accuracy. Good for Chinese transcription. ★ Recommended.",
+        "97 languages",
+        "769M",
+    ),
+    (
+        "ggml-large-v3-turbo",
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+        1_625_682_453,
+        "Large model, 8x faster than large-v3. Excellent Chinese accuracy. ★ Best for Chinese.",
+        "97 languages",
+        "809M",
     ),
 ];
 
@@ -290,7 +322,7 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
     let model_dir = WhisperEngine::model_dir()?;
 
     // Check known models first
-    let url = if let Some((_, url, _)) = KNOWN_MODELS.iter().find(|(name, _, _)| *name == model_name) {
+    let url = if let Some((_, url, _, _, _, _)) = KNOWN_MODELS.iter().find(|(name, _, _, _, _, _)| *name == model_name) {
         url
     } else {
         // Assume it's a direct URL or a known model name with default base URL
@@ -300,7 +332,7 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
             anyhow::bail!(
                 "Unknown model: {}. Available models: {}",
                 model_name,
-                KNOWN_MODELS.iter().map(|(n, _, _)| *n).collect::<Vec<_>>().join(", ")
+                KNOWN_MODELS.iter().map(|(n, _, _, _, _, _)| *n).collect::<Vec<_>>().join(", ")
             );
         }
     };
@@ -383,10 +415,13 @@ pub async fn download_model(client: &reqwest::Client, model_name: &str) -> Resul
 pub fn list_known_models() -> Vec<KnownModel> {
     KNOWN_MODELS
         .iter()
-        .map(|(name, url, size)| KnownModel {
+        .map(|(name, url, size, description, languages, params)| KnownModel {
             name: name.to_string(),
             url: url.to_string(),
             size_bytes: *size,
+            description: description.to_string(),
+            languages: languages.to_string(),
+            params: params.to_string(),
         })
         .collect()
 }
@@ -397,6 +432,9 @@ pub struct KnownModel {
     pub name: String,
     pub url: String,
     pub size_bytes: u64,
+    pub description: String,
+    pub languages: String,
+    pub params: String,
 }
 
 /// Resample audio to 16kHz using linear interpolation

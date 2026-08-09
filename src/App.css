@@ -144,6 +144,65 @@
   }
 }
 
+/* Manual light mode toggle (data-theme attribute) — overrides prefers-color-scheme: dark */
+[data-theme="light"] {
+  --primary: 260 62% 48%;
+  --primary-pressed: 260 62% 38%;
+  --primary-deep: 260 62% 30%;
+  --on-primary: 0 0% 100%;
+  --canvas: 0 0% 100%;
+  --surface: 40 20% 97%;
+  --surface-soft: 40 20% 99%;
+  --hairline: 40 12% 88%;
+  --hairline-soft: 40 16% 93%;
+  --hairline-strong: 40 10% 78%;
+  --ink-deep: 0 0% 0%;
+  --ink: 0 0% 10%;
+  --charcoal: 30 5% 20%;
+  --slate: 30 4% 35%;
+  --steel: 30 4% 45%;
+  --stone: 30 4% 60%;
+  --muted: 30 5% 72%;
+  --tint-peach: 24 100% 92%;
+  --tint-rose: 340 80% 93%;
+  --tint-mint: 142 50% 90%;
+  --tint-lavender: 268 50% 92%;
+  --tint-sky: 210 80% 93%;
+  --tint-yellow: 48 80% 92%;
+  --tint-yellow-bold: 48 90% 80%;
+  --tint-cream: 40 40% 96%;
+  --tint-gray: 40 8% 94%;
+  --success: 142 60% 36%;
+  --success-foreground: 0 0% 100%;
+  --warning: 24 90% 50%;
+  --warning-foreground: 0 0% 100%;
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --background: 40 20% 99%;
+  --foreground: 30 5% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 30 5% 20%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 40 20% 97%;
+  --secondary-foreground: 30 5% 20%;
+  --muted-fg: 30 4% 45%;
+  --accent: 268 50% 95%;
+  --accent-foreground: 260 62% 35%;
+  --border: 40 12% 88%;
+  --input: 40 10% 78%;
+  --ring: 260 62% 48%;
+  --sidebar-bg: 40 20% 98.5%;
+  --sidebar-border: 40 12% 90%;
+  --sidebar-item-active-bg: 260 40% 95%;
+  --sidebar-item-hover-bg: 40 20% 97%;
+  --sidebar-text: 30 4% 45%;
+  --sidebar-text-active: 260 62% 35%;
+  --brand: 260 62% 48%;
+  --brand-foreground: 0 0% 100%;
+  --brand-subtle: 260 40% 96%;
+  --brand-glow: 260 70% 55%;
+}
+
 /* Manual dark mode toggle (data-theme attribute) */
 [data-theme="dark"] {
   --primary: 260 60% 62%;

@@ -180,11 +180,11 @@ function BarChart({ data }: { data: DayBucket[] }) {
 function PieChart({ data }: { data: ModelBucket[] }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   if (total === 0) return null;
-  const r = 70;
-  const cx = 90;
-  const cy = 90;
-  const w = 300;
-  const h = 190;
+  const r = 60;
+  const cx = 75;
+  const cy = 70;
+  const w = 460;
+  const h = 160;
 
   let cumulativeAngle = 0;
   const slices = data.map((d) => {
@@ -218,14 +218,17 @@ function PieChart({ data }: { data: ModelBucket[] }) {
 
       {/* Legend */}
       {slices.map((s, i) => {
-        const ly = 16 + i * 20;
+        const ly = 10 + i * 18;
+        const maxNameLen = 24;
+        const displayName = s.model.length > maxNameLen ? s.model.slice(0, maxNameLen - 1) + "…" : s.model;
         return (
           <g key={i}>
-            <rect x={175} y={ly - 6} width={10} height={10} rx="2" fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            <text x={190} y={ly + 3} fontSize="10" fill="hsl(var(--ink))" style={{ fontFamily: "monospace" }}>
-              {s.model.length > 14 ? s.model.slice(0, 13) + "…" : s.model}
+            <rect x={165} y={ly - 4} width={8} height={8} rx="2" fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            <text x={179} y={ly + 3} fontSize="10" fill="hsl(var(--ink))" style={{ fontFamily: "monospace" }}>
+              <title>{s.model}</title>
+              {displayName}
             </text>
-            <text x={280} y={ly + 3} textAnchor="end" fontSize="10" fill="hsl(var(--steel))">
+            <text x={450} y={ly + 3} textAnchor="end" fontSize="10" fontWeight="600" fill="hsl(var(--ink))">
               {Math.round(s.fraction * 100)}%
             </text>
           </g>

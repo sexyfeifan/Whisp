@@ -30,7 +30,7 @@ export function HistoryPage(app: AppState) {
     settings, filteredHistory, stats, todayCount, errorMsg, polishErrorMsg,
     settingsFeedback, searchQuery, setSearchQuery, statusFilter, setStatusFilter,
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
-    retrying, hasMore, deleteEntry, deleteSelected, clearHistory, confirmingClear,
+    retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
     retryEntry, copyText, playAudio, playingAudioId, audioUrls, loadHistory, m, uiLanguage,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
@@ -39,6 +39,7 @@ export function HistoryPage(app: AppState) {
   const [exportDropdown, setExportDropdown] = useState<number | null>(null);
   const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   if (!settings) return null;
 
@@ -90,17 +91,31 @@ export function HistoryPage(app: AppState) {
               </Button>
             )}
             <Button
-              variant={confirmingClear ? "danger" : "secondary"}
+              variant="secondary"
               size="sm"
-              onClick={clearHistory}
+              onClick={() => {
+                if (history.length === 0) return;
+                setShowClearConfirm(true);
+              }}
             >
-              {confirmingClear ? m.clearConfirm : m.clear}
+              {m.clear}
             </Button>
             <Button
               variant="secondary"
               size="sm"
               onClick={async () => {
-                try { const csv = await invoke<string>("export_history"); await writeText(csv); }
+                try {
+                  const csv = await invoke<string>("export_history");
+                  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+                  const filename = `whisp_history_${ts}.csv`;
+                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = filename;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }
                 catch (error) { console.error("Export failed:", error); }
               }}
             >
@@ -424,6 +439,33 @@ export function HistoryPage(app: AppState) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Clear Confirmation Dialog */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowClearConfirm(false)}>
+          <div className="max-w-sm w-full mx-4 rounded-xl shadow-2xl border p-6" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }} onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-2" style={{ color: "hsl(var(--ink))" }}>{m.clearConfirmTitle ?? "Clear All History?"}</h2>
+            <p className="text-sm mb-6" style={{ color: "hsl(var(--steel))" }}>
+              {m.clearConfirmDesc ?? "This will permanently delete all transcription records. This action cannot be undone."}
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" size="sm" onClick={() => setShowClearConfirm(false)}>
+                {m.cancel ?? "Cancel"}
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={async () => {
+                  setShowClearConfirm(false);
+                  await clearHistory();
+                }}
+              >
+                {m.clearConfirm ?? "Confirm Clear"}
+              </Button>
+            </div>
           </div>
         </div>
       )}

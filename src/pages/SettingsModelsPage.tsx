@@ -18,6 +18,9 @@ interface KnownModel {
   name: string;
   url: string;
   size_bytes: number;
+  description: string;
+  languages: string;
+  params: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -208,15 +211,26 @@ export function SettingsModelsPage(app: AppState) {
                   {notDownloaded.map((model) => (
                     <div
                       key={model.name}
-                      className="flex items-center justify-between p-3 rounded-lg"
+                      className="flex items-start justify-between p-3 rounded-lg"
                       style={{ background: "hsl(var(--surface))" }}
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 mr-3">
                         <div className="text-sm font-medium truncate" style={{ color: "hsl(var(--ink))" }}>
                           {model.name}
                         </div>
-                        <div className="text-xs" style={{ color: "hsl(var(--steel))" }}>
-                          {formatBytes(model.size_bytes)}
+                        <div className="text-[11px] mt-0.5" style={{ color: "hsl(var(--steel))" }}>
+                          {model.description}
+                        </div>
+                        <div className="flex gap-3 mt-1">
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            🌐 {model.languages}
+                          </span>
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            📦 {model.params}
+                          </span>
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            {formatBytes(model.size_bytes)}
+                          </span>
                         </div>
                       </div>
                       <Button
@@ -224,6 +238,7 @@ export function SettingsModelsPage(app: AppState) {
                         size="sm"
                         onClick={() => handleDownload(model.name)}
                         disabled={downloading === model.name}
+                        className="shrink-0"
                       >
                         {downloading === model.name ? (
                           <RefreshCw size={12} className="mr-1 animate-spin" />

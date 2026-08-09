@@ -49,6 +49,16 @@ export interface AppSettings {
   waveform_preview_enabled: boolean;
   sync_dir: string;
   device_name: string;
+  summary_model: string;
+  summary_enabled: boolean;
+  streaming_enabled: boolean;
+  streaming_chunk_duration_secs: number;
+  diarization_enabled: boolean;
+  diarization_api_key: string;
+  diarization_api_base_url: string;
+  diarization_num_speakers: number;
+  global_hotkey: string;
+  global_hotkey_enabled: boolean;
 }
 
 export interface LogEntry {
@@ -76,6 +86,9 @@ export interface KnownModel {
   name: string;
   url: string;
   size_bytes: number;
+  description: string;
+  languages: string;
+  params: string;
 }
 
 export interface WhisperResult {

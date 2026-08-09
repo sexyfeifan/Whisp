@@ -49,6 +49,20 @@ export function SettingsRecordingPage(app: AppState) {
                 <textarea value={settings.whisper_prompt} onChange={(event) => updateSettings({ whisper_prompt: event.target.value })} placeholder={m.whisperPromptPlaceholder} rows={3} className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none" />
               </div>
               <ToggleRow label={m.trimSilence} description={m.trimSilenceDesc} value={settings.trim_silence_enabled} onChange={(value) => updateSettings({ trim_silence_enabled: value })} />
+              <ToggleRow
+                label={m.streamingEnabled ?? "Real-time Streaming"}
+                description={m.streamingEnabledDesc ?? "Show partial transcription in real-time as you speak (experimental)."}
+                value={settings.streaming_enabled}
+                onChange={(value) => updateSettings({ streaming_enabled: value })}
+              />
+              {settings.streaming_enabled && (
+                <div>
+                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>
+                    {m.streamingChunkDuration ?? "Chunk Duration (seconds)"}
+                  </label>
+                  <Input type="number" min={1} max={30} step={1} value={settings.streaming_chunk_duration_secs} onChange={(event) => updateSettings({ streaming_chunk_duration_secs: Math.min(30, Math.max(1, Number(event.target.value) || 3)) })} />
+                </div>
+              )}
               <div>
                 <label className="block text-xs mb-1" style={{ color: "hsl(var(--steel))" }}>
                   {m.audioRetentionLimit}

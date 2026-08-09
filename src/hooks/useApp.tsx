@@ -8,7 +8,7 @@ import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
-import { History, Settings, Mic, Shield, Zap, Activity, BarChart3, Terminal, Box } from "lucide-react";
+import { History, Settings, Mic, Shield, Activity, BarChart3, Terminal, Box } from "lucide-react";
 
 export interface UpdateInfo {
   latestVersion: string; releaseUrl: string; releaseNotes: string;
@@ -49,10 +49,6 @@ export interface AppState {
   downloading: boolean;
   downloadMsg: string | null;
   updateInfo: UpdateInfo | null;
-  polishStatus: "untested" | "testing" | "ok" | "error";
-  setPolishStatus: React.Dispatch<React.SetStateAction<"untested" | "testing" | "ok" | "error">>;
-  polishError: string | null;
-  setPolishError: React.Dispatch<React.SetStateAction<string | null>>;
   polishErrorMsg: string | null;
   playingAudioId: number | null;
   audioUrls: Record<number, string>;
@@ -75,7 +71,6 @@ export interface AppState {
   updateSettings: (patch: Partial<AppSettings>) => void;
   persistSettings: () => Promise<boolean>;
   testApiKey: (apiKey: string, apiBaseUrl: string, model: string) => Promise<void>;
-  testPolishConnection: () => Promise<void>;
   copyText: (text: string, id: number) => Promise<void>;
   playAudio: (path: string, id: number) => Promise<void>;
   loadLogs: () => Promise<void>;
@@ -127,8 +122,6 @@ export function useApp(): AppState {
   const [downloading, setDownloading] = useState(false);
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [polishStatus, setPolishStatus] = useState<"untested" | "testing" | "ok" | "error">("untested");
-  const [polishError, setPolishError] = useState<string | null>(null);
   const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
@@ -373,18 +366,6 @@ export function useApp(): AppState {
     }
   }, [m.optionalValidationHint]);
 
-  const testPolishConnection = useCallback(async () => {
-    if (!settings?.ai_polish_api_url || !settings?.ai_polish_api_key) return;
-    setPolishStatus("testing"); setPolishError(null);
-    try {
-      await invoke("validate_api_key", {
-        apiKey: settings.ai_polish_api_key, apiBaseUrl: settings.ai_polish_api_url,
-        model: settings.ai_polish_model || "gpt-4o-mini",
-      });
-      setPolishStatus("ok");
-    } catch (error) { setPolishStatus("error"); setPolishError(String(error)); }
-  }, [settings]);
-
   const copyText = useCallback(async (text: string, id: number) => {
     await writeText(text); setCopied(id);
     window.setTimeout(() => setCopied(null), 1500);
@@ -487,12 +468,6 @@ export function useApp(): AppState {
       setSettingsFeedback({ tone: "error", message: m.clearEmpty });
       window.setTimeout(() => setSettingsFeedback(null), 2200); return;
     }
-    if (!confirmingClear) {
-      setConfirmingClear(true);
-      if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); }
-      clearTimerRef.current = window.setTimeout(() => { setConfirmingClear(false); }, 2500);
-      return;
-    }
     if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
     try {
       await invoke("clear_history"); setHistory([]); setConfirmingClear(false);
@@ -500,7 +475,7 @@ export function useApp(): AppState {
       setSettingsFeedback({ tone: "success", message: m.clearSuccess });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
     } catch (error) { setConfirmingClear(false); setErrorMsg(`${m.clearFailed} ${String(error)}`); }
-  }, [history, confirmingClear, m]);
+  }, [history, m]);
 
   const retryEntry = useCallback(async (id: number) => {
     setRetrying(id);
@@ -570,7 +545,6 @@ export function useApp(): AppState {
     { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats", group: "main" },
     { id: "history", icon: <History size={16} />, label: m.history, group: "main" },
     { id: "settingsApi", icon: <Shield size={16} />, label: m.apiConfiguration, group: "config" },
-    { id: "settingsPolish", icon: <Zap size={16} />, label: m.aiPolishSettings, group: "config" },
     { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
     { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
     { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
@@ -585,11 +559,11 @@ export function useApp(): AppState {
     setStatusFilter, savingSettings, settingsFeedback, setSettingsFeedback,
     confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
-    polishStatus, setPolishStatus, polishError, setPolishError, polishErrorMsg, playingAudioId, audioUrls,
+    polishErrorMsg, playingAudioId, audioUrls,
     stopAudio, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, defaultPolishPrompt, darkMode, setDarkMode,
     uiLanguage, m, filteredHistory, stats, todayCount, hasApiConfig, canProceed,
-    navItems, updateSettings, persistSettings, testApiKey, testPolishConnection,
+    navItems, updateSettings, persistSettings, testApiKey,
     copyText, playAudio, loadLogs, clearLogs, copyAllLogs, flushAutoSave,
     deleteEntry, deleteSelected, clearHistory, retryEntry, loadHistory, loadSettings,
     searchHistory,

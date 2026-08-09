@@ -158,7 +158,6 @@ pub fn run() {
             commands::toggle_autostart,
             commands::check_for_updates,
             commands::polish_text,
-            commands::test_polish_connection,
             commands::translate_text,
             commands::get_logs,
             commands::clear_logs,

@@ -637,21 +637,6 @@ pub async fn polish_text(
     })
 }
 
-#[tauri::command]
-pub async fn test_polish_connection(
-    app: AppHandle,
-    api_key: String,
-    api_base_url: String,
-    model: String,
-) -> Result<(), String> {
-    let client = app
-        .try_state::<reqwest::Client>()
-        .ok_or("HTTP client not initialized")?;
-    crate::polish::validate_polish_key(&client, &api_key, &api_base_url, &model)
-        .await
-        .map_err(|e| e.to_string())
-}
-
 #[derive(Serialize)]
 pub struct TranslateOutput {
     pub text: String,
@@ -1812,13 +1797,13 @@ pub fn export_transcription(
 #[tauri::command]
 pub async fn generate_summary(
     history: State<'_, Arc<HistoryManager>>,
-    settings: State<'_, AppSettings>,
     client: State<'_, reqwest::Client>,
     entry_id: i64,
 ) -> Result<crate::summary::SummaryResult, String> {
     let entries = history.get_entries_by_ids(&[entry_id]).map_err(|e| e.to_string())?;
     let entry = entries.first().ok_or_else(|| "Entry not found".to_string())?;
 
+    let settings = settings::get_settings();
     let config = crate::summary::SummaryConfig {
         enabled: settings.summary_enabled,
         model: settings.summary_model.clone(),

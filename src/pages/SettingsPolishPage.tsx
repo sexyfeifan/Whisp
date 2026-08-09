@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Zap } from "lucide-react";
-import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { FilterChip } from "../components/FilterChip";
 import { ToggleRow } from "../components/ToggleRow";
@@ -12,9 +11,9 @@ import { aiPolishPresets, viewVariants } from "../lib/constants";
 
 export function SettingsPolishPage(app: AppState) {
   const {
-    settings, updateSettings, polishStatus, polishError, testPolishConnection,
-    defaultPolishPrompt, persistSettings, savingSettings, settingsFeedback, setView,
-    m, setPolishStatus, setPolishError, view, navItems, darkMode, setDarkMode,
+    settings, updateSettings, defaultPolishPrompt, persistSettings, savingSettings,
+    settingsFeedback, setView,
+    m, view, navItems, darkMode, setDarkMode,
     updateStatus, appVersion, checkForUpdates, flushAutoSave,
   } = app;
 
@@ -47,14 +46,14 @@ export function SettingsPolishPage(app: AppState) {
                     <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishApiUrl}</label>
                     <div className="flex gap-2 flex-wrap mb-2">
                       {aiPolishPresets.map((preset) => (
-                        <FilterChip key={`polish-${preset.apiUrl}-${preset.model}`} active={settings.ai_polish_api_url === preset.apiUrl && settings.ai_polish_model === preset.model} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.apiUrl, ai_polish_model: preset.model }); setPolishStatus("untested"); setPolishError(null); }} />
+                        <FilterChip key={`polish-${preset.apiUrl}-${preset.model}`} active={settings.ai_polish_api_url === preset.apiUrl && settings.ai_polish_model === preset.model} label={preset.label} onClick={() => { updateSettings({ ai_polish_api_url: preset.apiUrl, ai_polish_model: preset.model }); }} />
                       ))}
                     </div>
-                    <Input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="https://api.openai.com/v1" />
+                    <Input type="text" value={settings.ai_polish_api_url} onChange={(event) => { updateSettings({ ai_polish_api_url: event.target.value }); }} placeholder="https://api.openai.com/v1" />
                   </div>
                   <div>
                     <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishApiKey}</label>
-                    <Input type="password" value={settings.ai_polish_api_key} onChange={(event) => { updateSettings({ ai_polish_api_key: event.target.value }); setPolishStatus("untested"); setPolishError(null); }} placeholder="sk-..." />
+                    <Input type="password" value={settings.ai_polish_api_key} onChange={(event) => { updateSettings({ ai_polish_api_key: event.target.value }); }} placeholder="sk-..." />
                   </div>
                   <div>
                     <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishModel}</label>
@@ -77,17 +76,6 @@ export function SettingsPolishPage(app: AppState) {
                       {m.aiPolishPromptDesc}
                     </p>
                   </div>
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={testPolishConnection}
-                    disabled={!settings.ai_polish_api_url || !settings.ai_polish_api_key || polishStatus === "testing"}
-                  >
-                    {polishStatus === "testing" ? m.testing : polishStatus === "ok" ? m.connected : m.testPolishConnection}
-                  </Button>
-                  {polishStatus === "error" && polishError && (
-                    <p className="text-xs whitespace-pre-wrap" style={{ color: "hsl(var(--destructive))" }}>{polishError}</p>
-                  )}
                 </div>
               )}
             </SettingsSection>

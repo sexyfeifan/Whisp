@@ -171,9 +171,8 @@ struct DiskSettings {
     pub whisper_config_json: String,
     #[serde(default = "default_audio_retention_limit")]
     pub audio_retention_limit: usize,
-    /// api_key is normally empty here (stored in keychain).
-    /// Written as fallback when keychain is unavailable (e.g. ad-hoc signed builds).
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    /// API key — always saved to disk as fallback alongside keychain storage.
+    #[serde(default)]
     pub api_key: String,
     #[serde(default)]
     pub custom_endpoints: Vec<CustomEndpoint>,
@@ -380,11 +379,20 @@ fn credential_entry() -> Result<Entry, KeyringError> {
 }
 
 fn load_api_key() -> Result<Option<String>, String> {
-    let entry = credential_entry().map_err(|e| e.to_string())?;
+    let entry = match credential_entry() {
+        Ok(e) => e,
+        Err(e) => {
+            log::debug!("Keychain credential_entry() failed: {e}");
+            return Ok(None);
+        }
+    };
     match entry.get_password() {
         Ok(api_key) => Ok(Some(api_key)),
         Err(KeyringError::NoEntry) => Ok(None),
-        Err(e) => Err(e.to_string()),
+        Err(e) => {
+            log::debug!("Keychain get_password() failed: {e}");
+            Ok(None)
+        }
     }
 }
 
@@ -472,11 +480,10 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         ai_polish_model: settings.ai_polish_model.clone(),
         ai_polish_prompt: settings.ai_polish_prompt.clone(),
         audio_retention_limit: settings.audio_retention_limit,
-        api_key: if keychain_ok {
-            String::new()
-        } else {
-            settings.api_key.clone()
-        },
+        // Always save API key to disk as fallback, even when keychain is available.
+        // This prevents data loss if keychain access is denied later (e.g. after
+        // a macOS update, ad-hoc signing, or permission revocation).
+        api_key: settings.api_key.clone(),
         whisper_config_json: settings.whisper_config_json.clone(),
         vocabulary: settings.vocabulary.clone(),
         vocabulary_enabled: settings.vocabulary_enabled,
@@ -547,9 +554,12 @@ pub fn get_settings() -> AppSettings {
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
-    match load_api_key() {
-        Ok(Some(api_key)) if !api_key.is_empty() => settings.api_key = api_key,
+    let keychain_result = load_api_key();
+    log::debug!("Keychain load result: {keychain_result:?}");
+    match keychain_result {
+        Ok(Some(ref api_key)) if !api_key.is_empty() => settings.api_key = api_key.clone(),
         _ => {
+            log::debug!("Keychain unavailable or empty, falling back to disk/env for api_key");
             if !disk.api_key.trim().is_empty() {
                 settings.api_key = disk.api_key.clone();
             } else if let Some(api_key) = env_api_key() {
@@ -574,7 +584,7 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     if !keychain_ok {
         log::warn!("Keychain unavailable; API key(s) will be stored on disk as fallback");
     }
-    // Only persist API key to disk when keychain fails
+    // Always persist API key to disk alongside keychain (belt-and-suspenders)
     save_disk_settings(settings, keychain_ok)
 }
 
