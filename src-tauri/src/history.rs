@@ -1,7 +1,7 @@
 use anyhow::Result;
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -58,7 +58,7 @@ static MIGRATIONS: &[M] = &[
     ),
 ];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryEntry {
     pub id: i64,
     pub text: String,
