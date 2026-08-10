@@ -337,13 +337,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                           <button
                             className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded hover:bg-[hsl(var(--destructive)/0.15)] transition-colors"
                             title="删除此记录"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                await invoke("delete_history_entry", { id: entry.id });
-                                setHistory(prev => prev.filter(h => h.id !== entry.id));
-                              } catch (_) { /* ignore */ }
-                            }}
+                            onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }}
                           >
                             <X size={12} style={{ color: "hsl(var(--destructive))" }} />
                           </button>

@@ -1474,12 +1474,15 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
     log::info!("Downloading model from {} to {}", url, dest_path.display());
 
     // Emit initial progress
-    let _ = app.emit("model-download-progress", ModelDownloadProgress {
-        model_name: model_name.clone(),
-        downloaded_bytes: 0,
-        total_bytes: 0,
-        percentage: 0.0,
-    });
+    let _ = app.emit(
+        "model-download-progress",
+        ModelDownloadProgress {
+            model_name: model_name.clone(),
+            downloaded_bytes: 0,
+            total_bytes: 0,
+            percentage: 0.0,
+        },
+    );
 
     let mut response = client
         .get(url)
@@ -1495,15 +1498,15 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
     let total_size = response.content_length().unwrap_or(0);
     let dest_path_tmp = dest_path.with_extension("part");
 
-    let mut file = std::fs::File::create(&dest_path_tmp)
-        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    let mut file = std::fs::File::create(&dest_path_tmp).map_err(|e| format!("Failed to create temp file: {}", e))?;
     let mut downloaded: u64 = 0;
     let mut last_emit_bytes: u64 = 0;
 
     use std::io::Write;
     while let Some(chunk) = response.chunk().await.transpose() {
         let bytes = chunk.map_err(|e| format!("Failed to read chunk: {}", e))?;
-        file.write_all(&bytes).map_err(|e| format!("Failed to write chunk: {}", e))?;
+        file.write_all(&bytes)
+            .map_err(|e| format!("Failed to write chunk: {}", e))?;
         downloaded += bytes.len() as u64;
 
         // Emit progress every ~1MB or at end
@@ -1513,12 +1516,15 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
             } else {
                 0.0
             };
-            let _ = app.emit("model-download-progress", ModelDownloadProgress {
-                model_name: model_name.clone(),
-                downloaded_bytes: downloaded,
-                total_bytes: total_size,
-                percentage,
-            });
+            let _ = app.emit(
+                "model-download-progress",
+                ModelDownloadProgress {
+                    model_name: model_name.clone(),
+                    downloaded_bytes: downloaded,
+                    total_bytes: total_size,
+                    percentage,
+                },
+            );
             last_emit_bytes = downloaded;
         }
     }
@@ -1529,21 +1535,30 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
     // Verify downloaded size
     if total_size > 0 && downloaded != total_size {
         let _ = std::fs::remove_file(&dest_path_tmp);
-        return Err(format!("Download incomplete: expected {} bytes, got {}", total_size, downloaded));
+        return Err(format!(
+            "Download incomplete: expected {} bytes, got {}",
+            total_size, downloaded
+        ));
     }
 
-    std::fs::rename(&dest_path_tmp, &dest_path)
-        .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+    std::fs::rename(&dest_path_tmp, &dest_path).map_err(|e| format!("Failed to rename temp file: {}", e))?;
 
     // Emit final progress
-    let _ = app.emit("model-download-progress", ModelDownloadProgress {
-        model_name: model_name.clone(),
-        downloaded_bytes: downloaded,
-        total_bytes: total_size,
-        percentage: 100.0,
-    });
+    let _ = app.emit(
+        "model-download-progress",
+        ModelDownloadProgress {
+            model_name: model_name.clone(),
+            downloaded_bytes: downloaded,
+            total_bytes: total_size,
+            percentage: 100.0,
+        },
+    );
 
-    log::info!("Model downloaded: {} ({:.1} MB)", file_name, downloaded as f64 / 1_048_576.0);
+    log::info!(
+        "Model downloaded: {} ({:.1} MB)",
+        file_name,
+        downloaded as f64 / 1_048_576.0
+    );
 
     Ok(dest_path.to_string_lossy().to_string())
 }
@@ -2066,7 +2081,11 @@ pub async fn transcribe_file(
                 asr_duration_sec: Some(asr_duration_sec),
                 polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                 estimated_cost: Some(asr_cost + polish_cost),
-                polished_text: if final_text != text { Some(final_text.clone()) } else { None },
+                polished_text: if final_text != text {
+                    Some(final_text.clone())
+                } else {
+                    None
+                },
                 recorded_at: 0,
             };
 

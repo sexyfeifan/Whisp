@@ -311,8 +311,8 @@ fn split_wav_into_chunks(wav_data: &[u8], max_chunk_size: usize) -> Vec<Vec<u8>>
         chunk.extend_from_slice(b"RIFF");
         chunk.extend_from_slice(&file_size.to_le_bytes());
         chunk.extend_from_slice(&header[8..header_size]); // rest of header
-        // Update data chunk size in header
-        // The data size field is at offset 40 (header_size - 4)
+                                                          // Update data chunk size in header
+                                                          // The data size field is at offset 40 (header_size - 4)
         chunk[40..44].copy_from_slice(&chunk_data_size.to_le_bytes());
         chunk.extend_from_slice(chunk_audio);
 
@@ -387,7 +387,9 @@ pub async fn transcribe_audio(
         if is_chunked {
             return Ok(all_texts.join(" "));
         } else {
-            return all_texts.into_iter().next()
+            return all_texts
+                .into_iter()
+                .next()
                 .ok_or_else(|| anyhow::anyhow!("Transcription returned empty result"));
         }
     } else {
