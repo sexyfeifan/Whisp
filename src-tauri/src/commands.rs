@@ -1923,6 +1923,17 @@ pub fn export_transcription(
     }
 }
 
+/// Save export content to a temp file and return the absolute path.
+/// The frontend can then use tauri-plugin-opener to open it with the system default app.
+#[tauri::command]
+pub fn save_export_to_file(content: String, filename: String) -> Result<String, String> {
+    let dir = std::env::temp_dir().join("whisp_exports");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(&filename);
+    std::fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
 // --- AI Summary ---
 
 #[tauri::command]

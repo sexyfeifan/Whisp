@@ -157,6 +157,7 @@ pub fn run() {
             commands::export_history_srt,
             commands::export_history_markdown,
             commands::export_transcription,
+            commands::save_export_to_file,
             commands::generate_summary,
             commands::start_streaming_recording,
             commands::stop_streaming_recording,
