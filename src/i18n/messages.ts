@@ -260,7 +260,7 @@ const messages = {
     uploadSuccess: "转写完成",
     uploadFailed: "转写失败",
     selectAudioFile: "选择音频文件",
-    polisingText: "正在润色…",
+    polishingText: "正在润色…",
   },
   en: {
     appSubtitle: "Speak, transcribe, paste",
@@ -523,7 +523,7 @@ const messages = {
     uploadSuccess: "Transcription complete",
     uploadFailed: "Transcription failed",
     selectAudioFile: "Select Audio File",
-    polisingText: "Polishing…",
+    polishingText: "Polishing…",
   },
   ja: {
     appSubtitle: "話す、文字起こし、貼り付け",
@@ -786,7 +786,7 @@ const messages = {
     uploadSuccess: "転写完了",
     uploadFailed: "転写失敗",
     selectAudioFile: "音声ファイルを選択",
-    polisingText: "推敲中…",
+    polishingText: "推敲中…",
   },
 } as const;
 

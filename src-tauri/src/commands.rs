@@ -1944,7 +1944,7 @@ pub async fn transcribe_file(
                 text: final_text.clone(),
                 model: settings.model.clone(),
                 duration_ms,
-                audio_path: Some(file_path.clone()),
+                audio_path: None, // uploaded file not saved to disk
                 status: STATUS_SUCCESS.to_string(),
                 error_message: None,
                 provider,
@@ -1973,7 +1973,7 @@ pub async fn transcribe_file(
                 text: format!("转写失败: {}", &error_msg.chars().take(100).collect::<String>()),
                 model: settings.model.clone(),
                 duration_ms,
-                audio_path: Some(file_path.clone()),
+                audio_path: None, // uploaded file not saved to disk
                 status: STATUS_FAILED.to_string(),
                 error_message: Some(error_msg.clone()),
                 provider,

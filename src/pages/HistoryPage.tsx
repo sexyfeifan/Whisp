@@ -43,6 +43,7 @@ export function HistoryPage(app: AppState) {
   const [exporting, setExporting] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [uploadConfirm, setUploadConfirm] = useState<{ fileName: string; file: File } | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
 const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,6 +63,7 @@ const handleUploadConfirm = async (polish: boolean) => {
   if (!uploadConfirm) return;
   const { fileName, file } = uploadConfirm;
   setUploadConfirm(null);
+  setUploadStatus(null);
   try {
     // Read file as base64
     const reader = new FileReader();
@@ -76,9 +78,13 @@ const handleUploadConfirm = async (polish: boolean) => {
       reader.readAsDataURL(file);
     });
     await transcribeFile(base64, fileName, polish);
+    setUploadStatus({ type: "success", message: `✓ "${fileName}" ${polish ? "已转写并润色" : "已转写完成"}` });
   } catch (e) {
     console.error("Transcription failed:", e);
+    setUploadStatus({ type: "error", message: `✕ "${fileName}" 转写失败: ${String(e).slice(0, 100)}` });
   }
+  // Auto-clear status after 5 seconds
+  setTimeout(() => setUploadStatus(null), 5000);
 };
 
   if (!settings) return null;
@@ -185,6 +191,17 @@ const handleUploadConfirm = async (polish: boolean) => {
           style={{ display: "none" }}
           onChange={handleFileSelected}
         />
+
+        {/* Upload status feedback */}
+        {uploadStatus && (
+          <div className="mx-6 mb-2 px-4 py-2 rounded-lg text-sm font-medium" style={{
+            background: uploadStatus.type === "success" ? "hsl(142, 76%, 92%)" : "hsl(0, 84%, 94%)",
+            color: uploadStatus.type === "success" ? "hsl(142, 76%, 28%)" : "hsl(0, 84%, 40%)",
+            border: `1px solid ${uploadStatus.type === "success" ? "hsl(142, 76%, 75%)" : "hsl(0, 84%, 80%)"}`,
+          }}>
+            {uploadStatus.message}
+          </div>
+        )}
 
         {/* Stat cards */}
         <div className="px-6 pb-3 grid grid-cols-4 gap-3">

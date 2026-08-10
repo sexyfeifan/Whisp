@@ -136,7 +136,7 @@ html, body {
 .recording-text-row {
   display: flex;
   align-items: center;
-  padding-left: 36px; /* align with text after orb (28px orb + 8px gap) */
+  padding-left: 72px; /* align with text after orb (64px orb + 8px gap) */
 }
 
 .streaming-text {

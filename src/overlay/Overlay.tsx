@@ -284,13 +284,13 @@ function Overlay() {
             <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
             <span className="orb-timer">{elapsedSec}s</span>
           </div>
-          {streamingText && (
-            <div className="recording-text-row">
-              <span className="streaming-text" style={{ maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {streamingText.length > 80 ? streamingText.slice(-80) : streamingText}
-              </span>
-            </div>
-          )}
+          <div className="recording-text-row">
+            <span className="streaming-text" style={{ maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: streamingText ? 1 : 0.5 }}>
+              {streamingText
+                ? (streamingText.length > 80 ? streamingText.slice(-80) : streamingText)
+                : (lang === "en" ? "Listening..." : lang === "ja" ? "リスニング..." : "聆听中...")}
+            </span>
+          </div>
         </div>
       )}
     </div>
