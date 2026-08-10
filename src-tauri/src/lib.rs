@@ -950,7 +950,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
-                    let _target_bundle_id: Option<String> = {
+                    let target_bundle_id: Option<String> = {
                         #[cfg(target_os = "macos")]
                         {
                             LAST_FRONTMOST_APP_BUNDLE_ID
