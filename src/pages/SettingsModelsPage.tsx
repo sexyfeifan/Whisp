@@ -281,13 +281,13 @@ export function SettingsModelsPage(app: AppState) {
                         </div>
                         <div className="flex gap-3 mt-1">
                           <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            📦 {formatBytes(model.size_bytes)}
+                          </span>
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            🧩 {model.params}
+                          </span>
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
                             🌐 {model.languages}
-                          </span>
-                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
-                            📦 {model.params}
-                          </span>
-                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
-                            {formatBytes(model.size_bytes)}
                           </span>
                         </div>
                       </div>

@@ -64,6 +64,7 @@ export interface AppSettings {
   global_hotkey: string;
   global_hotkey_enabled: boolean;
   overlay_subtitle_style: string;
+  whisper_config_json: string;
 }
 
 export interface LogEntry {

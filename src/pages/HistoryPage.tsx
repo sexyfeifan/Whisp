@@ -398,7 +398,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                                   rawIdx = bestIdx;
                                 }
                                 const displayText = expandedId === entry.id || fullText.length <= 120 ? fullText : `${fullText.slice(0, 120)}...`;
-                                const highlightRatio = Math.min(1, rawIdx / displayText.length);
+                                const highlightRatio = Math.min(1, rawIdx / fullText.length);
                                 const highlightPct = highlightRatio * 100;
                                 return (
                                   <span style={{ position: "relative" }}>
@@ -493,7 +493,6 @@ const handleUploadConfirm = async (polish: boolean) => {
                     {entry.audio_path && (
                       <div className="mt-2">
                         <AudioPlayer
-                          entryId={entry.id}
                           audioPath={entry.audio_path}
                           durationMs={entry.duration_ms ?? null}
                           onTimeUpdate={(currentTime, duration) => {

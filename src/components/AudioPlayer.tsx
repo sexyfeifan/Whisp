@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Play, Pause, Volume2 } from "lucide-react";
 
 interface AudioPlayerProps {
-  entryId: number;
   audioPath: string | null;
   durationMs: number | null;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
@@ -122,7 +121,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
 
       // Color: played portion in primary color, rest in muted
       const isPlayed = i / waveformData.length <= progressRatio;
-      ctx.fillStyle = isPlayed ? "hsl(243, 75%, 59%)" : "hsl(220, 15%, 85%)";
+      ctx.fillStyle = isPlayed ? "hsl(260, 62%, 48%)" : "hsl(220, 15%, 85%)";
       ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
     });
   }, [waveformData, currentTime, duration]);
@@ -150,7 +149,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       audio.pause();
       cancelAnimationFrame(animationRef.current);
     } else {
-      audio.play();
+      audio.play().catch((e) => console.warn("Audio play failed:", e));
       animationRef.current = requestAnimationFrame(updateTime);
     }
     setIsPlaying(!isPlaying);
