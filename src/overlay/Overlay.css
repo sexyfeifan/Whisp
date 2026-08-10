@@ -137,7 +137,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -163,7 +163,7 @@ html, body {
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: right;
   opacity: 0.92;
 }
 

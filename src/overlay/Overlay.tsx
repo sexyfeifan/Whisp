@@ -144,10 +144,10 @@ function Overlay() {
     if (state !== "recording") return;
     if (streamingText) {
       // Widen to accommodate streaming text
-      getCurrentWindow().setSize(new LogicalSize(520, 80));
+      getCurrentWindow().setSize(new LogicalSize(600, 80));
     } else {
-      // Default recording size
-      getCurrentWindow().setSize(new LogicalSize(420, 80));
+      // Default recording size (smaller since waveform is shorter)
+      getCurrentWindow().setSize(new LogicalSize(360, 80));
     }
   }, [state, streamingText]);
 
@@ -159,7 +159,7 @@ function Overlay() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const canvasWidth = 180;
+    const canvasWidth = 100;
     const historyLength = Math.floor(canvasWidth / (COL_WIDTH + COL_GAP));
     historyRef.current = new Array(historyLength).fill(0);
     frameCountRef.current = 0;
@@ -293,14 +293,12 @@ function Overlay() {
         <div className="recording-layout">
           <div className="recording-top-row">
             <ThinkingOrb state="searching" size={64} speed={0.6} theme="auto" />
-            <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
+            <canvas ref={canvasRef} className="wave-canvas" style={{ width: 100, height: CANVAS_HEIGHT }} />
             <span className="orb-timer">{elapsedSec}s</span>
           </div>
           <div className="recording-text-row">
-            <span className="streaming-text" style={{ maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: streamingText ? 1 : 0.5 }}>
-              {streamingText
-                ? (streamingText.length > 80 ? streamingText.slice(-80) : streamingText)
-                : (lang === "en" ? "Listening..." : lang === "ja" ? "リスニング..." : "聆听中...")}
+            <span className="streaming-text" style={{ opacity: streamingText ? 1 : 0.5 }}>
+              {streamingText || (lang === "en" ? "Listening..." : lang === "ja" ? "リスニング..." : "聆听中...")}
             </span>
           </div>
         </div>

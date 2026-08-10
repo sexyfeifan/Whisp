@@ -166,18 +166,6 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
     }
   }, [duration]);
 
-  const skipBack = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = Math.max(0, audioRef.current.currentTime - 10);
-    }
-  }, []);
-
-  const skipForward = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = Math.min(duration, audioRef.current.currentTime + 10);
-    }
-  }, [duration]);
-
   const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const vol = parseFloat(e.target.value);
     setVolume(vol);
@@ -218,17 +206,6 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
-            onClick={skipBack}
-            className="p-1.5 rounded-full hover:opacity-70 transition-opacity flex items-center gap-0"
-            style={{ color: "hsl(var(--steel))" }}
-            title="-10s"
-          >
-            <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M7 1L2 7L7 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              <text x="13" y="11" fontSize="9" fontWeight="600" fill="currentColor" textAnchor="middle" fontFamily="system-ui, sans-serif">10</text>
-            </svg>
-          </button>
-          <button
             onClick={togglePlay}
             disabled={isLoading}
             className="p-2 rounded-full transition-all"
@@ -239,17 +216,6 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
             }}
           >
             {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-          </button>
-          <button
-            onClick={skipForward}
-            className="p-1.5 rounded-full hover:opacity-70 transition-opacity flex items-center gap-0"
-            style={{ color: "hsl(var(--steel))" }}
-            title="+10s"
-          >
-            <svg width="18" height="14" viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <text x="5" y="11" fontSize="9" fontWeight="600" fill="currentColor" textAnchor="middle" fontFamily="system-ui, sans-serif">10</text>
-              <path d="M11 1L16 7L11 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
           </button>
         </div>
 
