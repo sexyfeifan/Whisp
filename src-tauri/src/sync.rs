@@ -153,6 +153,7 @@ pub fn import_from_sync(history: &crate::history::HistoryManager, device_name: &
             asr_duration_sec: None,
             polish_tokens: None,
             estimated_cost: record.estimated_cost,
+            recorded_at: 0,
         }) {
             Ok(_) => {
                 imported += 1;

@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use base64::Engine;
 use reqwest::multipart;
 use reqwest::{StatusCode, Url};
-use std::sync::Arc;
 use std::time::Duration;
 
 fn transcription_endpoint(api_base_url: &str) -> Result<Url> {

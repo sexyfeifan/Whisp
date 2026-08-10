@@ -851,6 +851,7 @@ mod tests {
                 asr_duration_sec: Some(5.0),
                 polish_tokens: None,
                 estimated_cost: Some(0.03),
+                recorded_at: 0,
             })
             .unwrap();
 
@@ -891,6 +892,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                recorded_at: 0,
             })
             .unwrap();
 
@@ -916,6 +918,7 @@ mod tests {
             asr_duration_sec: Some(1.0),
             polish_tokens: None,
             estimated_cost: None,
+            recorded_at: 0,
         })
         .unwrap();
 
@@ -933,6 +936,7 @@ mod tests {
             asr_duration_sec: Some(2.0),
             polish_tokens: None,
             estimated_cost: None,
+            recorded_at: 0,
         })
         .unwrap();
 
@@ -969,6 +973,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                recorded_at: 0,
             })
             .unwrap();
         }
@@ -1001,6 +1006,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                recorded_at: 0,
             })
             .unwrap();
 

@@ -471,7 +471,7 @@ fn load_disk_settings() -> DiskSettings {
     }
 }
 
-fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), String> {
+fn save_disk_settings(settings: &AppSettings, _keychain_ok: bool) -> Result<(), String> {
     let dir = crate::data_dir();
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = dir.join("settings.json");
