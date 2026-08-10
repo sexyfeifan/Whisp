@@ -112,6 +112,9 @@ pub struct AppSettings {
     /// Expected number of speakers (0 = auto-detect)
     #[serde(default)]
     pub diarization_num_speakers: u32,
+    /// Overlay subtitle color style (default: "white-black")
+    #[serde(default = "default_overlay_subtitle_style")]
+    pub overlay_subtitle_style: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,6 +217,8 @@ struct DiskSettings {
     pub diarization_api_base_url: String,
     #[serde(default)]
     pub diarization_num_speakers: u32,
+    #[serde(default = "default_overlay_subtitle_style")]
+    pub overlay_subtitle_style: String,
 }
 
 fn default_api_key() -> String {
@@ -330,6 +335,10 @@ fn default_diarization_api_base_url() -> String {
     "https://api.pyannote.ai/v1".to_string()
 }
 
+fn default_overlay_subtitle_style() -> String {
+    "white-black".to_string()
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -378,6 +387,7 @@ impl Default for AppSettings {
             diarization_api_key: String::new(),
             diarization_api_base_url: default_diarization_api_base_url(),
             diarization_num_speakers: 0,
+            overlay_subtitle_style: default_overlay_subtitle_style(),
         }
     }
 }
@@ -514,6 +524,7 @@ fn save_disk_settings(settings: &AppSettings, keychain_ok: bool) -> Result<(), S
         diarization_api_key: settings.diarization_api_key.clone(),
         diarization_api_base_url: settings.diarization_api_base_url.clone(),
         diarization_num_speakers: settings.diarization_num_speakers,
+        overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -567,6 +578,7 @@ pub fn get_settings() -> AppSettings {
         diarization_api_key: disk.diarization_api_key,
         diarization_api_base_url: disk.diarization_api_base_url,
         diarization_num_speakers: disk.diarization_num_speakers,
+        overlay_subtitle_style: disk.overlay_subtitle_style,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
@@ -700,6 +712,7 @@ mod tests {
             diarization_api_key: settings.diarization_api_key.clone(),
             diarization_api_base_url: settings.diarization_api_base_url.clone(),
             diarization_num_speakers: settings.diarization_num_speakers,
+            overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
         };
 
         let json = serde_json::to_string(&disk).unwrap();

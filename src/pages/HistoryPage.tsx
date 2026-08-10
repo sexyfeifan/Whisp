@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Copy, Trash2,
   Play, Pause, Check, Volume2, Clock, FileAudio,
   RefreshCw, Loader2,
-  Download, FileText, Sparkles, X,
+  Download, FileText, Sparkles, X, Upload,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -33,7 +33,7 @@ export function HistoryPage(app: AppState) {
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
     retryEntry, copyText, playAudio, playingAudioId, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
-    audioPaused,
+    audioPaused, uploadingFile, transcribeFile,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -42,6 +42,44 @@ export function HistoryPage(app: AppState) {
   const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [uploadConfirm, setUploadConfirm] = useState<{ fileName: string; file: File } | null>(null);
+
+const fileInputRef = useRef<HTMLInputElement>(null);
+
+const handleUploadAudio = () => {
+  fileInputRef.current?.click();
+};
+
+const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  // Reset input so the same file can be selected again
+  e.target.value = "";
+  setUploadConfirm({ fileName: file.name, file });
+};
+
+const handleUploadConfirm = async (polish: boolean) => {
+  if (!uploadConfirm) return;
+  const { fileName, file } = uploadConfirm;
+  setUploadConfirm(null);
+  try {
+    // Read file as base64
+    const reader = new FileReader();
+    const base64 = await new Promise<string>((resolve, reject) => {
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Strip the data:audio/xxx;base64, prefix
+        const base64Data = result.split(",")[1] || result;
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    await transcribeFile(base64, fileName, polish);
+  } catch (e) {
+    console.error("Transcription failed:", e);
+  }
+};
 
   if (!settings) return null;
 
@@ -109,6 +147,15 @@ export function HistoryPage(app: AppState) {
             <Button
               variant="secondary"
               size="sm"
+              onClick={handleUploadAudio}
+              disabled={uploadingFile}
+            >
+              {uploadingFile ? <Loader2 size={14} className="animate-spin mr-1" /> : <Upload size={14} className="mr-1" />}
+              {m.uploadAudio ?? "Upload"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={async () => {
                 try {
                   const csv = await invoke<string>("export_history");
@@ -129,6 +176,15 @@ export function HistoryPage(app: AppState) {
             </Button>
           </div>
         </div>
+
+        {/* Hidden file input for audio upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".wav,.mp3,.m4a,.ogg,.flac,.webm,.aac,.wma,.opus"
+          style={{ display: "none" }}
+          onChange={handleFileSelected}
+        />
 
         {/* Stat cards */}
         <div className="px-6 pb-3 grid grid-cols-4 gap-3">
@@ -535,6 +591,49 @@ export function HistoryPage(app: AppState) {
                 }}
               >
                 {m.clearConfirm ?? "Confirm Clear"}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+      )}
+
+      {/* Upload Audio Confirm Dialog */}
+      {uploadConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setUploadConfirm(null)}>
+          <div className="max-w-sm w-full mx-4 rounded-xl shadow-2xl border p-6" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-3">
+              <Upload size={18} style={{ color: "hsl(var(--primary))" }} />
+              <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>{m.selectAudioFile ?? "Audio File Selected"}</h2>
+            </div>
+            <p className="text-sm mb-4" style={{ color: "hsl(var(--steel))" }}>
+              {uploadConfirm.fileName}
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="w-full"
+                onClick={() => handleUploadConfirm(false)}
+              >
+                {m.transcribeDirect ?? "Transcribe"}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => handleUploadConfirm(true)}
+              >
+                <Sparkles size={14} className="mr-1" />
+                {m.transcribeAndPolish ?? "Transcribe & Polish"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full"
+                onClick={() => setUploadConfirm(null)}
+              >
+                {m.cancel ?? "Cancel"}
               </Button>
             </div>
           </div>

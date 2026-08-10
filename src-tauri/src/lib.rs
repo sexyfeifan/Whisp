@@ -87,7 +87,7 @@ pub fn data_dir() -> PathBuf {
 
 // Named constants
 const OVERLAY_WIDTH: f64 = 420.0;
-const OVERLAY_HEIGHT: f64 = 64.0;
+const OVERLAY_HEIGHT: f64 = 80.0;
 const OVERLAY_BOTTOM_OFFSET: f64 = 80.0;
 const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
 const SILENCE_TRIM_PADDING_MS: u32 = 120;
@@ -105,6 +105,11 @@ struct PendingAudio {
     duration_ms: i64,
     audio_path: Option<String>,
 }
+
+/// Timestamp (Unix epoch seconds) when the current recording started.
+/// Used to set `recorded_at` in history entries so the displayed time matches
+/// when the user actually spoke, not when the transcription completed.
+static RECORDING_START_TIME: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
 fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
     match ui_language {
@@ -183,6 +188,7 @@ pub fn run() {
             commands::reset_pricing_config,
             commands::get_pending_waveform,
             commands::confirm_pending_transcription,
+            commands::transcribe_file,
             commands::discard_pending_recording,
             commands::trigger_sync,
             commands::get_sync_status,
@@ -447,7 +453,10 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let _ = w.hide();
     }
 
-    let overlay_url = format!("/src/overlay/index.html?lang={}", saved.ui_language);
+    let overlay_url = format!(
+        "/src/overlay/index.html?lang={}&subtitleStyle={}",
+        saved.ui_language, saved.overlay_subtitle_style
+    );
     match tauri::WebviewWindowBuilder::new(app_handle, "overlay", tauri::WebviewUrl::App(overlay_url.into()))
         .title("")
         .inner_size(OVERLAY_WIDTH, OVERLAY_HEIGHT)
@@ -494,6 +503,9 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         return;
     }
     log::info!("Recording started, model={}", saved.model);
+
+    // Record the actual moment the user started speaking
+    RECORDING_START_TIME.store(chrono::Utc::now().timestamp(), std::sync::atomic::Ordering::Relaxed);
 
     // Update tray to show recording state with orb icon (animation thread will cycle frames)
     if let Some(tray) = app_handle.tray_by_id("main") {
@@ -981,6 +993,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     asr_duration_sec: Some(asr_duration_sec),
                     polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                     estimated_cost: Some(estimated_cost),
+                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 };
                 let _ = history.add_entry(&entry);
                 let _ = history.cleanup_old_audio(audio_retention_limit);
@@ -1007,6 +1020,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 };
                 let _ = history.add_entry(&entry);
                 let _ = history.cleanup_old_audio(audio_retention_limit);
@@ -1231,6 +1245,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     asr_duration_sec: Some(asr_duration_sec),
                     polish_tokens: Some(polish_tokens),
                     estimated_cost: Some(estimated_cost),
+                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 });
 
                 match entry {
@@ -1259,6 +1274,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 });
                 let handle2 = handle.clone();
                 std::thread::spawn(move || {

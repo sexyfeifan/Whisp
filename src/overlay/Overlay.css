@@ -119,11 +119,34 @@ html, body {
 .success-message .status-icon { color: #2f9e44; }
 .success-message .status-text { color: #2f9e44; }
 
-.recording-row {
+.recording-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 8px;
+  width: 100%;
+}
+
+.recording-top-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 4px;
+}
+
+.recording-text-row {
+  display: flex;
+  align-items: center;
+  padding-left: 36px; /* align with text after orb (28px orb + 8px gap) */
+}
+
+.streaming-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--overlay-fg);
+  letter-spacing: -0.011em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .wave-canvas {
@@ -236,6 +259,61 @@ html, body {
 .preview-btn-discard:hover:not(:disabled) {
   color: var(--overlay-fg);
   background: rgba(128, 128, 128, 0.12);
+}
+
+
+/* ═══════════════════════════════════════════
+   Subtitle Styles (configurable from settings)
+   ═══════════════════════════════════════════ */
+
+/* White text with black border — classic subtitle */
+.subtitle-white-black .orb-label,
+.subtitle-white-black .status-text,
+.subtitle-white-black .streaming-text {
+  color: #ffffff;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    2px 4px rgba(0,0,0,0.5);
+}
+
+/* Yellow text with black border — anime/movie subtitle style */
+.subtitle-yellow-black .orb-label,
+.subtitle-yellow-black .status-text,
+.subtitle-yellow-black .streaming-text {
+  color: #FFD700;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    2px 4px rgba(0,0,0,0.5);
+}
+
+/* White text with dark semi-transparent background bar */
+.subtitle-white-darkbg .orb-label,
+.subtitle-white-darkbg .status-text,
+.subtitle-white-darkbg .streaming-text {
+  color: #ffffff;
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* Green text with black border — terminal hacker style */
+.subtitle-green-black .orb-label,
+.subtitle-green-black .status-text,
+.subtitle-green-black .streaming-text {
+  color: #00ff88;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000,
+     0    2px 4px rgba(0,0,0,0.5);
 }
 
 @media (prefers-color-scheme: dark) {

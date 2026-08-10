@@ -61,6 +61,7 @@ export interface AppSettings {
   diarization_num_speakers: number;
   global_hotkey: string;
   global_hotkey_enabled: boolean;
+  overlay_subtitle_style: string;
 }
 
 export interface LogEntry {

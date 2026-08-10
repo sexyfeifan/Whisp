@@ -988,6 +988,7 @@ pub async fn batch_transcribe(
                     asr_duration_sec: Some(asr_duration_sec),
                     polish_tokens: None,
                     estimated_cost: Some(estimated_cost),
+                    recorded_at: 0,
                 };
                 let _ = history.add_entry(&entry);
 
@@ -1031,6 +1032,7 @@ pub async fn batch_transcribe(
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    recorded_at: 0,
                 };
                 let _ = history.add_entry(&entry);
 
@@ -1718,6 +1720,7 @@ pub fn import_full_backup(
                 asr_duration_sec: entry.asr_duration_sec,
                 polish_tokens: entry.polish_tokens,
                 estimated_cost: entry.estimated_cost,
+                recorded_at: entry.timestamp,
             };
 
             if let Err(e) = history.add_entry(&new_entry) {
@@ -1839,6 +1842,155 @@ pub fn start_streaming_recording(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn stop_streaming_recording(app: AppHandle) -> Result<(), String> {
     crate::streaming::stop_streaming_recording(&app).map_err(|e| e.to_string())
+}
+
+/// Transcribe an uploaded audio file (base64-encoded) and optionally polish the result.
+/// Returns the transcribed text.
+#[tauri::command]
+pub async fn transcribe_file(
+    app: AppHandle,
+    file_data: String,
+    file_name: String,
+    polish: bool,
+) -> Result<String, String> {
+    let settings = settings::get_settings();
+    if settings.api_key.is_empty() {
+        return Err("API key not configured".to_string());
+    }
+
+    let client = app.state::<reqwest::Client>().inner().clone();
+    let history = app.state::<Arc<HistoryManager>>().inner().clone();
+
+    // Decode base64 file data
+    let wav_data = base64::engine::general_purpose::STANDARD
+        .decode(&file_data)
+        .map_err(|e| format!("Failed to decode file data: {e}"))?;
+
+    // Try to get duration from file (best-effort for WAV)
+    let duration_ms: Option<i64> = hound::WavReader::new(std::io::Cursor::new(&wav_data))
+        .ok()
+        .map(|reader| {
+            let spec = reader.spec();
+            let sample_count = reader.duration() as i64;
+            if spec.sample_rate > 0 {
+                sample_count * 1000 / spec.sample_rate as i64
+            } else {
+                0
+            }
+        });
+
+    let lang = if settings.language == "auto" {
+        None
+    } else {
+        Some(settings.language.as_str())
+    };
+    let prompt = if settings.whisper_prompt.trim().is_empty() {
+        None
+    } else {
+        Some(settings.whisper_prompt.as_str())
+    };
+    let provider = crate::transcribe::provider_name(&settings.api_base_url);
+
+    log::info!("Transcribing uploaded file: {}", file_name);
+
+    match crate::transcribe::transcribe_audio(
+        &client,
+        &settings.api_key,
+        &settings.api_base_url,
+        &settings.model,
+        &wav_data,
+        lang,
+        prompt,
+        settings.request_timeout_sec,
+        settings.retry_count,
+    )
+    .await
+    {
+        Ok(text) => {
+            log::info!("File transcription succeeded: {} chars", text.len());
+
+            let (final_text, polish_tokens) = if polish && !settings.ai_polish_api_key.is_empty() {
+                match crate::polish::polish_text(
+                    &client,
+                    &settings.ai_polish_api_key,
+                    &settings.ai_polish_api_url,
+                    &settings.ai_polish_model,
+                    &text,
+                    &settings.ai_polish_prompt,
+                    settings.request_timeout_sec,
+                )
+                .await
+                {
+                    Ok(result) => (result.text, result.tokens_used),
+                    Err(e) => {
+                        log::info!("AI polish failed: {}", e);
+                        let _ = app.emit("polish-error", e.to_string());
+                        (text, 0i64)
+                    }
+                }
+            } else {
+                (text, 0i64)
+            };
+
+            let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
+            let asr_cost = crate::cost::estimate_asr_cost(&settings.api_base_url, &settings.model, asr_duration_sec);
+            let polish_cost = if polish_tokens > 0 {
+                crate::cost::estimate_polish_cost(&settings.ai_polish_api_url, &settings.ai_polish_model, polish_tokens)
+            } else {
+                0.0
+            };
+
+            let entry = NewHistoryEntry {
+                text: final_text.clone(),
+                model: settings.model.clone(),
+                duration_ms,
+                audio_path: Some(file_path.clone()),
+                status: STATUS_SUCCESS.to_string(),
+                error_message: None,
+                provider,
+                api_base_url: settings.api_base_url.clone(),
+                language: settings.language.clone(),
+                retry_of: None,
+                asr_duration_sec: Some(asr_duration_sec),
+                polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
+                estimated_cost: Some(asr_cost + polish_cost),
+                recorded_at: 0,
+            };
+
+            if let Err(e) = history.add_entry(&entry) {
+                log::error!("Failed to save history: {}", e);
+            }
+            let _ = history.cleanup_old_audio(settings.audio_retention_limit);
+            let _ = app.emit("history-updated", ());
+
+            Ok(final_text)
+        }
+        Err(e) => {
+            log::error!("File transcription failed: {}", e);
+            let error_msg = e.to_string();
+
+            let entry = NewHistoryEntry {
+                text: format!("转写失败: {}", &error_msg.chars().take(100).collect::<String>()),
+                model: settings.model.clone(),
+                duration_ms,
+                audio_path: Some(file_path.clone()),
+                status: STATUS_FAILED.to_string(),
+                error_message: Some(error_msg.clone()),
+                provider,
+                api_base_url: settings.api_base_url.clone(),
+                language: settings.language.clone(),
+                retry_of: None,
+                asr_duration_sec: None,
+                polish_tokens: None,
+                estimated_cost: None,
+                recorded_at: 0,
+            };
+
+            let _ = history.add_entry(&entry);
+            let _ = app.emit("history-updated", ());
+            Err(error_msg)
+        }
+    }
 }
 
 #[cfg(test)]

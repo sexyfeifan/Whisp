@@ -78,6 +78,27 @@ export function SettingsRecordingPage(app: AppState) {
                 />
               </div>
             </SettingsSection>
+
+            <SettingsSection
+              icon={<span style={{ fontSize: 14 }}>🎬</span>}
+              title={m.overlaySubtitleStyle ?? "Overlay Subtitle Style"}
+              description={m.overlaySubtitleStyleDesc ?? "Choose the color style for real-time transcription text in the overlay."}
+            >
+              <div>
+                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.overlaySubtitleStyle ?? "Overlay Subtitle Style"}</label>
+                <select
+                  value={settings.overlay_subtitle_style}
+                  onChange={(e) => updateSettings({ overlay_subtitle_style: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))", border: "1px solid hsl(var(--hairline))" }}
+                >
+                  <option value="white-black">{m.subtitleWhiteBlack ?? "White text, black border"}</option>
+                  <option value="yellow-black">{m.subtitleYellowBlack ?? "Yellow text, black border"}</option>
+                  <option value="white-darkbg">{m.subtitleWhiteDarkbg ?? "White text, dark background"}</option>
+                  <option value="green-black">{m.subtitleGreenBlack ?? "Green text, black border"}</option>
+                </select>
+              </div>
+            </SettingsSection>
           </div>
         </motion.div>
       </div>

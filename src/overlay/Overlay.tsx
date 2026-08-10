@@ -7,7 +7,9 @@ import WaveformPreview, { type WaveformData } from "../components/WaveformPrevie
 
 type OverlayState = "recording" | "transcribing" | "silence-stopping" | "error" | "cancelled" | "preview";
 
-const lang = new URLSearchParams(window.location.search).get("lang") ?? "zh-CN";
+const params = new URLSearchParams(window.location.search);
+const lang = params.get("lang") ?? "zh-CN";
+const subtitleStyle = params.get("subtitleStyle") ?? "white-black";
 
 const STRINGS = {
   transcribing: lang === "en" ? "Transcribing..." : lang === "ja" ? "転写中..." : "转录中...",
@@ -225,15 +227,15 @@ function Overlay() {
   }, [state, previewHeight]);
 
   return (
-    <div className="overlay-body" onPointerDown={handlePointerDown} data-state={state}>
+    <div className={`overlay-body subtitle-${subtitleStyle}`} onPointerDown={handlePointerDown} data-state={state}>
       {state === "transcribing" ? (
         <div className="orb-row">
-          <ThinkingOrb state="composing" size={20} speed={0.75} />
+          <ThinkingOrb state="composing" size={64} speed={0.75} />
           <span className="orb-label">{STRINGS.transcribing}</span>
         </div>
       ) : state === "silence-stopping" ? (
         <div className="orb-row">
-          <ThinkingOrb state="breathing" size={20} speed={0.5} />
+          <ThinkingOrb state="breathing" size={64} speed={0.5} />
           <span className="orb-label dim">{STRINGS.silenceStopping}</span>
         </div>
       ) : state === "error" ? (
@@ -276,16 +278,19 @@ function Overlay() {
           </div>
         </div>
       ) : (
-        <div className="recording-row">
-          <ThinkingOrb state="listening" size={20} speed={0.75} />
-          {streamingText ? (
-            <span className="orb-label" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {streamingText.length > 60 ? streamingText.slice(-60) : streamingText}
-            </span>
-          ) : (
+        <div className="recording-layout">
+          <div className="recording-top-row">
+            <ThinkingOrb state="listening" size={64} speed={0.75} />
             <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
+            <span className="orb-timer">{elapsedSec}s</span>
+          </div>
+          {streamingText && (
+            <div className="recording-text-row">
+              <span className="streaming-text" style={{ maxWidth: 380, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {streamingText.length > 80 ? streamingText.slice(-80) : streamingText}
+              </span>
+            </div>
           )}
-          <span className="orb-timer">{elapsedSec}s</span>
         </div>
       )}
     </div>

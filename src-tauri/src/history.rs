@@ -93,6 +93,8 @@ pub struct NewHistoryEntry {
     pub asr_duration_sec: Option<f64>,
     pub polish_tokens: Option<i64>,
     pub estimated_cost: Option<f64>,
+    /// Recording start timestamp (Unix epoch seconds). If 0, uses current time.
+    pub recorded_at: i64,
 }
 
 pub struct HistoryManager {
@@ -145,7 +147,11 @@ impl HistoryManager {
 
     pub fn add_entry(&self, entry: &NewHistoryEntry) -> Result<HistoryEntry> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let timestamp = chrono::Utc::now().timestamp();
+        let timestamp = if entry.recorded_at > 0 {
+            entry.recorded_at
+        } else {
+            chrono::Utc::now().timestamp()
+        };
         conn.execute(
             "INSERT INTO transcriptions (
                 text,

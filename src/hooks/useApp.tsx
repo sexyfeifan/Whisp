@@ -50,6 +50,8 @@ export interface AppState {
   downloadMsg: string | null;
   updateInfo: UpdateInfo | null;
   polishErrorMsg: string | null;
+  uploadingFile: boolean;
+  transcribeFile: (fileData: string, fileName: string, polish: boolean) => Promise<string>;
   playingAudioId: number | null;
   audioUrls: Record<number, string>;
   audioProgress: number;    // current time in seconds
@@ -125,6 +127,7 @@ export function useApp(): AppState {
   const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "latest" | "error">("idle");
   const [downloading, setDownloading] = useState(false);
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
@@ -473,6 +476,18 @@ export function useApp(): AppState {
     }
   }, []);
 
+  const transcribeFile = useCallback(async (fileData: string, fileName: string, polish: boolean) => {
+    setUploadingFile(true);
+    try {
+      const text = await invoke<string>("transcribe_file", { fileData, fileName, polish });
+      return text;
+    } catch (error) {
+      throw error;
+    } finally {
+      setUploadingFile(false);
+    }
+  }, []);
+
   const loadLogs = useCallback(async () => {
     try {
       const entries = await invoke<LogEntry[]>("get_logs");
@@ -636,7 +651,7 @@ export function useApp(): AppState {
     setStatusFilter, savingSettings, settingsFeedback, setSettingsFeedback,
     confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
-    polishErrorMsg, playingAudioId, audioUrls,
+    polishErrorMsg, uploadingFile, transcribeFile, playingAudioId, audioUrls,
  audioProgress, audioDuration, stopAudio, seekAudio,
  audioPaused, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, defaultPolishPrompt, darkMode, setDarkMode,
