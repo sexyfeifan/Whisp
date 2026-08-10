@@ -339,13 +339,12 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
     }
 
     // Adaptive threshold: use the larger of the noise floor (floor_threshold)
-    // and 8% of the signal peak. The 8% value is a conservative speech detection
-    // threshold that works well for typical recordings: quiet sections are
-    // reliably distinguished from speech while avoiding false positives from
-    // breathing, ambient noise, or slight microphone hiss.
-    // 0.08 = 8% of peak amplitude; empirically chosen to distinguish speech from noise
-    // while preserving soft consonants and trailing words
-    let threshold = floor_threshold.max(peak * 0.08);
+    // and 4% of the signal peak. 4% is more aggressive than the original 8% to
+    // preserve trailing words that naturally fade in volume. Soft endings like
+    // "…the", "…of", "…and" where the final consonant is quiet can drop below
+    // 8% of peak amplitude — lowering to 4% ensures they survive trimming.
+    // 0.04 = 4% of peak amplitude; balances noise rejection vs. tail preservation
+    let threshold = floor_threshold.max(peak * 0.04);
     let start = audio.samples.iter().position(|sample| sample.abs() >= threshold);
     let end = audio.samples.iter().rposition(|sample| sample.abs() >= threshold);
 

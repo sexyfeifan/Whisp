@@ -333,8 +333,24 @@ const handleUploadConfirm = async (polish: boolean) => {
 
                     <div className="mt-2">
                       {failed ? (
-                        <div>
-                          <div className="text-sm" style={{ color: "hsl(var(--destructive))" }}>{entry.error_message ?? entry.text}</div>
+                        <div className="rounded-md border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.06)] p-2 relative">
+                          <button
+                            className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded hover:bg-[hsl(var(--destructive)/0.15)] transition-colors"
+                            title="删除此记录"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await invoke("delete_history_entry", { id: entry.id });
+                                setHistory(prev => prev.filter(h => h.id !== entry.id));
+                              } catch (_) { /* ignore */ }
+                            }}
+                          >
+                            <X size={12} style={{ color: "hsl(var(--destructive))" }} />
+                          </button>
+                          <div
+                            className="text-sm pr-6 cursor-text"
+                            style={{ color: "hsl(var(--destructive))", userSelect: "text", WebkitUserSelect: "text" }}
+                          >{entry.error_message ?? entry.text}</div>
                           <Button
                             variant="secondary"
                             size="sm"
