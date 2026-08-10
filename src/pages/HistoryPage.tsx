@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -98,13 +99,8 @@ const handleUploadConfirm = async (polish: boolean) => {
       const ext = fmt === "srt" ? "srt" : fmt === "vtt" ? "vtt" : fmt === "csv" ? "csv" : fmt === "markdown" ? "md" : "txt";
       const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
       const filename = `whisp_${ts}.${ext}`;
-      const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      const path = await invoke<string>("save_export_to_file", { content, filename });
+      await openPath(path);
     } catch (e) { console.error("Export failed:", e); }
     finally { setExporting(null); }
   };
@@ -168,13 +164,8 @@ const handleUploadConfirm = async (polish: boolean) => {
                   const csv = await invoke<string>("export_history");
                   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
                   const filename = `whisp_history_${ts}.csv`;
-                  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = filename;
-                  a.click();
-                  URL.revokeObjectURL(url);
+                  const path = await invoke<string>("save_export_to_file", { content: csv, filename });
+                  await openPath(path);
                 }
                 catch (error) { console.error("Export failed:", error); }
               }}
@@ -396,7 +387,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                                   : Math.min(highlightIdx, 120);
                                 return (
                                   <>
-                                    <span style={{ background: "hsl(260, 62%, 48% / 0.18)", borderRadius: 2, padding: 0, transition: "background 0.1s" }}>
+                                    <span style={{ background: "hsla(48, 96%, 53%, 0.45)", color: "hsl(var(--ink))", borderRadius: 3, padding: "1px 0", transition: "background 0.08s" }}>
                                       {displayText.slice(0, displayHighlightIdx)}
                                     </span>
                                     <span>{displayText.slice(displayHighlightIdx)}</span>
