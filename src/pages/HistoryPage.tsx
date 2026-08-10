@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Copy, Trash2,
-  Play, Pause, Check, Volume2, Clock, FileAudio,
+  Check, Volume2, Clock, FileAudio,
   RefreshCw, Loader2,
   Download, FileText, Sparkles, X, Upload,
 } from "lucide-react";
@@ -17,8 +17,9 @@ import { FilterChip } from "../components/FilterChip";
 import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
+import { AudioPlayer } from "../components/AudioPlayer";
 import type { AppState } from "../hooks/useApp";
-import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage, formatPlaybackTime, cn } from "../lib/utils";
+import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage, cn } from "../lib/utils";
 
 interface SummaryResult {
   title: string;
@@ -33,8 +34,8 @@ export function HistoryPage(app: AppState) {
     settingsFeedback, searchQuery, setSearchQuery, statusFilter, setStatusFilter,
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
-    retryEntry, copyText, playAudio, playingAudioId, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
-    audioPaused, uploadingFile, transcribeFile,
+    retryEntry, copyText, loadHistory, m, uiLanguage,
+    uploadingFile, transcribeFile,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -46,6 +47,10 @@ export function HistoryPage(app: AppState) {
   const [uploadConfirm, setUploadConfirm] = useState<{ fileName: string; file: File } | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showPolished, setShowPolished] = useState<Record<number, boolean>>({});
+  // Audio playback local state — driven by AudioPlayer onTimeUpdate
+  const [audioPlayingEntryId, setAudioPlayingEntryId] = useState<number | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioTotalDuration, setAudioTotalDuration] = useState(0);
 
 const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -363,35 +368,29 @@ const handleUploadConfirm = async (polish: boolean) => {
                           )}
                           <div
                             className="text-sm cursor-pointer relative"
-                            onClick={(e) => {
-                              // If audio is playing for this entry, seek to clicked position
-                              if (playingAudioId === entry.id && audioDuration > 0) {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                                seekAudio(ratio * audioDuration);
-                              } else {
-                                setExpandedId(expandedId === entry.id ? null : entry.id);
-                              }
+                            onClick={() => {
+                              setExpandedId(expandedId === entry.id ? null : entry.id);
                             }}
                             style={{ userSelect: "text", color: "hsl(var(--ink))" }}
                           >
                             {(() => {
                               const activeText = showPolished[entry.id] !== false && entry.polished_text ? entry.polished_text : entry.text;
-                              if (playingAudioId === entry.id && audioDuration > 0 && audioProgress > 0) {
-                                const progressRatio = Math.min(1, audioProgress / audioDuration);
-                                const fullText = activeText;
-                                const highlightIdx = Math.floor(fullText.length * progressRatio);
+                              // Highlight text in sync with audio playback position
+                              if (audioPlayingEntryId === entry.id && audioTotalDuration > 0 && audioCurrentTime > 0) {
+                                const progressRatio = Math.min(1, audioCurrentTime / audioTotalDuration);
                                 const displayText = expandedId === entry.id || activeText.length <= 120 ? activeText : `${activeText.slice(0, 120)}...`;
-                                const displayHighlightIdx = expandedId === entry.id || activeText.length <= 120
-                                  ? highlightIdx
-                                  : Math.min(highlightIdx, 120);
                                 return (
-                                  <>
-                                    <span style={{ background: "hsla(48, 96%, 53%, 0.45)", color: "hsl(var(--ink))", borderRadius: 3, padding: "1px 0", transition: "background 0.08s" }}>
-                                      {displayText.slice(0, displayHighlightIdx)}
+                                  <span style={{ position: "relative" }}>
+                                    {/* Gradient highlight using background-image for smooth transition */}
+                                    <span style={{
+                                      background: `linear-gradient(to right, hsla(48, 96%, 53%, 0.45) ${progressRatio * 100}%, transparent ${progressRatio * 100}%)`,
+                                      color: "hsl(var(--ink))",
+                                      borderRadius: 2,
+                                      transition: "background 0.15s linear",
+                                    }}>
+                                      {displayText}
                                     </span>
-                                    <span>{displayText.slice(displayHighlightIdx)}</span>
-                                  </>
+                                  </span>
                                 );
                               }
                               return expandedId === entry.id || activeText.length <= 120 ? activeText : `${activeText.slice(0, 120)}...`;
@@ -470,50 +469,19 @@ const handleUploadConfirm = async (polish: boolean) => {
                       </div>
                     </div>
 
-                    {/* Audio player */}
+                    {/* Audio player with waveform, progress bar, and controls */}
                     {entry.audio_path && (
                       <div className="mt-2">
-                        <button
-                          onClick={() => playAudio(entry.audio_path!, entry.id)}
-                          className="flex items-center gap-2 px-3 py-2 rounded-lg border-none cursor-pointer text-xs transition-colors"
-                          style={{
-                            background: "hsl(var(--surface))",
-                            color: playingAudioId === entry.id ? "hsl(var(--primary))" : "hsl(var(--steel))",
+                        <AudioPlayer
+                          entryId={entry.id}
+                          audioPath={entry.audio_path}
+                          durationMs={entry.duration_ms ?? null}
+                          onTimeUpdate={(currentTime, duration) => {
+                            setAudioPlayingEntryId(entry.id);
+                            setAudioCurrentTime(currentTime);
+                            setAudioTotalDuration(duration);
                           }}
-                        >
-                          {playingAudioId === entry.id && !audioPaused ? <Pause size={14} /> : <Play size={14} />}
-                          {playingAudioId === entry.id && !audioPaused ? m.pauseAudio : m.playAudio}
-                        </button>
-                        {/* Progress bar + time display when playing */}
-                        {playingAudioId === entry.id && audioDuration > 0 && (
-                          <div className="space-y-1">
-                            <div
-                              className="h-1.5 rounded-full cursor-pointer group relative"
-                              style={{ background: "hsl(var(--hairline))" }}
-                              onClick={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                                seekAudio(ratio * audioDuration);
-                              }}
-                            >
-                              <div
-                                className="h-full rounded-full transition-all duration-75"
-                                style={{
-                                  width: `${(audioProgress / audioDuration) * 100}%`,
-                                  background: "hsl(var(--primary))",
-                                }}
-                              />
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
-                                {formatPlaybackTime(audioProgress)}
-                              </span>
-                              <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
-                                {formatPlaybackTime(audioDuration)}
-                              </span>
-                            </div>
-                          </div>
-                        )}
+                        />
                       </div>
                     )}
                   </Card>

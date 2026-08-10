@@ -14,8 +14,8 @@
   }
   .overlay-body {
     background: transparent;
-    border-color: rgba(139, 92, 246, 0.25);
-    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.08);
+    border-color: rgba(139, 92, 246, 0.12);
+    box-shadow: 0 2px 16px rgba(139, 92, 246, 0.04);
   }
 }
 
@@ -35,11 +35,11 @@ html, body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
-  border: 1.5px solid rgba(139, 92, 246, 0.18);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(139, 92, 246, 0.08);
   border-radius: 50px;
-  box-shadow: 0 4px 24px rgba(99, 95, 199, 0.10);
+  box-shadow: 0 2px 16px rgba(99, 95, 199, 0.06);
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;

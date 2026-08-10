@@ -280,7 +280,7 @@ function Overlay() {
       ) : (
         <div className="recording-layout">
           <div className="recording-top-row">
-            <ThinkingOrb state="listening" size={64} speed={0.75} />
+            <ThinkingOrb state="searching" size={64} speed={0.6} theme="auto" />
             <canvas ref={canvasRef} className="wave-canvas" style={{ width: 180, height: CANVAS_HEIGHT }} />
             <span className="orb-timer">{elapsedSec}s</span>
           </div>

@@ -1484,12 +1484,24 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
         },
     );
 
+    // Try primary URL, fall back to hf-mirror.com (China mirror)
     let mut response = client
         .get(url)
         .timeout(std::time::Duration::from_secs(1800))
         .send()
-        .await
-        .map_err(|e| format!("Failed to download model: {}", e))?;
+        .await;
+    if response.is_err() {
+        // Fallback to hf-mirror.com for users in China
+        if let Some(mirror_url) = url.replace("huggingface.co", "hf-mirror.com").into() {
+            log::info!("Primary URL failed, trying mirror: {}", mirror_url);
+            response = client
+                .get(&mirror_url)
+                .timeout(std::time::Duration::from_secs(1800))
+                .send()
+                .await;
+        }
+    }
+    let mut response = response.map_err(|e| format!("Failed to download model (primary & mirror both failed): {}", e))?;
 
     if !response.status().is_success() {
         return Err(format!("Download failed with HTTP {}", response.status()));
@@ -1509,8 +1521,8 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
             .map_err(|e| format!("Failed to write chunk: {}", e))?;
         downloaded += bytes.len() as u64;
 
-        // Emit progress every ~1MB or at end
-        if downloaded - last_emit_bytes >= 1_048_576 || (total_size > 0 && downloaded >= total_size) {
+        // Emit progress every ~256KB for responsive progress bar
+        if downloaded - last_emit_bytes >= 262_144 || (total_size > 0 && downloaded >= total_size) {
             let percentage = if total_size > 0 {
                 (downloaded as f64 / total_size as f64) * 100.0
             } else {
