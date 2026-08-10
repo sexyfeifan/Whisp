@@ -1501,7 +1501,8 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
                 .await;
         }
     }
-    let mut response = response.map_err(|e| format!("Failed to download model (primary & mirror both failed): {}", e))?;
+    let mut response =
+        response.map_err(|e| format!("Failed to download model (primary & mirror both failed): {}", e))?;
 
     if !response.status().is_success() {
         return Err(format!("Download failed with HTTP {}", response.status()));
