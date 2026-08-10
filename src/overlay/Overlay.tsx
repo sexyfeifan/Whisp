@@ -139,6 +139,18 @@ function Overlay() {
     };
   }, []);
 
+  // Resize overlay for streaming text — widen capsule to avoid obscuring
+  useEffect(() => {
+    if (state !== "recording") return;
+    if (streamingText) {
+      // Widen to accommodate streaming text
+      getCurrentWindow().setSize(new LogicalSize(520, 80));
+    } else {
+      // Default recording size
+      getCurrentWindow().setSize(new LogicalSize(420, 80));
+    }
+  }, [state, streamingText]);
+
   // Waveform animation (recording state)
   useEffect(() => {
     const canvas = canvasRef.current;

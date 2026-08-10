@@ -45,7 +45,7 @@ export function SettingsModelsPage(app: AppState) {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: number }>({});
+  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: { pct: number; downloaded: number; total: number } }>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const loadModels = useCallback(async () => {
@@ -74,6 +74,9 @@ export function SettingsModelsPage(app: AppState) {
   const downloadedNames = new Set(downloadedModels.map((m) => m.name));
   const notDownloaded = knownModels.filter((k) => !downloadedNames.has(k.name));
 
+  // Build a lookup for known model metadata to annotate downloaded models
+  const knownLookup = new Map(knownModels.map((k) => [k.name, k]));
+
   const handleDelete = async (modelName: string) => {
     setDeleting(modelName);
     try {
@@ -90,15 +93,19 @@ export function SettingsModelsPage(app: AppState) {
 
   const handleDownload = async (modelName: string) => {
     setDownloading(prev => new Set(prev).add(modelName));
-    setDownloadProgress(prev => ({ ...prev, [modelName]: 0 }));
+    setDownloadProgress(prev => ({ ...prev, [modelName]: { pct: 0, downloaded: 0, total: 0 } }));
 
-    const unlisten = await listen<{ model_name: string; percentage: number }>(
+    const unlisten = await listen<{ model_name: string; percentage: number; downloaded_bytes: number; total_bytes: number }>(
       'model-download-progress',
       (event) => {
         if (event.payload.model_name === modelName) {
           setDownloadProgress(prev => ({
             ...prev,
-            [modelName]: event.payload.percentage,
+            [modelName]: {
+              pct: Math.round(event.payload.percentage * 10) / 10,
+              downloaded: event.payload.downloaded_bytes,
+              total: event.payload.total_bytes,
+            },
           }));
         }
       },
@@ -198,18 +205,37 @@ export function SettingsModelsPage(app: AppState) {
                 <p className="text-sm" style={{ color: "hsl(var(--steel))" }}>{m.noModelsDownloaded}</p>
               ) : (
                 <div className="space-y-2">
-                  {downloadedModels.map((model) => (
+                  {downloadedModels.map((model) => {
+                    const known = knownLookup.get(model.name);
+                    return (
                     <div
                       key={model.name}
-                      className="flex items-center justify-between p-3 rounded-lg"
+                      className="flex items-start justify-between p-3 rounded-lg"
                       style={{ background: "hsl(var(--surface))" }}
                     >
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium truncate" style={{ color: "hsl(var(--ink))" }}>
                           {model.name}
                         </div>
-                        <div className="text-xs" style={{ color: "hsl(var(--steel))" }}>
-                          {formatBytes(model.size_bytes)}
+                        {known && (
+                          <div className="text-[11px] mt-0.5" style={{ color: "hsl(var(--steel))" }}>
+                            {known.description}
+                          </div>
+                        )}
+                        <div className="flex gap-3 mt-1">
+                          <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                            📦 {formatBytes(model.size_bytes)}
+                          </span>
+                          {known && (
+                            <>
+                              <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                                🌐 {known.languages}
+                              </span>
+                              <span className="text-[10px]" style={{ color: "hsl(var(--muted))" }}>
+                                🧩 {known.params}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                       <Button
@@ -226,7 +252,8 @@ export function SettingsModelsPage(app: AppState) {
                         {m.deleteModel}
                       </Button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </SettingsSection>
@@ -264,17 +291,28 @@ export function SettingsModelsPage(app: AppState) {
                           </span>
                         </div>
                       </div>
-                      <div className="shrink-0 w-36">
+                      <div className="shrink-0 w-40">
                         {downloading.has(model.name) ? (
                           downloadProgress[model.name] !== undefined ? (
                             <div className="w-full">
                               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(var(--hairline))" }}>
                                 <div
                                   className="h-full transition-all duration-300 rounded-full"
-                                  style={{ width: `${downloadProgress[model.name]}%`, background: "hsl(var(--primary))" }}
+                                  style={{ width: `${Math.max(1, downloadProgress[model.name].pct)}%`, background: "hsl(var(--primary))" }}
                                 />
                               </div>
-                              <p className="text-[10px] mt-1 text-right" style={{ color: "hsl(var(--steel))" }}>{downloadProgress[model.name]}%</p>
+                              <div className="flex justify-between mt-1">
+                                <span className="text-[10px]" style={{ color: "hsl(var(--steel))" }}>
+                                  {downloadProgress[model.name].total > 0
+                                    ? `${formatBytes(downloadProgress[model.name].downloaded)} / ${formatBytes(downloadProgress[model.name].total)}`
+                                    : downloadProgress[model.name].downloaded > 0
+                                      ? formatBytes(downloadProgress[model.name].downloaded)
+                                      : m.downloadingModel}
+                                </span>
+                                <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
+                                  {downloadProgress[model.name].pct}%
+                                </span>
+                              </div>
                             </div>
                           ) : (
                             <div className="flex items-center gap-1.5 justify-end">
