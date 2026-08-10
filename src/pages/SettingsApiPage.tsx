@@ -9,7 +9,7 @@ import { SettingsSection } from "../components/SettingsSection";
 import { SettingsPageHeader } from "../components/SettingsPageHeader";
 import { Sidebar } from "../components/Sidebar";
 import type { AppState } from "../hooks/useApp";
-import { endpointPresets, suggestedModels, defaultApiBaseUrl, viewVariants } from "../lib/constants";
+import { endpointPresets, summaryEndpointPresets, suggestedModels, defaultApiBaseUrl, viewVariants } from "../lib/constants";
 import { displaySpeechLanguage } from "../lib/utils";
 
 export function SettingsApiPage(app: AppState) {
@@ -163,6 +163,19 @@ export function SettingsApiPage(app: AppState) {
               title={m.aiSummary}
               description="Configure a separate API endpoint for AI summaries. Leave empty to use the main transcription API."
             >
+              <div>
+                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.endpointPresets}</label>
+                <div className="flex gap-2 flex-wrap">
+                  {summaryEndpointPresets.map((preset) => (
+                    <FilterChip
+                      key={preset.apiUrl}
+                      active={settings.summary_api_base_url === preset.apiUrl}
+                      label={preset.label}
+                      onClick={() => updateSettings({ summary_api_base_url: preset.apiUrl, summary_model: preset.model })}
+                    />
+                  ))}
+                </div>
+              </div>
               <div>
                 <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryApiUrl}</label>
                 <Input type="text" value={settings.summary_api_base_url} onChange={(event) => updateSettings({ summary_api_base_url: event.target.value })} placeholder={settings.api_base_url || "https://api.openai.com/v1"} />

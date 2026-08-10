@@ -40,11 +40,16 @@ export type ModelCatalogItem = {
 
 export const endpointPresets = [
   { label: "OpenAI", value: "https://api.openai.com/v1" },
-  { label: "Groq", value: "https://api.groq.com/openai/v1" },
-  { label: "Fireworks", value: "https://api.fireworks.ai/inference/v1" },
-  { label: "MiMo", value: "https://api.xiaomimimo.com/v1" },
   { label: "DeepSeek", value: "https://api.deepseek.com/v1" },
+  { label: "MiMo", value: "https://api.xiaomimimo.com/v1" },
   { label: "MiMo Token Plan", value: "https://token-plan-cn.xiaomimimo.com/v1" },
+];
+
+export const summaryEndpointPresets = [
+  { label: "OpenAI", apiUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+  { label: "DeepSeek", apiUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+  { label: "MiMo", apiUrl: "https://api.xiaomimimo.com/v1", model: "mimo-v2.5" },
+  { label: "MiMo Token Plan", apiUrl: "https://token-plan-cn.xiaomimimo.com/v1", model: "mimo-v2.5" },
 ];
 
 export const aiPolishPresets = [

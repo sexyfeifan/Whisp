@@ -56,12 +56,29 @@ export function SettingsRecordingPage(app: AppState) {
                 onChange={(value) => updateSettings({ streaming_enabled: value })}
               />
               {settings.streaming_enabled && (
-                <div>
-                  <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>
-                    {m.streamingChunkDuration ?? "Chunk Duration (seconds)"}
-                  </label>
-                  <Input type="number" min={1} max={30} step={1} value={settings.streaming_chunk_duration_secs} onChange={(event) => updateSettings({ streaming_chunk_duration_secs: Math.min(30, Math.max(1, Number(event.target.value) || 2)) })} />
-                </div>
+                <>
+                  <div>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>
+                      {m.streamingChunkDuration ?? "Chunk Duration (seconds)"}
+                    </label>
+                    <Input type="number" min={1} max={30} step={1} value={settings.streaming_chunk_duration_secs} onChange={(event) => updateSettings({ streaming_chunk_duration_secs: Math.min(30, Math.max(1, Number(event.target.value) || 2)) })} />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>
+                      {m.streamingSource ?? "Streaming Source"}
+                    </label>
+                    <p className="text-[11px] mb-2" style={{ color: "hsl(var(--steel))" }}>{m.streamingSourceDesc ?? "Choose cloud API or local Whisper model for real-time subtitles."}</p>
+                    <select
+                      value={settings.streaming_use_local_model ? "local" : "cloud"}
+                      onChange={(e) => updateSettings({ streaming_use_local_model: e.target.value === "local" })}
+                      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                      style={{ background: "hsl(var(--surface))", color: "hsl(var(--ink))", border: "1px solid hsl(var(--hairline))" }}
+                    >
+                      <option value="cloud">{m.streamingSourceCloud ?? "Cloud API"}</option>
+                      <option value="local">{m.streamingSourceLocal ?? "Local Model"}</option>
+                    </select>
+                  </div>
+                </>
               )}
               <div>
                 <label className="block text-xs mb-1" style={{ color: "hsl(var(--steel))" }}>

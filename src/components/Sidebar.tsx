@@ -1,6 +1,5 @@
 import type React from "react";
 import { Download, Moon, Sun } from "lucide-react";
-import { Badge } from "./ui/badge";
 import logoUrl from "../assets/logo.png";
 import type { View } from "../lib/constants";
 
@@ -92,9 +91,6 @@ export function Sidebar({
           <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>
             {appVersion ? `v${appVersion}` : ""}
           </span>
-          {updateStatus === "available" && (
-            <Badge variant="success">{m.newVersionAvailable}</Badge>
-          )}
         </div>
       </div>
     </div>

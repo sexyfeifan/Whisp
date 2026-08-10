@@ -35,6 +35,8 @@ pub struct StreamingConfig {
     pub language: String,
     /// Optional prompt to guide the transcription model.
     pub prompt: String,
+    /// Use local Whisper model instead of cloud API.
+    pub use_local_model: bool,
 }
 
 impl Default for StreamingConfig {
@@ -44,6 +46,7 @@ impl Default for StreamingConfig {
             chunk_duration_secs: 2,
             language: "auto".to_string(),
             prompt: String::new(),
+            use_local_model: false,
         }
     }
 }
@@ -154,32 +157,78 @@ pub async fn process_streaming_chunk(
         }
     };
 
-    // Build optional language and prompt for the API call.
-    let lang_opt = if config.language == "auto" {
-        None
+    // Transcribe the chunk — local Whisper or cloud API.
+    let chunk_result: std::result::Result<String, anyhow::Error> = if config.use_local_model {
+        // Use local Whisper engine for transcription
+        let engine = crate::whisper::WhisperEngine::new();
+        let whisper_config = crate::whisper::WhisperConfig {
+            model_path: String::new(), // will be loaded from stored config
+            language: config.language.clone(),
+            n_threads: 0,
+            translate: false,
+            prompt: config.prompt.clone(),
+        };
+        engine.set_config(whisper_config);
+        // Load the actual config from disk
+        let stored_config = engine.get_config();
+        if stored_config.model_path.is_empty() {
+            // Try to get model path from stored whisper config
+            let settings = crate::settings::get_settings();
+            if !settings.whisper_config_json.is_empty() {
+                if let Ok(wc) = serde_json::from_str::<crate::whisper::WhisperConfig>(&settings.whisper_config_json) {
+                    engine.set_config(crate::whisper::WhisperConfig {
+                        model_path: wc.model_path,
+                        language: config.language.clone(),
+                        n_threads: wc.n_threads,
+                        translate: false,
+                        prompt: config.prompt.clone(),
+                    });
+                }
+            }
+        }
+        // Convert WAV to f32 samples
+        let hound_reader = hound::WavReader::new(&wav_data[..]);
+        match hound_reader {
+            Ok(mut reader) => {
+                let samples: std::result::Result<Vec<f32>, _> =
+                    reader.samples::<i16>().map(|s| s.map(|v| v as f32 / 32768.0)).collect();
+                match samples {
+                    Ok(samples) => {
+                        let sample_rate = reader.spec().sample_rate;
+                        engine.transcribe(&samples, sample_rate).map(|r| r.text)
+                    }
+                    Err(e) => Err(anyhow::anyhow!("Failed to decode WAV samples: {}", e)),
+                }
+            }
+            Err(e) => Err(anyhow::anyhow!("Failed to read WAV: {}", e)),
+        }
     } else {
-        Some(config.language.as_str())
-    };
-    let prompt_opt = if config.prompt.trim().is_empty() {
-        None
-    } else {
-        Some(config.prompt.as_str())
+        // Build optional language and prompt for the API call.
+        let lang_opt = if config.language == "auto" {
+            None
+        } else {
+            Some(config.language.as_str())
+        };
+        let prompt_opt = if config.prompt.trim().is_empty() {
+            None
+        } else {
+            Some(config.prompt.as_str())
+        };
+        transcribe::transcribe_audio(
+            client,
+            api_key,
+            api_base_url,
+            model,
+            &wav_data,
+            lang_opt,
+            prompt_opt,
+            request_timeout_secs,
+            retry_count,
+        )
+        .await
     };
 
-    // Transcribe the chunk via the existing transcribe_audio function.
-    match transcribe::transcribe_audio(
-        client,
-        api_key,
-        api_base_url,
-        model,
-        &wav_data,
-        lang_opt,
-        prompt_opt,
-        request_timeout_secs,
-        retry_count,
-    )
-    .await
-    {
+    match chunk_result {
         Ok(chunk_text) => {
             // Append this chunk's text to the accumulated partial text.
             let mut st = state.lock().unwrap_or_else(|e| e.into_inner());

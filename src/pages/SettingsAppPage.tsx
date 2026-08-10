@@ -121,8 +121,7 @@ export function SettingsAppPage(app: AppState) {
               {updateStatus === "available" && updateInfo && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge variant="purple">{m.updateAvailable}</Badge>
-                    <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>v{updateInfo.latestVersion}</span>
+                    <span className="text-xs font-mono" style={{ color: "hsl(var(--primary))" }}>v{updateInfo.latestVersion}</span>
                   </div>
                   {updateInfo.publishedAt && (
                     <div className="text-[11px]" style={{ color: "hsl(var(--steel))" }}>{m.publishedAt}: {new Date(updateInfo.publishedAt).toLocaleDateString()}</div>

@@ -559,6 +559,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
         let stream_handle = app_handle.clone();
         let stream_chunk_dur = saved.streaming_chunk_duration_secs;
         let stream_lang = saved.language.clone();
+        let stream_use_local = saved.streaming_use_local_model;
         let stream_prompt = {
             let base = saved.whisper_prompt.clone();
             if saved.vocabulary_enabled && !saved.vocabulary.is_empty() {
@@ -594,6 +595,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                 chunk_duration_secs: stream_chunk_dur,
                 language: stream_lang,
                 prompt: stream_prompt,
+                use_local_model: stream_use_local,
             };
             let state = crate::streaming::STREAMING_STATE.get_or_init(|| std::sync::Mutex::new(None));
             {

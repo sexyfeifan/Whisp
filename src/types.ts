@@ -57,6 +57,7 @@ export interface AppSettings {
   summary_api_base_url: string;
   streaming_enabled: boolean;
   streaming_chunk_duration_secs: number;
+  streaming_use_local_model: boolean;
   diarization_enabled: boolean;
   diarization_api_key: string;
   diarization_api_base_url: string;

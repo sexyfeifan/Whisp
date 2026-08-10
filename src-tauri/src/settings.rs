@@ -100,6 +100,9 @@ pub struct AppSettings {
     /// Streaming chunk duration in seconds (default: 3)
     #[serde(default = "default_streaming_chunk_duration_secs")]
     pub streaming_chunk_duration_secs: u32,
+    /// Use local Whisper model for streaming transcription (default: false)
+    #[serde(default)]
+    pub streaming_use_local_model: bool,
     /// Speaker diarization enabled (default: false)
     #[serde(default)]
     pub diarization_enabled: bool,
@@ -209,6 +212,8 @@ struct DiskSettings {
     pub streaming_enabled: bool,
     #[serde(default = "default_streaming_chunk_duration_secs")]
     pub streaming_chunk_duration_secs: u32,
+    #[serde(default)]
+    pub streaming_use_local_model: bool,
     #[serde(default)]
     pub diarization_enabled: bool,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -383,6 +388,7 @@ impl Default for AppSettings {
             summary_api_base_url: String::new(),
             streaming_enabled: false,
             streaming_chunk_duration_secs: default_streaming_chunk_duration_secs(),
+            streaming_use_local_model: false,
             diarization_enabled: false,
             diarization_api_key: String::new(),
             diarization_api_base_url: default_diarization_api_base_url(),
@@ -520,6 +526,7 @@ fn save_disk_settings(settings: &AppSettings, _keychain_ok: bool) -> Result<(), 
         summary_api_base_url: settings.summary_api_base_url.clone(),
         streaming_enabled: settings.streaming_enabled,
         streaming_chunk_duration_secs: settings.streaming_chunk_duration_secs,
+        streaming_use_local_model: settings.streaming_use_local_model,
         diarization_enabled: settings.diarization_enabled,
         diarization_api_key: settings.diarization_api_key.clone(),
         diarization_api_base_url: settings.diarization_api_base_url.clone(),
@@ -574,6 +581,7 @@ pub fn get_settings() -> AppSettings {
         summary_api_base_url: disk.summary_api_base_url,
         streaming_enabled: disk.streaming_enabled,
         streaming_chunk_duration_secs: disk.streaming_chunk_duration_secs,
+        streaming_use_local_model: disk.streaming_use_local_model,
         diarization_enabled: disk.diarization_enabled,
         diarization_api_key: disk.diarization_api_key,
         diarization_api_base_url: disk.diarization_api_base_url,
