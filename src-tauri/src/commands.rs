@@ -2035,6 +2035,7 @@ pub async fn transcribe_file(
     {
         Ok(text) => {
             log::info!("File transcription succeeded: {} chars", text.len());
+            let raw_text = text.clone();
 
             let (final_text, polish_tokens) = if polish && !settings.ai_polish_api_key.is_empty() {
                 match crate::polish::polish_text(
@@ -2068,7 +2069,7 @@ pub async fn transcribe_file(
             };
 
             let entry = NewHistoryEntry {
-                text: text.clone(),
+                text: raw_text.clone(),
                 model: settings.model.clone(),
                 duration_ms,
                 audio_path: None, // uploaded file not saved to disk
@@ -2081,7 +2082,7 @@ pub async fn transcribe_file(
                 asr_duration_sec: Some(asr_duration_sec),
                 polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                 estimated_cost: Some(asr_cost + polish_cost),
-                polished_text: if final_text != text {
+                polished_text: if final_text != raw_text {
                     Some(final_text.clone())
                 } else {
                     None

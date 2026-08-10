@@ -936,6 +936,7 @@ mod tests {
             asr_duration_sec: Some(1.0),
             polish_tokens: None,
             estimated_cost: None,
+            polished_text: None,
             recorded_at: 0,
         })
         .unwrap();
@@ -954,6 +955,7 @@ mod tests {
             asr_duration_sec: Some(2.0),
             polish_tokens: None,
             estimated_cost: None,
+            polished_text: None,
             recorded_at: 0,
         })
         .unwrap();
