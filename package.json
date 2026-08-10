@@ -1,7 +1,7 @@
 {
   "name": "whisp",
   "private": true,
-  "version": "2.12.11",
+  "version": "2.12.12",
   "type": "module",
   "scripts": {
     "dev": "vite",
