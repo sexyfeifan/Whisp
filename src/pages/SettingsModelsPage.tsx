@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Box, Download, Trash2, RefreshCw, HardDrive, Info, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -45,7 +45,8 @@ export function SettingsModelsPage(app: AppState) {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
-  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: { pct: number; downloaded: number; total: number } }>({});
+  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: { pct: number; downloaded: number; total: number; speed: number } }>({});
+  const dlTrackingRef = useRef<Record<string, { lastBytes: number; lastTime: number }>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const loadModels = useCallback(async () => {
@@ -93,18 +94,30 @@ export function SettingsModelsPage(app: AppState) {
 
   const handleDownload = async (modelName: string) => {
     setDownloading(prev => new Set(prev).add(modelName));
-    setDownloadProgress(prev => ({ ...prev, [modelName]: { pct: 0, downloaded: 0, total: 0 } }));
+    setDownloadProgress(prev => ({ ...prev, [modelName]: { pct: 0, downloaded: 0, total: 0, speed: 0 } }));
+    dlTrackingRef.current[modelName] = { lastBytes: 0, lastTime: Date.now() };
 
     const unlisten = await listen<{ model_name: string; percentage: number; downloaded_bytes: number; total_bytes: number }>(
       'model-download-progress',
       (event) => {
         if (event.payload.model_name === modelName) {
+          const now = Date.now();
+          const tracking = dlTrackingRef.current[modelName];
+          let speed = 0;
+          if (tracking) {
+            const elapsed = (now - tracking.lastTime) / 1000;
+            const deltaBytes = event.payload.downloaded_bytes - tracking.lastBytes;
+            speed = elapsed > 0.3 ? deltaBytes / elapsed : 0;
+            tracking.lastBytes = event.payload.downloaded_bytes;
+            tracking.lastTime = now;
+          }
           setDownloadProgress(prev => ({
             ...prev,
             [modelName]: {
               pct: Math.round(event.payload.percentage * 10) / 10,
               downloaded: event.payload.downloaded_bytes,
               total: event.payload.total_bytes,
+              speed,
             },
           }));
         }
@@ -120,6 +133,7 @@ export function SettingsModelsPage(app: AppState) {
     } finally {
       setDownloading(prev => { const s = new Set(prev); s.delete(modelName); return s; });
       setDownloadProgress(prev => { const p = { ...prev }; delete p[modelName]; return p; });
+      delete dlTrackingRef.current[modelName];
       unlisten();
       setTimeout(() => setFeedback(null), 3000);
     }
@@ -310,7 +324,9 @@ export function SettingsModelsPage(app: AppState) {
                                       : m.downloadingModel}
                                 </span>
                                 <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
-                                  {downloadProgress[model.name].pct}%
+                                  {downloadProgress[model.name].speed > 0
+                                    ? `${formatBytes(downloadProgress[model.name].speed)}/s`
+                                    : `${downloadProgress[model.name].pct}%`}
                                 </span>
                               </div>
                             </div>

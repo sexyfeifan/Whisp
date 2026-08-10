@@ -403,7 +403,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                                 return (
                                   <span style={{ position: "relative" }}>
                                     <span style={{
-                                      background: `linear-gradient(to right, hsla(258, 75%, 60%, 0.28) ${highlightPct}%, transparent ${highlightPct}%)`,
+                                      background: `linear-gradient(to right, hsla(175, 60%, 48%, 0.28) ${highlightPct}%, transparent ${highlightPct}%)`,
                                       color: "hsl(var(--ink))",
                                       borderRadius: 3,
                                       transition: "background 0.08s linear",
@@ -553,7 +553,22 @@ const handleUploadConfirm = async (polish: boolean) => {
                 )}
                 <div>
                   <h3 className="text-sm font-medium mb-1" style={{ color: "hsl(var(--steel))" }}>{m.summaryOverview}</h3>
-                  <p className="text-sm" style={{ color: "hsl(var(--ink))" }}>{summaryModal.result.summary}</p>
+                  <div className="text-sm space-y-1.5 leading-relaxed" style={{ color: "hsl(var(--ink))" }}>
+                    {summaryModal.result.summary.split('\n').map((line, i) => {
+                      const trimmed = line.trim();
+                      if (!trimmed) return <div key={i} className="h-1.5" />;
+                      // Bold headers: **text** or **text**: content
+                      const boldMatch = trimmed.match(/^\*\*(.+?)\*\*:?\s*(.*)/);
+                      if (boldMatch) {
+                        return <p key={i}><strong className="font-semibold">{boldMatch[1]}</strong>{boldMatch[2] ? `: ${boldMatch[2]}` : ''}</p>;
+                      }
+                      // List items: - or • or * prefix
+                      if (/^[-•*]\s/.test(trimmed)) {
+                        return <p key={i} className="flex gap-2 pl-1"><span className="shrink-0" style={{ color: "hsl(var(--primary))" }}>•</span><span>{trimmed.replace(/^[-•*]\s*/, '')}</span></p>;
+                      }
+                      return <p key={i}>{trimmed}</p>;
+                    })}
+                  </div>
                 </div>
                 {summaryModal.result.keywords.length > 0 && (
                   <div>

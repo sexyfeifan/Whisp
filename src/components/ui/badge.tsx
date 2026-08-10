@@ -17,7 +17,7 @@ function Badge({ className, variant = "default", ...props }: BadgeProps) {
           "bg-[hsl(24_90%_50%)] text-white rounded-full px-2.5 py-1 text-[13px]": variant === "orange",
           "bg-[hsl(142_60%_36%)] text-white rounded-full px-2.5 py-1 text-[13px]": variant === "green",
           /* Notion tag chips: soft bg, small rounded */
-          "bg-[hsl(var(--tint-lavender))] text-[hsl(268_40%_28%)] rounded-[6px] px-2 py-0.5 text-[12px]": variant === "tag-purple",
+          "bg-[hsl(var(--tint-teal))] text-[hsl(175_40%_28%)] rounded-[6px] px-2 py-0.5 text-[12px]": variant === "tag-purple",
           "bg-[hsl(var(--tint-peach))] text-[hsl(24_60%_30%)] rounded-[6px] px-2 py-0.5 text-[12px]": variant === "tag-orange",
           "bg-[hsl(var(--tint-mint))] text-[hsl(142_40%_25%)] rounded-[6px] px-2 py-0.5 text-[12px]": variant === "tag-green",
           /* Default / semantic */

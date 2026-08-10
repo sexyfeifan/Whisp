@@ -7,9 +7,9 @@
 
 :root {
   /* Brand & Primary */
-  --primary: 260 62% 48%;
-  --primary-pressed: 260 62% 38%;
-  --primary-deep: 260 62% 30%;
+  --primary: 175 60% 40%;
+  --primary-pressed: 175 60% 32%;
+  --primary-deep: 175 60% 24%;
   --on-primary: 0 0% 100%;
 
   /* Surface */
@@ -33,7 +33,7 @@
   --tint-peach: 24 100% 92%;
   --tint-rose: 340 80% 93%;
   --tint-mint: 142 50% 90%;
-  --tint-lavender: 268 50% 92%;
+  --tint-teal: 175 50% 92%;
   --tint-sky: 210 80% 93%;
   --tint-yellow: 48 80% 92%;
   --tint-yellow-bold: 48 90% 80%;
@@ -57,31 +57,31 @@
   --secondary: 40 20% 97%;
   --secondary-foreground: 30 5% 20%;
   --muted-fg: 30 4% 45%;
-  --accent: 268 50% 95%;
-  --accent-foreground: 260 62% 35%;
+  --accent: 175 50% 95%;
+  --accent-foreground: 175 60% 35%;
   --border: 40 12% 88%;
   --input: 40 10% 78%;
-  --ring: 260 62% 48%;
+  --ring: 175 60% 40%;
   --radius: 0.5rem;
 
   --sidebar-bg: 40 20% 98.5%;
   --sidebar-border: 40 12% 90%;
-  --sidebar-item-active-bg: 260 40% 95%;
+  --sidebar-item-active-bg: 175 40% 95%;
   --sidebar-item-hover-bg: 40 20% 97%;
   --sidebar-text: 30 4% 45%;
-  --sidebar-text-active: 260 62% 35%;
+  --sidebar-text-active: 175 60% 35%;
 
-  --brand: 260 62% 48%;
+  --brand: 175 60% 40%;
   --brand-foreground: 0 0% 100%;
-  --brand-subtle: 260 40% 96%;
-  --brand-glow: 260 70% 55%;
+  --brand-subtle: 175 40% 96%;
+  --brand-glow: 175 70% 50%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary: 260 60% 62%;
-    --primary-pressed: 260 60% 52%;
-    --primary-deep: 260 60% 45%;
+    --primary: 175 55% 55%;
+    --primary-pressed: 175 55% 45%;
+    --primary-deep: 175 55% 38%;
     --on-primary: 0 0% 5%;
 
     --canvas: 240 6% 6%;
@@ -102,7 +102,7 @@
     --tint-peach: 24 30% 18%;
     --tint-rose: 340 25% 18%;
     --tint-mint: 142 20% 16%;
-    --tint-lavender: 268 20% 18%;
+    --tint-teal: 175 20% 18%;
     --tint-sky: 210 25% 18%;
     --tint-yellow: 48 25% 18%;
     --tint-yellow-bold: 48 35% 22%;
@@ -124,31 +124,31 @@
     --secondary: 240 5% 13%;
     --secondary-foreground: 40 5% 82%;
     --muted-fg: 40 4% 52%;
-    --accent: 260 20% 16%;
-    --accent-foreground: 260 60% 75%;
+    --accent: 175 20% 16%;
+    --accent-foreground: 175 55% 75%;
     --border: 240 5% 18%;
     --input: 240 5% 25%;
-    --ring: 260 60% 62%;
+    --ring: 175 55% 55%;
 
     --sidebar-bg: 240 6% 5%;
     --sidebar-border: 240 5% 16%;
-    --sidebar-item-active-bg: 260 25% 14%;
+    --sidebar-item-active-bg: 175 25% 14%;
     --sidebar-item-hover-bg: 240 5% 10%;
     --sidebar-text: 40 4% 48%;
-    --sidebar-text-active: 260 60% 75%;
+    --sidebar-text-active: 175 55% 75%;
 
-    --brand: 260 60% 62%;
+    --brand: 175 55% 55%;
     --brand-foreground: 0 0% 5%;
-    --brand-subtle: 260 25% 12%;
-    --brand-glow: 260 70% 55%;
+    --brand-subtle: 175 25% 12%;
+    --brand-glow: 175 70% 50%;
   }
 }
 
 /* Manual light mode toggle (data-theme attribute) — overrides prefers-color-scheme: dark */
 [data-theme="light"] {
-  --primary: 260 62% 48%;
-  --primary-pressed: 260 62% 38%;
-  --primary-deep: 260 62% 30%;
+  --primary: 175 60% 40%;
+  --primary-pressed: 175 60% 32%;
+  --primary-deep: 175 60% 24%;
   --on-primary: 0 0% 100%;
   --canvas: 0 0% 100%;
   --surface: 40 20% 97%;
@@ -166,7 +166,7 @@
   --tint-peach: 24 100% 92%;
   --tint-rose: 340 80% 93%;
   --tint-mint: 142 50% 90%;
-  --tint-lavender: 268 50% 92%;
+  --tint-teal: 175 50% 92%;
   --tint-sky: 210 80% 93%;
   --tint-yellow: 48 80% 92%;
   --tint-yellow-bold: 48 90% 80%;
@@ -186,28 +186,28 @@
   --secondary: 40 20% 97%;
   --secondary-foreground: 30 5% 20%;
   --muted-fg: 30 4% 45%;
-  --accent: 268 50% 95%;
-  --accent-foreground: 260 62% 35%;
+  --accent: 175 50% 95%;
+  --accent-foreground: 175 60% 35%;
   --border: 40 12% 88%;
   --input: 40 10% 78%;
-  --ring: 260 62% 48%;
+  --ring: 175 60% 40%;
   --sidebar-bg: 40 20% 98.5%;
   --sidebar-border: 40 12% 90%;
-  --sidebar-item-active-bg: 260 40% 95%;
+  --sidebar-item-active-bg: 175 40% 95%;
   --sidebar-item-hover-bg: 40 20% 97%;
   --sidebar-text: 30 4% 45%;
-  --sidebar-text-active: 260 62% 35%;
-  --brand: 260 62% 48%;
+  --sidebar-text-active: 175 60% 35%;
+  --brand: 175 60% 40%;
   --brand-foreground: 0 0% 100%;
-  --brand-subtle: 260 40% 96%;
-  --brand-glow: 260 70% 55%;
+  --brand-subtle: 175 40% 96%;
+  --brand-glow: 175 70% 50%;
 }
 
 /* Manual dark mode toggle (data-theme attribute) */
 [data-theme="dark"] {
-  --primary: 260 60% 62%;
-  --primary-pressed: 260 60% 52%;
-  --primary-deep: 260 60% 45%;
+  --primary: 175 55% 55%;
+  --primary-pressed: 175 55% 45%;
+  --primary-deep: 175 55% 38%;
   --on-primary: 0 0% 5%;
 
   --canvas: 240 6% 6%;
@@ -228,7 +228,7 @@
   --tint-peach: 24 30% 18%;
   --tint-rose: 340 25% 18%;
   --tint-mint: 142 20% 16%;
-  --tint-lavender: 268 20% 18%;
+  --tint-teal: 175 20% 18%;
   --tint-sky: 210 25% 18%;
   --tint-yellow: 48 25% 18%;
   --tint-yellow-bold: 48 35% 22%;
@@ -250,23 +250,23 @@
   --secondary: 240 5% 13%;
   --secondary-foreground: 40 5% 82%;
   --muted-fg: 40 4% 52%;
-  --accent: 260 20% 16%;
-  --accent-foreground: 260 60% 75%;
+  --accent: 175 20% 16%;
+  --accent-foreground: 175 55% 75%;
   --border: 240 5% 18%;
   --input: 240 5% 25%;
-  --ring: 260 60% 62%;
+  --ring: 175 55% 55%;
 
   --sidebar-bg: 240 6% 5%;
   --sidebar-border: 240 5% 16%;
-  --sidebar-item-active-bg: 260 25% 14%;
+  --sidebar-item-active-bg: 175 25% 14%;
   --sidebar-item-hover-bg: 240 5% 10%;
   --sidebar-text: 40 4% 48%;
-  --sidebar-text-active: 260 60% 75%;
+  --sidebar-text-active: 175 55% 75%;
 
-  --brand: 260 60% 62%;
+  --brand: 175 55% 55%;
   --brand-foreground: 0 0% 5%;
-  --brand-subtle: 260 25% 12%;
-  --brand-glow: 260 70% 55%;
+  --brand-subtle: 175 25% 12%;
+  --brand-glow: 175 70% 50%;
 }
 
 /* ═══ Typography ═══ */

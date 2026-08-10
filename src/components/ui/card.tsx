@@ -61,13 +61,13 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 CardContent.displayName = "CardContent";
 
 /* Pastel-tinted feature cards (Notion style) */
-type TintColor = "peach" | "rose" | "mint" | "lavender" | "sky" | "yellow" | "cream" | "gray";
+type TintColor = "peach" | "rose" | "mint" | "teal" | "sky" | "yellow" | "cream" | "gray";
 
 const tintMap: Record<TintColor, string> = {
   peach: "bg-[hsl(var(--tint-peach))]",
   rose: "bg-[hsl(var(--tint-rose))]",
   mint: "bg-[hsl(var(--tint-mint))]",
-  lavender: "bg-[hsl(var(--tint-lavender))]",
+  teal: "bg-[hsl(var(--tint-teal))]",
   sky: "bg-[hsl(var(--tint-sky))]",
   yellow: "bg-[hsl(var(--tint-yellow))]",
   cream: "bg-[hsl(var(--tint-cream))]",

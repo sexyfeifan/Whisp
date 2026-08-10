@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Play, Pause, Volume2 } from "lucide-react";
+import { Play, Pause } from "lucide-react";
 
 interface AudioPlayerProps {
   audioPath: string | null;
@@ -18,8 +18,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [waveformData, setWaveformData] = useState<number[]>([]);
-  const [volume, setVolume] = useState(1);
-  const [showVolume, setShowVolume] = useState(false);
+
 
   // Generate waveform data from WAV bytes
   const generateWaveform = useCallback((bytes: Uint8Array) => {
@@ -74,7 +73,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
           cancelAnimationFrame(animationRef.current);
         });
 
-        audio.volume = volume;
+        audio.volume = 1;
       } catch (error) {
         console.error("Failed to load audio:", error);
       } finally {
@@ -91,7 +90,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       }
       cancelAnimationFrame(animationRef.current);
     };
-  }, [audioPath, generateWaveform, volume]);
+  }, [audioPath, generateWaveform]);
 
   // Draw waveform on canvas
   useEffect(() => {
@@ -121,7 +120,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
 
       // Color: played portion in primary color, rest in muted
       const isPlayed = i / waveformData.length <= progressRatio;
-      ctx.fillStyle = isPlayed ? "hsl(260, 62%, 48%)" : "hsl(220, 15%, 85%)";
+      ctx.fillStyle = isPlayed ? "hsl(175, 60%, 40%)" : "hsl(220, 15%, 85%)";
       ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
     });
   }, [waveformData, currentTime, duration]);
@@ -165,13 +164,6 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
     }
   }, [duration]);
 
-  const handleVolumeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const vol = parseFloat(e.target.value);
-    setVolume(vol);
-    if (audioRef.current) {
-      audioRef.current.volume = vol;
-    }
-  }, []);
 
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60);
@@ -222,31 +214,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
           <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
-          <div
-            className="relative"
-            onMouseEnter={() => setShowVolume(true)}
-            onMouseLeave={() => setShowVolume(false)}
-          >
-            <button
-              className="p-1 rounded hover:opacity-70"
-              style={{ color: "hsl(var(--steel))" }}
-            >
-              <Volume2 size={14} />
-            </button>
-            {showVolume && (
-              <div className="absolute bottom-full right-0 mb-1 p-2 rounded-lg shadow-lg" style={{ background: "hsl(var(--background))" }}>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  className="w-20"
-                />
-              </div>
-            )}
-          </div>
+
         </div>
       </div>
     </div>
