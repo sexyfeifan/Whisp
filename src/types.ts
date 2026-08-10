@@ -14,6 +14,8 @@ export interface HistoryEntry {
   asr_duration_sec: number | null;
   polish_tokens: number | null;
   estimated_cost: number | null;
+  ai_polished: boolean | null;
+  polished_text: string | null;
 }
 
 export interface AppSettings {

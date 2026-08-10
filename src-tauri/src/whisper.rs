@@ -242,7 +242,7 @@ pub struct ModelInfo {
 
 /// Known Whisper models and their download URLs
 /// Tuple: (name, url, size, description_en, description_zh, languages, params)
-const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str, &str)] = &[
+pub const KNOWN_MODELS: &[(&str, &str, u64, &str, &str, &str, &str)] = &[
     (
         "ggml-tiny.en",
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",

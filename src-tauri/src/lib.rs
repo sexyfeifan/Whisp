@@ -909,7 +909,8 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     }
                 }
 
-                let (text, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
+                let raw_text = text.clone();
+                let (polished_text_opt, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
                     log::info!("Polishing text with AI...");
                     match polish::polish_text(
                         &http_client,
@@ -924,17 +925,20 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     {
                         Ok(result) => {
                             log::info!("AI polish succeeded, text_length={}", result.text.len());
-                            (result.text, result.tokens_used)
+                            (Some(result.text), result.tokens_used)
                         }
                         Err(e) => {
                             log::info!("AI polish failed: {}", e);
                             let _ = handle.emit("polish-error", e.to_string());
-                            (text, 0i64)
+                            (None, 0i64)
                         }
                     }
                 } else {
-                    (text, 0i64)
+                    (None, 0i64)
                 };
+
+                // Use polished text for display/clipboard, raw text for storage
+                let display_text = polished_text_opt.as_deref().unwrap_or(&raw_text);
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
                 let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
@@ -946,7 +950,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 let estimated_cost = asr_cost + polish_cost;
 
                 // Copy to clipboard and auto-paste into active app
-                let _ = handle.clipboard().write_text(&text);
+                let _ = handle.clipboard().write_text(display_text);
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
@@ -980,7 +984,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 }
 
                 let entry = NewHistoryEntry {
-                    text: text.clone(),
+                    text: raw_text.clone(),
                     model: model.clone(),
                     duration_ms,
                     audio_path: audio_path_str.clone(),
@@ -993,6 +997,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     asr_duration_sec: Some(asr_duration_sec),
                     polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                     estimated_cost: Some(estimated_cost),
+                    polished_text: polished_text_opt,
                     recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 };
                 let _ = history.add_entry(&entry);
@@ -1020,6 +1025,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    polished_text: None,
                     recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 };
                 let _ = history.add_entry(&entry);
@@ -1186,7 +1192,8 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     }
                 }
 
-                let (text, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
+                let raw_text = text.clone();
+                let (polished_text_opt, polish_tokens) = if ai_polish_enabled && !ai_polish_api_key.is_empty() {
                     match polish::polish_text(
                         &http_client,
                         &ai_polish_api_key,
@@ -1198,18 +1205,20 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     )
                     .await
                     {
-                        Ok(result) => (result.text, result.tokens_used),
+                        Ok(result) => (Some(result.text), result.tokens_used),
                         Err(e) => {
                             log::info!("AI polish failed: {}", e);
                             let _ = handle.emit("polish-error", e.to_string());
-                            (text, 0i64)
+                            (None, 0i64)
                         }
                     }
                 } else {
-                    (text, 0i64)
+                    (None, 0i64)
                 };
 
-                let _ = handle.clipboard().write_text(&text);
+                let display_text = polished_text_opt.as_deref().unwrap_or(&raw_text);
+
+                let _ = handle.clipboard().write_text(display_text);
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
@@ -1220,7 +1229,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     });
                 }
 
-                let _ = handle.emit("transcription-done", &text);
+                let _ = handle.emit("transcription-done", display_text);
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
                 let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
@@ -1232,7 +1241,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                 let estimated_cost = asr_cost + polish_cost;
 
                 let entry = history_clone.add_entry(&NewHistoryEntry {
-                    text: text.clone(),
+                    text: raw_text.clone(),
                     model: model.clone(),
                     duration_ms,
                     audio_path,
@@ -1243,8 +1252,9 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     language: language.clone(),
                     retry_of: None,
                     asr_duration_sec: Some(asr_duration_sec),
-                    polish_tokens: Some(polish_tokens),
+                    polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                     estimated_cost: Some(estimated_cost),
+                    polished_text: polished_text_opt,
                     recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 });
 
@@ -1274,6 +1284,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    polished_text: None,
                     recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
                 });
                 let handle2 = handle.clone();

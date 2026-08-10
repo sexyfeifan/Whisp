@@ -57,6 +57,7 @@ static MIGRATIONS: &[M] = &[
             VALUES (new.id, new.text, new.model, new.provider, new.language);
         END;",
     ),
+    M::up("ALTER TABLE transcriptions ADD COLUMN polished_text TEXT;"),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,6 +77,7 @@ pub struct HistoryEntry {
     pub asr_duration_sec: Option<f64>,
     pub polish_tokens: Option<i64>,
     pub estimated_cost: Option<f64>,
+    pub polished_text: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +95,7 @@ pub struct NewHistoryEntry {
     pub asr_duration_sec: Option<f64>,
     pub polish_tokens: Option<i64>,
     pub estimated_cost: Option<f64>,
+    pub polished_text: Option<String>,
     /// Recording start timestamp (Unix epoch seconds). If 0, uses current time.
     pub recorded_at: i64,
 }
@@ -167,8 +170,9 @@ impl HistoryManager {
                 retry_of,
                 asr_duration_sec,
                 polish_tokens,
-                estimated_cost
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+                estimated_cost,
+                polished_text
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             rusqlite::params![
                 entry.text,
                 entry.model,
@@ -184,6 +188,7 @@ impl HistoryManager {
                 entry.asr_duration_sec,
                 entry.polish_tokens,
                 entry.estimated_cost,
+                entry.polished_text,
             ],
         )?;
         let id = conn.last_insert_rowid();
@@ -203,6 +208,7 @@ impl HistoryManager {
             asr_duration_sec: entry.asr_duration_sec,
             polish_tokens: entry.polish_tokens,
             estimated_cost: entry.estimated_cost,
+            polished_text: entry.polished_text.clone(),
         })
     }
 
@@ -224,7 +230,8 @@ impl HistoryManager {
                 retry_of,
                 asr_duration_sec,
                 polish_tokens,
-                estimated_cost
+                estimated_cost,
+                polished_text
              FROM transcriptions
              WHERE id = ?1",
         )?;
@@ -242,6 +249,7 @@ impl HistoryManager {
         provider: &str,
         api_base_url: &str,
         language: &str,
+        polished_text: Option<&str>,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
         let timestamp = chrono::Utc::now().timestamp();
@@ -254,8 +262,9 @@ impl HistoryManager {
                  error_message = ?5,
                  provider = ?6,
                  api_base_url = ?7,
-                 language = ?8
-             WHERE id = ?9",
+                 language = ?8,
+                 polished_text = ?9
+             WHERE id = ?10",
             rusqlite::params![
                 text,
                 model,
@@ -265,6 +274,7 @@ impl HistoryManager {
                 provider,
                 api_base_url,
                 language,
+                polished_text,
                 id
             ],
         )?;
@@ -309,7 +319,8 @@ impl HistoryManager {
                 retry_of,
                 asr_duration_sec,
                 polish_tokens,
-                estimated_cost
+                estimated_cost,
+                polished_text
              FROM transcriptions
              ORDER BY timestamp DESC",
         )?;
@@ -337,7 +348,8 @@ impl HistoryManager {
                 retry_of,
                 asr_duration_sec,
                 polish_tokens,
-                estimated_cost
+                estimated_cost,
+                polished_text
              FROM transcriptions
              ORDER BY timestamp DESC
              LIMIT ?1 OFFSET ?2",
@@ -458,7 +470,8 @@ impl HistoryManager {
                         retry_of INTEGER,
                         asr_duration_sec REAL,
                         polish_tokens INTEGER,
-                        estimated_cost REAL
+                        estimated_cost REAL,
+                        polished_text TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_transcriptions_timestamp ON transcriptions(timestamp DESC);
                     CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
@@ -527,7 +540,8 @@ impl HistoryManager {
                 t.retry_of,
                 t.asr_duration_sec,
                 t.polish_tokens,
-                t.estimated_cost
+                t.estimated_cost,
+                t.polished_text
              FROM transcriptions t
              INNER JOIN transcriptions_fts fts ON t.id = fts.rowid
              WHERE transcriptions_fts MATCH ?1
@@ -631,7 +645,8 @@ impl HistoryManager {
                 retry_of,
                 asr_duration_sec,
                 polish_tokens,
-                estimated_cost
+                estimated_cost,
+                polished_text
              FROM transcriptions
              WHERE text LIKE ?1 ESCAPE '\\'
              ORDER BY timestamp DESC
@@ -721,7 +736,7 @@ impl HistoryManager {
             "SELECT
                 id, text, model, timestamp, duration_ms, audio_path,
                 status, error_message, provider, api_base_url, language,
-                retry_of, asr_duration_sec, polish_tokens, estimated_cost
+                retry_of, asr_duration_sec, polish_tokens, estimated_cost, polished_text
              FROM transcriptions
              WHERE id IN ({})
              ORDER BY timestamp ASC",
@@ -816,6 +831,7 @@ fn row_to_history_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<HistoryEntr
         asr_duration_sec: row.get(12)?,
         polish_tokens: row.get(13)?,
         estimated_cost: row.get(14)?,
+        polished_text: row.get(15)?,
     })
 }
 
@@ -851,6 +867,7 @@ mod tests {
                 asr_duration_sec: Some(5.0),
                 polish_tokens: None,
                 estimated_cost: Some(0.03),
+                polished_text: None,
                 recorded_at: 0,
             })
             .unwrap();
@@ -892,6 +909,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                polished_text: None,
                 recorded_at: 0,
             })
             .unwrap();
@@ -973,6 +991,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                polished_text: None,
                 recorded_at: 0,
             })
             .unwrap();
@@ -1006,6 +1025,7 @@ mod tests {
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                polished_text: None,
                 recorded_at: 0,
             })
             .unwrap();
@@ -1019,6 +1039,7 @@ mod tests {
             "Groq",
             "https://api.groq.com/v1",
             "zh",
+            None,
         )
         .unwrap();
 

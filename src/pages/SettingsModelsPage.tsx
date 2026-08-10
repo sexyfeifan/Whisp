@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Box, Download, Trash2, RefreshCw, HardDrive } from "lucide-react";
+import { Box, Download, Trash2, RefreshCw, HardDrive, Info, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { Button } from "../components/ui/button";
 import { SettingsSection } from "../components/SettingsSection";
 import { Sidebar } from "../components/Sidebar";
@@ -43,7 +44,8 @@ export function SettingsModelsPage(app: AppState) {
   const [diskUsage, setDiskUsage] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: number }>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
 
   const loadModels = useCallback(async () => {
@@ -87,7 +89,21 @@ export function SettingsModelsPage(app: AppState) {
   };
 
   const handleDownload = async (modelName: string) => {
-    setDownloading(modelName);
+    setDownloading(prev => new Set(prev).add(modelName));
+    setDownloadProgress(prev => ({ ...prev, [modelName]: 0 }));
+
+    const unlisten = await listen<{ model_name: string; percentage: number }>(
+      'model-download-progress',
+      (event) => {
+        if (event.payload.model_name === modelName) {
+          setDownloadProgress(prev => ({
+            ...prev,
+            [modelName]: event.payload.percentage,
+          }));
+        }
+      },
+    );
+
     try {
       await invoke("download_whisper_model", { modelName });
       setFeedback({ tone: "success", message: m.modelDownloaded });
@@ -95,7 +111,9 @@ export function SettingsModelsPage(app: AppState) {
     } catch (error) {
       setFeedback({ tone: "error", message: String(error) });
     } finally {
-      setDownloading(null);
+      setDownloading(prev => { const s = new Set(prev); s.delete(modelName); return s; });
+      setDownloadProgress(prev => { const p = { ...prev }; delete p[modelName]; return p; });
+      unlisten();
       setTimeout(() => setFeedback(null), 3000);
     }
   };
@@ -146,6 +164,19 @@ export function SettingsModelsPage(app: AppState) {
           )}
 
           <div className="space-y-6">
+            {/* Offline model usage explanation */}
+            <div className="rounded-lg p-4" style={{ border: "1px solid hsl(var(--hairline))" }}>
+              <div className="flex items-start gap-2">
+                <Info size={16} className="mt-0.5 shrink-0" style={{ color: "hsl(var(--steel))" }} />
+                <div>
+                  <p className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>离线语音识别模型</p>
+                  <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
+                    下载的 Whisper 模型可作为离线语音识别的备用方案。当 API 转写服务不可用时，
+                    系统会自动使用本地模型进行转写。您也可以在设置中开启"优先使用本地模型"。
+                  </p>
+                </div>
+              </div>
+            </div>
             {/* Total disk usage */}
             <div className="flex items-center gap-3 p-4 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
               <HardDrive size={18} style={{ color: "hsl(var(--steel))" }} />
@@ -233,20 +264,37 @@ export function SettingsModelsPage(app: AppState) {
                           </span>
                         </div>
                       </div>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleDownload(model.name)}
-                        disabled={downloading === model.name}
-                        className="shrink-0"
-                      >
-                        {downloading === model.name ? (
-                          <RefreshCw size={12} className="mr-1 animate-spin" />
+                      <div className="shrink-0 w-36">
+                        {downloading.has(model.name) ? (
+                          downloadProgress[model.name] !== undefined ? (
+                            <div className="w-full">
+                              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "hsl(var(--hairline))" }}>
+                                <div
+                                  className="h-full transition-all duration-300 rounded-full"
+                                  style={{ width: `${downloadProgress[model.name]}%`, background: "hsl(var(--primary))" }}
+                                />
+                              </div>
+                              <p className="text-[10px] mt-1 text-right" style={{ color: "hsl(var(--steel))" }}>{downloadProgress[model.name]}%</p>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <Loader2 size={12} className="animate-spin" style={{ color: "hsl(var(--primary))" }} />
+                              <span className="text-xs" style={{ color: "hsl(var(--steel))" }}>{m.downloadingModel}</span>
+                            </div>
+                          )
                         ) : (
-                          <Download size={12} className="mr-1" />
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleDownload(model.name)}
+                            disabled={downloading.has(model.name)}
+                            className="w-full"
+                          >
+                            <Download size={12} className="mr-1" />
+                            {m.downloadModel}
+                          </Button>
                         )}
-                        {downloading === model.name ? m.downloadingModel : m.downloadModel}
-                      </Button>
+                      </div>
                     </div>
                   ))}
                 </div>

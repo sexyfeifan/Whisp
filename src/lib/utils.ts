@@ -52,6 +52,14 @@ export function formatTime(timestamp: number, uiLanguage: UiLanguage): string {
   })}`;
 }
 
+export function formatPlaybackTime(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.round(seconds));
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${minutes}m${secs}s`;
+}
+
 export function formatDuration(durationMs: number | null): string {
   if (!durationMs) return "";
   const totalSeconds = Math.round(durationMs / 1000);

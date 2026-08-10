@@ -17,7 +17,7 @@ import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
 import type { AppState } from "../hooks/useApp";
-import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage } from "../lib/utils";
+import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage, formatPlaybackTime, cn } from "../lib/utils";
 
 interface SummaryResult {
   title: string;
@@ -44,6 +44,7 @@ export function HistoryPage(app: AppState) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [uploadConfirm, setUploadConfirm] = useState<{ fileName: string; file: File } | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showPolished, setShowPolished] = useState<Record<number, boolean>>({});
 
 const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -344,42 +345,58 @@ const handleUploadConfirm = async (polish: boolean) => {
                           </Button>
                         </div>
                       ) : (
-                        <div
-                          className="text-sm cursor-pointer relative"
-                          onClick={(e) => {
-                            // If audio is playing for this entry, seek to clicked position
-                            if (playingAudioId === entry.id && audioDuration > 0) {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-                              seekAudio(ratio * audioDuration);
-                            } else {
-                              setExpandedId(expandedId === entry.id ? null : entry.id);
-                            }
-                          }}
-                          style={{ userSelect: "text", color: "hsl(var(--ink))" }}
-                        >
-                          {(() => {
-                            if (playingAudioId === entry.id && audioDuration > 0 && audioProgress > 0) {
-                              const progressRatio = Math.min(1, audioProgress / audioDuration);
-                              const fullText = entry.text;
-                              const highlightIdx = Math.floor(fullText.length * progressRatio);
-                              const displayText = expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
-                              // Map highlight index from full text to display text
-                              const displayHighlightIdx = expandedId === entry.id || entry.text.length <= 120
-                                ? highlightIdx
-                                : Math.min(highlightIdx, 120);
-                              return (
-                                <>
-                                  <span style={{ background: "hsl(260, 62%, 48% / 0.18)", borderRadius: 2, padding: 0, transition: "background 0.1s" }}>
-                                    {displayText.slice(0, displayHighlightIdx)}
-                                  </span>
-                                  <span>{displayText.slice(displayHighlightIdx)}</span>
-                                </>
-                              );
-                            }
-                            return expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
-                          })()}
-                        </div>
+                        <>
+                          {entry.polished_text && entry.polished_text.length > 0 && (
+                            <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowPolished(prev => ({...prev, [entry.id]: true})); }}
+                                className={cn('text-xs px-2 py-0.5 rounded transition-colors',
+                                  showPolished[entry.id] !== false ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--steel))] hover:bg-[hsl(var(--surface))]')}
+                              >AI 润色</button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setShowPolished(prev => ({...prev, [entry.id]: false})); }}
+                                className={cn('text-xs px-2 py-0.5 rounded transition-colors',
+                                  showPolished[entry.id] === false ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--steel))] hover:bg-[hsl(var(--surface))]')}
+                              >原文</button>
+                            </div>
+                          )}
+                          <div
+                            className="text-sm cursor-pointer relative"
+                            onClick={(e) => {
+                              // If audio is playing for this entry, seek to clicked position
+                              if (playingAudioId === entry.id && audioDuration > 0) {
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                seekAudio(ratio * audioDuration);
+                              } else {
+                                setExpandedId(expandedId === entry.id ? null : entry.id);
+                              }
+                            }}
+                            style={{ userSelect: "text", color: "hsl(var(--ink))" }}
+                          >
+                            {(() => {
+                              const activeText = showPolished[entry.id] !== false && entry.polished_text ? entry.polished_text : entry.text;
+                              if (playingAudioId === entry.id && audioDuration > 0 && audioProgress > 0) {
+                                const progressRatio = Math.min(1, audioProgress / audioDuration);
+                                const fullText = activeText;
+                                const highlightIdx = Math.floor(fullText.length * progressRatio);
+                                const displayText = expandedId === entry.id || activeText.length <= 120 ? activeText : `${activeText.slice(0, 120)}...`;
+                                const displayHighlightIdx = expandedId === entry.id || activeText.length <= 120
+                                  ? highlightIdx
+                                  : Math.min(highlightIdx, 120);
+                                return (
+                                  <>
+                                    <span style={{ background: "hsl(260, 62%, 48% / 0.18)", borderRadius: 2, padding: 0, transition: "background 0.1s" }}>
+                                      {displayText.slice(0, displayHighlightIdx)}
+                                    </span>
+                                    <span>{displayText.slice(displayHighlightIdx)}</span>
+                                  </>
+                                );
+                              }
+                              return expandedId === entry.id || activeText.length <= 120 ? activeText : `${activeText.slice(0, 120)}...`;
+                            })()}
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -488,10 +505,10 @@ const handleUploadConfirm = async (polish: boolean) => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
-                                {formatTime(audioProgress * 1000, uiLanguage)}
+                                {formatPlaybackTime(audioProgress)}
                               </span>
                               <span className="text-[10px] tabular-nums" style={{ color: "hsl(var(--steel))" }}>
-                                {formatTime(audioDuration * 1000, uiLanguage)}
+                                {formatPlaybackTime(audioDuration)}
                               </span>
                             </div>
                           </div>

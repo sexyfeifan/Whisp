@@ -122,21 +122,28 @@ html, body {
 .recording-layout {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
   width: 100%;
 }
 
 .recording-top-row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 
 .recording-text-row {
   display: flex;
   align-items: center;
-  padding-left: 72px; /* align with text after orb (64px orb + 8px gap) */
+  justify-content: center;
+  padding-left: 0;
+  text-align: center;
+  width: 100%;
+  min-height: 20px;
 }
 
 .streaming-text {

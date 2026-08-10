@@ -278,6 +278,51 @@ fn generate_silent_wav() -> Vec<u8> {
     buf
 }
 
+fn split_wav_into_chunks(wav_data: &[u8], max_chunk_size: usize) -> Vec<Vec<u8>> {
+    if wav_data.len() <= max_chunk_size {
+        return vec![wav_data.to_vec()];
+    }
+
+    // WAV header is typically 44 bytes
+    let header_size = 44usize;
+    if wav_data.len() <= header_size {
+        return vec![wav_data.to_vec()];
+    }
+
+    let header = &wav_data[..header_size];
+    let audio_data = &wav_data[header_size..];
+    let chunk_audio_size = max_chunk_size - header_size;
+
+    // Align to sample boundary (2 bytes for 16-bit mono)
+    let aligned_chunk_size = (chunk_audio_size / 2) * 2;
+
+    let mut chunks = Vec::new();
+    let mut offset = 0;
+    while offset < audio_data.len() {
+        let end = (offset + aligned_chunk_size).min(audio_data.len());
+        // Align end to sample boundary
+        let aligned_end = (end / 2) * 2;
+        let chunk_audio = &audio_data[offset..aligned_end];
+
+        let chunk_data_size = chunk_audio.len() as u32;
+        let file_size = 36 + chunk_data_size;
+
+        let mut chunk = Vec::with_capacity(header_size + chunk_audio.len());
+        chunk.extend_from_slice(b"RIFF");
+        chunk.extend_from_slice(&file_size.to_le_bytes());
+        chunk.extend_from_slice(&header[8..header_size]); // rest of header
+        // Update data chunk size in header
+        // The data size field is at offset 40 (header_size - 4)
+        chunk[40..44].copy_from_slice(&chunk_data_size.to_le_bytes());
+        chunk.extend_from_slice(chunk_audio);
+
+        chunks.push(chunk);
+        offset = aligned_end;
+    }
+
+    chunks
+}
+
 pub async fn transcribe_audio(
     client: &reqwest::Client,
     api_key: &str,
@@ -294,38 +339,56 @@ pub async fn transcribe_audio(
 
     if is_mimo_asr(model) {
         let endpoint = mimo_endpoint(api_base_url)?;
-        for attempt in 0..attempts {
-            let json_body = build_mimo_json(wav_data, model, language)?;
-            let response = client
-                .post(endpoint.clone())
-                .header("api-key", api_key)
-                .timeout(timeout)
-                .json(&json_body)
-                .send()
-                .await;
+        // Split large files for MiMo API (10MB limit on input_audio.data)
+        const MIMO_MAX_AUDIO_BYTES: usize = 6_000_000; // ~6MB WAV -> ~8MB base64, under 10MB limit
+        let chunks = split_wav_into_chunks(wav_data, MIMO_MAX_AUDIO_BYTES);
+        let is_chunked = chunks.len() > 1;
 
-            match response {
-                Ok(resp) if resp.status().is_success() => {
-                    let json: serde_json::Value = resp.json().await.context("Failed to parse MiMo API response")?;
-                    return extract_mimo_text(&json);
-                }
-                Ok(resp) => {
-                    let status = resp.status();
-                    let body = shorten_error_body(resp.text().await.unwrap_or_default());
-                    if attempt + 1 < attempts && should_retry_status(status) {
-                        tokio::time::sleep(backoff_duration(attempt)).await;
-                        continue;
+        let mut all_texts = Vec::new();
+
+        for chunk_data in &chunks {
+            for attempt in 0..attempts {
+                let json_body = build_mimo_json(chunk_data, model, language)?;
+                let response = client
+                    .post(endpoint.clone())
+                    .header("api-key", api_key)
+                    .timeout(timeout)
+                    .json(&json_body)
+                    .send()
+                    .await;
+
+                match response {
+                    Ok(resp) if resp.status().is_success() => {
+                        let json: serde_json::Value = resp.json().await.context("Failed to parse MiMo API response")?;
+                        let text = extract_mimo_text(&json)?;
+                        all_texts.push(text);
+                        break;
                     }
-                    anyhow::bail!("MiMo API error {}: {}", status, body);
-                }
-                Err(error) => {
-                    if attempt + 1 < attempts {
-                        tokio::time::sleep(backoff_duration(attempt)).await;
-                        continue;
+                    Ok(resp) => {
+                        let status = resp.status();
+                        let body = shorten_error_body(resp.text().await.unwrap_or_default());
+                        if attempt + 1 < attempts && should_retry_status(status) {
+                            tokio::time::sleep(backoff_duration(attempt)).await;
+                            continue;
+                        }
+                        anyhow::bail!("MiMo API error {}: {}", status, body);
                     }
-                    anyhow::bail!("Failed to send MiMo transcription request: {}", error);
+                    Err(error) => {
+                        if attempt + 1 < attempts {
+                            tokio::time::sleep(backoff_duration(attempt)).await;
+                            continue;
+                        }
+                        anyhow::bail!("Failed to send MiMo transcription request: {}", error);
+                    }
                 }
             }
+        }
+
+        if is_chunked {
+            return Ok(all_texts.join(" "));
+        } else {
+            return all_texts.into_iter().next()
+                .ok_or_else(|| anyhow::anyhow!("Transcription returned empty result"));
         }
     } else {
         let endpoint = transcription_endpoint(api_base_url)?;

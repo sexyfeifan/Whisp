@@ -571,41 +571,44 @@ pub async fn retry_transcription(
         )
         .await
         {
-            Ok(result) => result.text,
+            Ok(result) => Some(result.text),
             Err(e) => {
                 log::warn!("Polish failed during retry, using original: {}", e);
-                text.clone()
+                None
             }
         }
     } else {
-        text.clone()
+        None
     };
 
     let provider = transcribe::provider_name(&settings.api_base_url);
+
+    let display_text = polished_text.as_deref().unwrap_or(&text);
 
     // Update entry in place (preserves ID and audio_path)
     history
         .update_entry(
             id,
-            &polished_text,
+            &text,
             &settings.model,
             STATUS_SUCCESS,
             None,
             &provider,
             &settings.api_base_url,
             &settings.language,
+            polished_text.as_deref(),
         )
         .map_err(|e| e.to_string())?;
 
     // Copy + paste
-    let _ = app.clipboard().write_text(&polished_text);
+    let _ = app.clipboard().write_text(display_text);
     if settings.auto_paste_enabled {
         crate::paste::simulate_paste(&app).ok();
     }
 
     let _ = app.emit("history-updated", ());
 
-    Ok(polished_text)
+    Ok(display_text.to_string())
 }
 
 #[derive(Serialize)]
@@ -988,6 +991,7 @@ pub async fn batch_transcribe(
                     asr_duration_sec: Some(asr_duration_sec),
                     polish_tokens: None,
                     estimated_cost: Some(estimated_cost),
+                    polished_text: None,
                     recorded_at: 0,
                 };
                 let _ = history.add_entry(&entry);
@@ -1032,6 +1036,7 @@ pub async fn batch_transcribe(
                     asr_duration_sec: None,
                     polish_tokens: None,
                     estimated_cost: None,
+                    polished_text: None,
                     recorded_at: 0,
                 };
                 let _ = history.add_entry(&entry);
@@ -1421,9 +1426,17 @@ pub fn list_known_models() -> Vec<crate::whisper::KnownModel> {
     crate::whisper::list_known_models(&settings.ui_language)
 }
 
+#[derive(Clone, Serialize)]
+pub struct ModelDownloadProgress {
+    pub model_name: String,
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub percentage: f64,
+}
+
 #[tauri::command]
 pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Result<String, String> {
-    use crate::whisper::download_model;
+    use crate::whisper::KNOWN_MODELS;
 
     log::info!("Downloading Whisper model: {}", model_name);
 
@@ -1432,9 +1445,107 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
         .map(|s| (*s).clone())
         .unwrap_or_else(|| reqwest::Client::new());
 
-    let path = download_model(&client, &model_name).await.map_err(|e| e.to_string())?;
+    // Resolve URL
+    let url = if let Some((_, url, _, _, _, _, _)) =
+        KNOWN_MODELS.iter().find(|(name, _, _, _, _, _, _)| *name == model_name)
+    {
+        url
+    } else {
+        if model_name.starts_with("http://") || model_name.starts_with("https://") {
+            model_name.as_str()
+        } else {
+            return Err(format!("Unknown model: {}", model_name));
+        }
+    };
 
-    Ok(path.to_string_lossy().to_string())
+    let model_dir = crate::whisper::WhisperEngine::model_dir().map_err(|e| e.to_string())?;
+    let file_name = if url.ends_with(".bin") {
+        url.rsplit_once('/').map(|(_, name)| name).unwrap_or("model.bin")
+    } else {
+        "model.bin"
+    };
+    let dest_path = model_dir.join(file_name);
+
+    if dest_path.exists() {
+        log::info!("Model already exists at {}", dest_path.display());
+        return Ok(dest_path.to_string_lossy().to_string());
+    }
+
+    log::info!("Downloading model from {} to {}", url, dest_path.display());
+
+    // Emit initial progress
+    let _ = app.emit("model-download-progress", ModelDownloadProgress {
+        model_name: model_name.clone(),
+        downloaded_bytes: 0,
+        total_bytes: 0,
+        percentage: 0.0,
+    });
+
+    let mut response = client
+        .get(url)
+        .timeout(std::time::Duration::from_secs(1800))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to download model: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Download failed with HTTP {}", response.status()));
+    }
+
+    let total_size = response.content_length().unwrap_or(0);
+    let dest_path_tmp = dest_path.with_extension("part");
+
+    let mut file = std::fs::File::create(&dest_path_tmp)
+        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+    let mut downloaded: u64 = 0;
+    let mut last_emit_bytes: u64 = 0;
+
+    use std::io::Write;
+    while let Some(chunk) = response.chunk().await.transpose() {
+        let bytes = chunk.map_err(|e| format!("Failed to read chunk: {}", e))?;
+        file.write_all(&bytes).map_err(|e| format!("Failed to write chunk: {}", e))?;
+        downloaded += bytes.len() as u64;
+
+        // Emit progress every ~1MB or at end
+        if downloaded - last_emit_bytes >= 1_048_576 || (total_size > 0 && downloaded >= total_size) {
+            let percentage = if total_size > 0 {
+                (downloaded as f64 / total_size as f64) * 100.0
+            } else {
+                0.0
+            };
+            let _ = app.emit("model-download-progress", ModelDownloadProgress {
+                model_name: model_name.clone(),
+                downloaded_bytes: downloaded,
+                total_bytes: total_size,
+                percentage,
+            });
+            last_emit_bytes = downloaded;
+        }
+    }
+
+    file.flush().map_err(|e| format!("Failed to flush file: {}", e))?;
+    drop(file);
+
+    // Verify downloaded size
+    if total_size > 0 && downloaded != total_size {
+        let _ = std::fs::remove_file(&dest_path_tmp);
+        return Err(format!("Download incomplete: expected {} bytes, got {}", total_size, downloaded));
+    }
+
+    std::fs::rename(&dest_path_tmp, &dest_path)
+        .map_err(|e| format!("Failed to rename temp file: {}", e))?;
+
+    // Emit final progress
+    let _ = app.emit("model-download-progress", ModelDownloadProgress {
+        model_name: model_name.clone(),
+        downloaded_bytes: downloaded,
+        total_bytes: total_size,
+        percentage: 100.0,
+    });
+
+    log::info!("Model downloaded: {} ({:.1} MB)", file_name, downloaded as f64 / 1_048_576.0);
+
+    Ok(dest_path.to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -1720,6 +1831,7 @@ pub fn import_full_backup(
                 asr_duration_sec: entry.asr_duration_sec,
                 polish_tokens: entry.polish_tokens,
                 estimated_cost: entry.estimated_cost,
+                polished_text: entry.polished_text.clone(),
                 recorded_at: entry.timestamp,
             };
 
@@ -1941,7 +2053,7 @@ pub async fn transcribe_file(
             };
 
             let entry = NewHistoryEntry {
-                text: final_text.clone(),
+                text: text.clone(),
                 model: settings.model.clone(),
                 duration_ms,
                 audio_path: None, // uploaded file not saved to disk
@@ -1954,6 +2066,7 @@ pub async fn transcribe_file(
                 asr_duration_sec: Some(asr_duration_sec),
                 polish_tokens: if polish_tokens > 0 { Some(polish_tokens) } else { None },
                 estimated_cost: Some(asr_cost + polish_cost),
+                polished_text: if final_text != text { Some(final_text.clone()) } else { None },
                 recorded_at: 0,
             };
 
@@ -1983,6 +2096,7 @@ pub async fn transcribe_file(
                 asr_duration_sec: None,
                 polish_tokens: None,
                 estimated_cost: None,
+                polished_text: None,
                 recorded_at: 0,
             };
 
