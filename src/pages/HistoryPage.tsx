@@ -384,7 +384,6 @@ const handleUploadConfirm = async (polish: boolean) => {
                                 // Find nearest word boundary (space, punctuation) to avoid mid-word splits
                                 if (rawIdx > 0 && rawIdx < fullText.length) {
                                   const searchRange = fullText.slice(Math.max(0, rawIdx - 8), rawIdx + 8);
-                                  const localOffset = rawIdx - Math.max(0, rawIdx - 8);
                                   // Search forward first, then backward for nearest space/punct
                                   let bestIdx = rawIdx;
                                   let bestDist = 999;
