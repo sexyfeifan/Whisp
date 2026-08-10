@@ -938,7 +938,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 };
 
                 // Use polished text for display/clipboard, raw text for storage
-                let display_text = polished_text_opt.as_deref().unwrap_or(&raw_text);
+                let display_text = polished_text_opt.clone().unwrap_or(raw_text.clone());
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
                 let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);
@@ -950,7 +950,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 let estimated_cost = asr_cost + polish_cost;
 
                 // Copy to clipboard and auto-paste into active app
-                let _ = handle.clipboard().write_text(display_text);
+                let _ = handle.clipboard().write_text(&display_text);
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
@@ -1216,9 +1216,9 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     (None, 0i64)
                 };
 
-                let display_text = polished_text_opt.as_deref().unwrap_or(&raw_text);
+                let display_text = polished_text_opt.clone().unwrap_or(raw_text.clone());
 
-                let _ = handle.clipboard().write_text(display_text);
+                let _ = handle.clipboard().write_text(&display_text);
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
@@ -1229,7 +1229,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     });
                 }
 
-                let _ = handle.emit("transcription-done", display_text);
+                let _ = handle.emit("transcription-done", &display_text);
 
                 let asr_duration_sec = duration_ms.unwrap_or(0) as f64 / 1000.0;
                 let asr_cost = cost::estimate_asr_cost(&api_base_url, &model, asr_duration_sec);

@@ -583,7 +583,7 @@ pub async fn retry_transcription(
 
     let provider = transcribe::provider_name(&settings.api_base_url);
 
-    let display_text = polished_text.as_deref().unwrap_or(&text);
+    let display_text = polished_text.clone().unwrap_or(text.clone());
 
     // Update entry in place (preserves ID and audio_path)
     history
@@ -601,14 +601,14 @@ pub async fn retry_transcription(
         .map_err(|e| e.to_string())?;
 
     // Copy + paste
-    let _ = app.clipboard().write_text(display_text);
+    let _ = app.clipboard().write_text(&display_text);
     if settings.auto_paste_enabled {
         crate::paste::simulate_paste(&app).ok();
     }
 
     let _ = app.emit("history-updated", ());
 
-    Ok(display_text.to_string())
+    Ok(display_text)
 }
 
 #[derive(Serialize)]
