@@ -378,15 +378,36 @@ const handleUploadConfirm = async (polish: boolean) => {
                               // Highlight text in sync with audio playback position
                               if (audioPlayingEntryId === entry.id && audioTotalDuration > 0 && audioCurrentTime > 0) {
                                 const progressRatio = Math.min(1, audioCurrentTime / audioTotalDuration);
-                                const displayText = expandedId === entry.id || activeText.length <= 120 ? activeText : `${activeText.slice(0, 120)}...`;
+                                const fullText = activeText;
+                                // Snap highlight boundary to nearest word/space for natural reading
+                                let rawIdx = Math.floor(fullText.length * progressRatio);
+                                // Find nearest word boundary (space, punctuation) to avoid mid-word splits
+                                if (rawIdx > 0 && rawIdx < fullText.length) {
+                                  const searchRange = fullText.slice(Math.max(0, rawIdx - 8), rawIdx + 8);
+                                  const localOffset = rawIdx - Math.max(0, rawIdx - 8);
+                                  // Search forward first, then backward for nearest space/punct
+                                  let bestIdx = rawIdx;
+                                  let bestDist = 999;
+                                  for (let i = 0; i < searchRange.length; i++) {
+                                    const ch = searchRange[i];
+                                    if (ch === ' ' || ch === '，' || ch === '。' || ch === ',' || ch === '.' || ch === '、' || ch === '！' || ch === '？' || ch === '；' || ch === '：') {
+                                      const absIdx = Math.max(0, rawIdx - 8) + i;
+                                      const dist = Math.abs(absIdx - rawIdx);
+                                      if (dist < bestDist) { bestDist = dist; bestIdx = absIdx + 1; }
+                                    }
+                                  }
+                                  rawIdx = bestIdx;
+                                }
+                                const displayText = expandedId === entry.id || fullText.length <= 120 ? fullText : `${fullText.slice(0, 120)}...`;
+                                const highlightRatio = Math.min(1, rawIdx / displayText.length);
+                                const highlightPct = highlightRatio * 100;
                                 return (
                                   <span style={{ position: "relative" }}>
-                                    {/* Gradient highlight using background-image for smooth transition */}
                                     <span style={{
-                                      background: `linear-gradient(to right, hsla(48, 96%, 53%, 0.45) ${progressRatio * 100}%, transparent ${progressRatio * 100}%)`,
+                                      background: `linear-gradient(to right, hsla(258, 75%, 60%, 0.28) ${highlightPct}%, transparent ${highlightPct}%)`,
                                       color: "hsl(var(--ink))",
-                                      borderRadius: 2,
-                                      transition: "background 0.15s linear",
+                                      borderRadius: 3,
+                                      transition: "background 0.08s linear",
                                     }}>
                                       {displayText}
                                     </span>

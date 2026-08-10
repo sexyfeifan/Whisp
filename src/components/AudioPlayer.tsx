@@ -128,14 +128,20 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
     });
   }, [waveformData, currentTime, duration]);
 
-  // Animation loop for progress updates
+  // Keep onTimeUpdate ref current to avoid stale closure in animation loop
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  useEffect(() => { onTimeUpdateRef.current = onTimeUpdate; }, [onTimeUpdate]);
+
+  // Animation loop for progress updates — uses ref to always get latest callback
   const updateTime = useCallback(() => {
     if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-      onTimeUpdate?.(audioRef.current.currentTime, audioRef.current.duration || 0);
+      const t = audioRef.current.currentTime;
+      const d = audioRef.current.duration || 0;
+      setCurrentTime(t);
+      onTimeUpdateRef.current?.(t, d);
     }
     animationRef.current = requestAnimationFrame(updateTime);
-  }, [onTimeUpdate]);
+  }, []); // No dependencies — stable reference, uses refs for latest values
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;

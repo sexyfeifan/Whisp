@@ -1,21 +1,21 @@
+/* ═══════════════════════════════════════════
+   Whisp Overlay — Elegant Capsule Design
+   ═══════════════════════════════════════════ */
+
 :root {
-  --overlay-bg: rgba(255, 255, 255, 0.88);
-  --overlay-fg: rgba(26, 26, 26, 0.95);
-  --overlay-dim: rgba(87, 83, 78, 0.6);
-  --overlay-border: rgba(200, 196, 190, 0.6);
+  --overlay-fg: rgba(26, 26, 26, 0.92);
+  --overlay-dim: rgba(87, 83, 78, 0.5);
+  --overlay-border: rgba(0, 0, 0, 0.06);
+  --overlay-accent: hsl(258, 72%, 58%);
+  --overlay-accent-soft: hsla(258, 72%, 58%, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --overlay-bg: rgba(10, 10, 10, 0.92);
-    --overlay-fg: rgba(240, 238, 234, 0.97);
-    --overlay-dim: rgba(164, 160, 151, 0.6);
-    --overlay-border: rgba(255, 255, 255, 0.08);
-  }
-  .overlay-body {
-    background: transparent;
-    border-color: rgba(139, 92, 246, 0.12);
-    box-shadow: 0 2px 16px rgba(139, 92, 246, 0.04);
+    --overlay-fg: rgba(240, 238, 234, 0.95);
+    --overlay-dim: rgba(164, 160, 151, 0.5);
+    --overlay-border: rgba(255, 255, 255, 0.06);
+    --overlay-accent-soft: hsla(258, 72%, 68%, 0.1);
   }
 }
 
@@ -28,6 +28,7 @@ html, body {
   height: 100%;
 }
 
+/* ─── Capsule Body ─── */
 .overlay-body {
   position: fixed;
   inset: 0;
@@ -35,11 +36,11 @@ html, body {
   align-items: center;
   justify-content: center;
   background: transparent;
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid rgba(139, 92, 246, 0.08);
-  border-radius: 50px;
-  box-shadow: 0 2px 16px rgba(99, 95, 199, 0.06);
+  -webkit-backdrop-filter: blur(32px) saturate(1.4);
+  backdrop-filter: blur(32px) saturate(1.4);
+  border: 1px solid var(--overlay-border);
+  border-radius: 9999px;
+  box-shadow: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -50,24 +51,24 @@ html, body {
   cursor: grabbing;
 }
 
+/* ─── Idle Row (orb + label + timer) ─── */
 .orb-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 10px;
+  padding: 0 14px;
 }
 
 .orb-row > :first-child {
-  transform: scale(0.9);
+  transform: scale(0.88);
   transform-origin: center center;
 }
 
 .orb-label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--overlay-fg);
-  letter-spacing: -0.011em;
-  text-shadow: 0 0 8px rgba(255,255,255,0.25);
+  letter-spacing: -0.01em;
 }
 
 .orb-label.dim {
@@ -75,7 +76,7 @@ html, body {
 }
 
 .orb-timer {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--overlay-dim);
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -84,53 +85,50 @@ html, body {
   text-align: right;
 }
 
+/* ─── Status Messages ─── */
 .status-message {
   display: flex;
-  gap: 7px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
-  max-width: 380px;
+  max-width: 360px;
   padding: 0 18px;
 }
 
 .status-icon {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
   line-height: 1;
 }
 
 .status-text {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--overlay-fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: -0.011em;
-  text-shadow: 0 0 8px rgba(255,255,255,0.25);
+  letter-spacing: -0.01em;
 }
 
 .error-message .status-icon { color: #e03131; }
 .error-message .status-text { color: #e03131; }
 .cancelled-message .status-icon { color: var(--overlay-dim); }
 .cancelled-message .status-text { color: var(--overlay-dim); }
-
-/* Silence-stopping state: warm amber */
 .silence-message .status-icon { color: #f08c00; }
 .silence-message .status-text { color: #f08c00; }
-
-/* Success state: green for completed transcription */
 .success-message .status-icon { color: #2f9e44; }
 .success-message .status-text { color: #2f9e44; }
 
+/* ─── Recording Layout ─── */
 .recording-layout {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 6px 16px 8px;
+  gap: 1px;
+  padding: 5px 16px 7px;
   width: 100%;
 }
 
@@ -142,7 +140,7 @@ html, body {
 }
 
 .recording-top-row > :first-child {
-  transform: scale(0.9);
+  transform: scale(0.88);
   transform-origin: center center;
 }
 
@@ -153,17 +151,18 @@ html, body {
   padding-left: 0;
   text-align: center;
   width: 100%;
-  min-height: 20px;
+  min-height: 18px;
 }
 
 .streaming-text {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--overlay-fg);
-  letter-spacing: -0.011em;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 0.92;
 }
 
 .wave-canvas {
@@ -175,14 +174,12 @@ html, body {
    Waveform Preview Layout
    ═══════════════════════════════════════════ */
 
-/* When in preview state, the overlay body gets extra height.
-   Layout: vertical column — waveform canvas on top, meta row below. */
 .overlay-body[data-state="preview"] {
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   padding: 10px 16px;
   cursor: default;
-  border-radius: 50px;
+  border-radius: 9999px;
 }
 
 .preview-layout {
@@ -190,24 +187,23 @@ html, body {
   flex-direction: column;
   align-items: stretch;
   width: 100%;
-  gap: 8px;
+  gap: 6px;
 }
 
 .preview-waveform {
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
   background: transparent;
 }
 
 .waveform-preview-canvas {
   display: block;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
-/* Meta row: duration on left, action buttons on right */
 .preview-meta {
   display: flex;
   align-items: center;
@@ -216,7 +212,7 @@ html, body {
 }
 
 .preview-duration {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--overlay-dim);
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -225,48 +221,48 @@ html, body {
 
 .preview-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .preview-btn {
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 0.5px solid var(--overlay-border);
-  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--overlay-border);
+  font-size: 11px;
   font-weight: 500;
   font-family: inherit;
   cursor: pointer;
   background: transparent;
   color: var(--overlay-fg);
   transition: background 0.15s, opacity 0.15s;
-  letter-spacing: -0.011em;
+  letter-spacing: -0.01em;
 }
 
 .preview-btn:hover:not(:disabled) {
-  background: rgba(128, 128, 128, 0.1);
+  background: rgba(128, 128, 128, 0.08);
 }
 
 .preview-btn:active:not(:disabled) {
-  background: rgba(128, 128, 128, 0.18);
+  background: rgba(128, 128, 128, 0.14);
 }
 
 .preview-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .preview-btn-confirm {
-  background: hsl(260, 62%, 48%);
+  background: var(--overlay-accent);
   color: #fff;
   border-color: transparent;
 }
 
 .preview-btn-confirm:hover:not(:disabled) {
-  background: hsl(260, 62%, 42%);
+  background: hsl(258, 72%, 52%);
 }
 
 .preview-btn-confirm:active:not(:disabled) {
-  background: hsl(260, 62%, 36%);
+  background: hsl(258, 72%, 46%);
 }
 
 .preview-btn-discard {
@@ -275,15 +271,28 @@ html, body {
 
 .preview-btn-discard:hover:not(:disabled) {
   color: var(--overlay-fg);
-  background: rgba(128, 128, 128, 0.12);
+  background: rgba(128, 128, 128, 0.1);
 }
 
+@media (prefers-color-scheme: dark) {
+  .preview-btn-confirm {
+    background: hsl(258, 65%, 68%);
+    color: hsl(0, 0%, 5%);
+  }
+
+  .preview-btn-confirm:hover:not(:disabled) {
+    background: hsl(258, 65%, 60%);
+  }
+
+  .preview-btn-confirm:active:not(:disabled) {
+    background: hsl(258, 65%, 54%);
+  }
+}
 
 /* ═══════════════════════════════════════════
-   Subtitle Styles (configurable from settings)
+   Subtitle Styles
    ═══════════════════════════════════════════ */
 
-/* White text with black border — classic subtitle */
 .subtitle-white-black .orb-label,
 .subtitle-white-black .status-text,
 .subtitle-white-black .streaming-text {
@@ -296,7 +305,6 @@ html, body {
      0    2px 4px rgba(0,0,0,0.5);
 }
 
-/* Yellow text with black border — anime/movie subtitle style */
 .subtitle-yellow-black .orb-label,
 .subtitle-yellow-black .status-text,
 .subtitle-yellow-black .streaming-text {
@@ -309,7 +317,6 @@ html, body {
      0    2px 4px rgba(0,0,0,0.5);
 }
 
-/* White text with dark semi-transparent background bar */
 .subtitle-white-darkbg .orb-label,
 .subtitle-white-darkbg .status-text,
 .subtitle-white-darkbg .streaming-text {
@@ -320,7 +327,6 @@ html, body {
   border-radius: 4px;
 }
 
-/* Green text with black border — terminal hacker style */
 .subtitle-green-black .orb-label,
 .subtitle-green-black .status-text,
 .subtitle-green-black .streaming-text {
@@ -331,19 +337,4 @@ html, body {
     -1px  1px 0 #000,
      1px  1px 0 #000,
      0    2px 4px rgba(0,0,0,0.5);
-}
-
-@media (prefers-color-scheme: dark) {
-  .preview-btn-confirm {
-    background: hsl(260, 60%, 62%);
-    color: hsl(0, 0%, 5%);
-  }
-
-  .preview-btn-confirm:hover:not(:disabled) {
-    background: hsl(260, 60%, 56%);
-  }
-
-  .preview-btn-confirm:active:not(:disabled) {
-    background: hsl(260, 60%, 50%);
-  }
 }
