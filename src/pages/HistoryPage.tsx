@@ -33,6 +33,7 @@ export function HistoryPage(app: AppState) {
     selectedIds, setSelectedIds, expandedId, setExpandedId, copied, setCopied,
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
     retryEntry, copyText, playAudio, playingAudioId, audioProgress, audioDuration, seekAudio, loadHistory, m, uiLanguage,
+    audioPaused,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
     flushAutoSave, setView, history,
   } = app;
@@ -272,24 +273,38 @@ export function HistoryPage(app: AppState) {
                       ) : (
                         <div
                           className="text-sm cursor-pointer relative"
-                          onClick={() => setExpandedId(expandedId === entry.id ? null : entry.id)}
+                          onClick={(e) => {
+                            // If audio is playing for this entry, seek to clicked position
+                            if (playingAudioId === entry.id && audioDuration > 0) {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                              seekAudio(ratio * audioDuration);
+                            } else {
+                              setExpandedId(expandedId === entry.id ? null : entry.id);
+                            }
+                          }}
                           style={{ userSelect: "text", color: "hsl(var(--ink))" }}
                         >
                           {(() => {
-                            const displayText = expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
                             if (playingAudioId === entry.id && audioDuration > 0 && audioProgress > 0) {
                               const progressRatio = Math.min(1, audioProgress / audioDuration);
-                              const highlightIdx = Math.floor(displayText.length * progressRatio);
+                              const fullText = entry.text;
+                              const highlightIdx = Math.floor(fullText.length * progressRatio);
+                              const displayText = expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
+                              // Map highlight index from full text to display text
+                              const displayHighlightIdx = expandedId === entry.id || entry.text.length <= 120
+                                ? highlightIdx
+                                : Math.min(highlightIdx, 120);
                               return (
                                 <>
                                   <span style={{ background: "hsl(260, 62%, 48% / 0.18)", borderRadius: 2, padding: 0, transition: "background 0.1s" }}>
-                                    {displayText.slice(0, highlightIdx)}
+                                    {displayText.slice(0, displayHighlightIdx)}
                                   </span>
-                                  <span>{displayText.slice(highlightIdx)}</span>
+                                  <span>{displayText.slice(displayHighlightIdx)}</span>
                                 </>
                               );
                             }
-                            return displayText;
+                            return expandedId === entry.id || entry.text.length <= 120 ? entry.text : `${entry.text.slice(0, 120)}...`;
                           })()}
                         </div>
                       )}
@@ -375,8 +390,8 @@ export function HistoryPage(app: AppState) {
                             color: playingAudioId === entry.id ? "hsl(var(--primary))" : "hsl(var(--steel))",
                           }}
                         >
-                          {playingAudioId === entry.id ? <Pause size={14} /> : <Play size={14} />}
-                          {playingAudioId === entry.id ? m.pauseAudio : m.playAudio}
+                          {playingAudioId === entry.id && !audioPaused ? <Pause size={14} /> : <Play size={14} />}
+                          {playingAudioId === entry.id && !audioPaused ? m.pauseAudio : m.playAudio}
                         </button>
                         {/* Progress bar + time display when playing */}
                         {playingAudioId === entry.id && audioDuration > 0 && (

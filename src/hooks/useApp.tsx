@@ -54,6 +54,7 @@ export interface AppState {
   audioUrls: Record<number, string>;
   audioProgress: number;    // current time in seconds
   audioDuration: number;    // total duration in seconds
+  audioPaused: boolean;
   stopAudio: () => void;
   seekAudio: (time: number) => void;
   logs: LogEntry[];
@@ -130,6 +131,7 @@ export function useApp(): AppState {
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
   const [audioProgress, setAudioProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [audioPaused, setAudioPaused] = useState(false);
   const audioElRef = useRef<HTMLAudioElement | null>(null);
   const audioAnimRef = useRef<number>(0);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -388,12 +390,29 @@ export function useApp(): AppState {
     setPlayingAudioId(null);
     setAudioProgress(0);
     setAudioDuration(0);
+    setAudioPaused(false);
   }, []);
 
   const playAudio = useCallback(async (path: string, id: number) => {
-    if (playingAudioId === id) {
-      // Already playing this entry — stop it
-      stopAudio();
+    // Pause/resume if clicking the same entry
+    if (playingAudioId === id && audioElRef.current) {
+      if (audioElRef.current.paused) {
+        audioElRef.current.play().then(() => {
+          setAudioPaused(false);
+          // Resume animation loop
+          const tick = () => {
+            if (audioElRef.current && !audioElRef.current.paused && playingAudioId === id) {
+              setAudioProgress(audioElRef.current.currentTime);
+              audioAnimRef.current = requestAnimationFrame(tick);
+            }
+          };
+          audioAnimRef.current = requestAnimationFrame(tick);
+        }).catch(() => {});
+      } else {
+        audioElRef.current.pause();
+        setAudioPaused(true);
+        cancelAnimationFrame(audioAnimRef.current);
+      }
       return;
     }
     // Stop any currently playing audio first
@@ -618,7 +637,8 @@ export function useApp(): AppState {
     confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
     polishErrorMsg, playingAudioId, audioUrls,
-    audioProgress, audioDuration, stopAudio, seekAudio, logs, logsAutoScroll,
+ audioProgress, audioDuration, stopAudio, seekAudio,
+ audioPaused, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, defaultPolishPrompt, darkMode, setDarkMode,
     uiLanguage, m, filteredHistory, stats, todayCount, hasApiConfig, canProceed,
     navItems, updateSettings, persistSettings, testApiKey,

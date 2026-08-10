@@ -59,6 +59,20 @@ pub fn request_accessibility_with_prompt() -> bool {
 ///
 /// On Linux, falls back to xdotool/ydotool/wtype if enigo fails.
 pub fn simulate_paste(app_handle: &AppHandle) -> Result<(), String> {
+    // Log environment for diagnostics
+    #[cfg(target_os = "linux")]
+    {
+        let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "unknown".into());
+        let display = std::env::var("DISPLAY").unwrap_or_else(|_| "unset".into());
+        let wayland = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "unset".into());
+        log::info!(
+            "Paste env: XDG_SESSION_TYPE={}, DISPLAY={}, WAYLAND_DISPLAY={}",
+            session_type,
+            display,
+            wayland
+        );
+    }
+
     // Auto-initialize if not yet done but accessibility is granted
     if app_handle.try_state::<EnigoState>().is_none() {
         if !is_accessibility_trusted() {
@@ -135,11 +149,17 @@ fn paste_linux_fallback() -> Result<(), String> {
     log::info!("Paste fallback: XDG_SESSION_TYPE={}", session_type);
 
     // Try xdotool first (works on X11 and XWayland)
-    if let Ok(output) = std::process::Command::new("xdotool").args(["key", "ctrl+v"]).output() {
+    if let Ok(output) = std::process::Command::new("xdotool")
+        .args(["key", "ctrl+v"])
+        .env("DISPLAY", std::env::var("DISPLAY").unwrap_or_else(|_| ":0".into()))
+        .output()
+    {
         if output.status.success() {
             return Ok(());
         }
         log::warn!("xdotool failed: {}", String::from_utf8_lossy(&output.stderr));
+    } else {
+        log::info!("xdotool not found in PATH");
     }
 
     // Try ydotool (works on Wayland)
@@ -151,6 +171,8 @@ fn paste_linux_fallback() -> Result<(), String> {
             return Ok(());
         }
         log::warn!("ydotool failed: {}", String::from_utf8_lossy(&output.stderr));
+    } else {
+        log::info!("ydotool not found in PATH");
     }
 
     // Try wtype (Wayland native)
@@ -162,6 +184,8 @@ fn paste_linux_fallback() -> Result<(), String> {
             return Ok(());
         }
         log::warn!("wtype failed: {}", String::from_utf8_lossy(&output.stderr));
+    } else {
+        log::info!("wtype not found in PATH");
     }
 
     Err("No working paste method found (tried xdotool, ydotool, wtype)".into())

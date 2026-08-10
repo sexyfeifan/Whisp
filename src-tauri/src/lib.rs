@@ -86,8 +86,8 @@ pub fn data_dir() -> PathBuf {
 }
 
 // Named constants
-const OVERLAY_WIDTH: f64 = 320.0;
-const OVERLAY_HEIGHT: f64 = 48.0;
+const OVERLAY_WIDTH: f64 = 420.0;
+const OVERLAY_HEIGHT: f64 = 64.0;
 const OVERLAY_BOTTOM_OFFSET: f64 = 80.0;
 const SILENCE_TRIM_THRESHOLD: f32 = 0.015;
 const SILENCE_TRIM_PADDING_MS: u32 = 120;

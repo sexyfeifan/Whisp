@@ -1,6 +1,6 @@
 :root {
   --overlay-bg: rgba(255, 255, 255, 0.88);
-  --overlay-fg: rgba(26, 26, 26, 0.85);
+  --overlay-fg: rgba(26, 26, 26, 0.95);
   --overlay-dim: rgba(87, 83, 78, 0.6);
   --overlay-border: rgba(200, 196, 190, 0.6);
 }
@@ -8,14 +8,14 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --overlay-bg: rgba(10, 10, 10, 0.92);
-    --overlay-fg: rgba(240, 238, 234, 0.9);
+    --overlay-fg: rgba(240, 238, 234, 0.97);
     --overlay-dim: rgba(164, 160, 151, 0.6);
     --overlay-border: rgba(255, 255, 255, 0.08);
   }
   .overlay-body {
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(99, 95, 199, 0.08));
-    border-color: rgba(139, 92, 246, 0.18);
-    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.08), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.20), rgba(99, 95, 199, 0.14));
+    border-color: rgba(139, 92, 246, 0.25);
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   }
 }
 
@@ -34,12 +34,12 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(99, 95, 199, 0.10), rgba(139, 92, 246, 0.06));
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid rgba(139, 92, 246, 0.12);
-  border-radius: 24px;
-  box-shadow: 0 4px 24px rgba(99, 95, 199, 0.10), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  background: linear-gradient(135deg, rgba(99, 95, 199, 0.18), rgba(139, 92, 246, 0.12));
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  backdrop-filter: blur(20px) saturate(1.6);
+  border: 1.5px solid rgba(139, 92, 246, 0.18);
+  border-radius: 32px;
+  box-shadow: 0 4px 24px rgba(99, 95, 199, 0.14), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -54,14 +54,15 @@ html, body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 6px;
+  padding: 0 10px;
 }
 
 .orb-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--overlay-fg);
   letter-spacing: -0.011em;
+  text-shadow: 0 0 8px rgba(255,255,255,0.25);
 }
 
 .orb-label.dim {
@@ -83,8 +84,8 @@ html, body {
   gap: 7px;
   align-items: center;
   justify-content: center;
-  max-width: 280px;
-  padding: 0 14px;
+  max-width: 380px;
+  padding: 0 18px;
 }
 
 .status-icon {
@@ -95,13 +96,14 @@ html, body {
 }
 
 .status-text {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--overlay-fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.011em;
+  text-shadow: 0 0 8px rgba(255,255,255,0.25);
 }
 
 .error-message .status-icon { color: #e03131; }
@@ -140,7 +142,7 @@ html, body {
   gap: 8px;
   padding: 10px 16px;
   cursor: default;
-  border-radius: 20px;
+  border-radius: 28px;
 }
 
 .preview-layout {
