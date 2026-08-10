@@ -479,10 +479,7 @@ export function useApp(): AppState {
   const transcribeFile = useCallback(async (fileData: string, fileName: string, polish: boolean) => {
     setUploadingFile(true);
     try {
-      const text = await invoke<string>("transcribe_file", { fileData, fileName, polish });
-      return text;
-    } catch (error) {
-      throw error;
+      return await invoke<string>("transcribe_file", { fileData, fileName, polish });
     } finally {
       setUploadingFile(false);
     }

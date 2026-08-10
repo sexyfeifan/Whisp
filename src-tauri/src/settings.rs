@@ -772,11 +772,12 @@ mod tests {
             diarization_api_key: settings.diarization_api_key.clone(),
             diarization_api_base_url: settings.diarization_api_base_url.clone(),
             diarization_num_speakers: settings.diarization_num_speakers,
+            overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
         };
 
         let json = serde_json::to_string(&disk).unwrap();
         assert!(json.contains("\"api_key\""));
-        assert!(json.contains("sk-secret-key"));
+        assert!(json.contains("«redacted:sk-…»"));
     }
 
     #[test]
