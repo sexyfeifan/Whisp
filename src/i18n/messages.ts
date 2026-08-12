@@ -264,7 +264,7 @@ const messages = {
     polishingText: "正在润色…",
     originalText: "原文",
     deleteRecord: "删除此记录",
-    offlineModelDesc: "下载的 Whisper 模型可作为离线语音识别的备用方案。当 API 转写服务不可用时，系统会自动使用本地模型进行转写。您也可以在设置中开启"优先使用本地模型"。",
+    offlineModelDesc: "下载的 Whisper 模型可作为离线语音识别的备用方案。当 API 转写服务不可用时，系统会自动使用本地模型进行转写。您也可以在设置中开启「优先使用本地模型」。",
     pieChartTotal: "总数",
     today: "今天",
     yesterday: "昨天",

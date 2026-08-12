@@ -28,7 +28,7 @@ interface DayBucket {
   count: number;
 }
 
-function computeDailyUsage(history: AppState["history"], m?: Record<string, string>): DayBucket[] {
+function computeDailyUsage(history: AppState["history"], m: Record<string, string>): DayBucket[] {
   const now = new Date();
   const buckets: DayBucket[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -175,7 +175,7 @@ function BarChart({ data }: { data: DayBucket[] }) {
   );
 }
 
-function PieChart({ data, m }: { data: ModelBucket[]; m?: Record<string, string> }) {
+function PieChart({ data, m }: { data: ModelBucket[]; m: Record<string, string> }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   if (total === 0) return null;
   const r = 60;

@@ -190,6 +190,9 @@ export function useApp(): AppState {
     }
   }, []);
 
+  const uiLanguage: UiLanguage = (settings?.ui_language as UiLanguage) ?? "zh-CN";
+  const m: Record<string, string> = (messages[uiLanguage] ?? messages["zh-CN"]) || {};
+
   const downloadAndInstall = useCallback(async (url?: string, filename?: string) => {
     setDownloading(true);
     setDownloadMsg(null);
@@ -329,9 +332,6 @@ export function useApp(): AppState {
     await invoke("request_accessibility");
     await waitForPermission("check_accessibility", setAccessibilityOk);
   }, [waitForPermission]);
-
-  const uiLanguage: UiLanguage = (settings?.ui_language as UiLanguage) ?? "zh-CN";
-  const m: Record<string, string> = (messages[uiLanguage] ?? messages["zh-CN"]) || {};
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((current) => {
