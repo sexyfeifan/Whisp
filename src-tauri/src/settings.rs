@@ -671,7 +671,7 @@ mod tests {
     #[test]
     fn test_disk_settings_always_includes_api_key() {
         let mut settings = AppSettings::default();
-        settings.api_key = "«redacted:sk-…»".to_string();
+        settings.api_key = "sk-test-api-key".to_string();
 
         // api_key is always written to disk (belt-and-suspenders alongside keychain)
         let disk = DiskSettings {
@@ -727,15 +727,13 @@ mod tests {
         let json = serde_json::to_string(&disk).unwrap();
         // api_key is always present in JSON (belt-and-suspenders fallback)
         assert!(json.contains("\"api_key\""));
-        // Roundtrip check — serde_json may escape Unicode chars, so deserialize back
-        let parsed: DiskSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.api_key, "«redacted:sk-…»");
+        assert!(json.contains("sk-test-api-key"));
     }
 
     #[test]
     fn test_disk_settings_includes_api_key_when_keychain_fails() {
         let mut settings = AppSettings::default();
-        settings.api_key = "sk-secret-key".to_string();
+        settings.api_key = "sk-test-api-key".to_string();
 
         let disk = DiskSettings {
             api_base_url: settings.api_base_url.clone(),
@@ -762,7 +760,7 @@ mod tests {
             ai_polish_model: settings.ai_polish_model.clone(),
             ai_polish_prompt: settings.ai_polish_prompt.clone(),
             audio_retention_limit: settings.audio_retention_limit,
-            api_key: "sk-secret-key".to_string(), // keychain_ok = false
+            api_key: "sk-test-api-key".to_string(), // keychain_ok = false
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
@@ -789,9 +787,7 @@ mod tests {
 
         let json = serde_json::to_string(&disk).unwrap();
         assert!(json.contains("\"api_key\""));
-        // Roundtrip check — serde_json may escape Unicode chars, so deserialize back
-        let parsed: DiskSettings = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.api_key, "«redacted:sk-…»");
+        assert!(json.contains("sk-test-api-key"));
     }
 
     #[test]
