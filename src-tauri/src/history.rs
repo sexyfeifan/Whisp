@@ -252,23 +252,20 @@ impl HistoryManager {
         polished_text: Option<&str>,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let timestamp = chrono::Utc::now().timestamp();
         conn.execute(
             "UPDATE transcriptions
              SET text = ?1,
                  model = ?2,
-                 timestamp = ?3,
-                 status = ?4,
-                 error_message = ?5,
-                 provider = ?6,
-                 api_base_url = ?7,
-                 language = ?8,
-                 polished_text = ?9
-             WHERE id = ?10",
+                 status = ?3,
+                 error_message = ?4,
+                 provider = ?5,
+                 api_base_url = ?6,
+                 language = ?7,
+                 polished_text = ?8
+             WHERE id = ?9",
             rusqlite::params![
                 text,
                 model,
-                timestamp,
                 status,
                 error_message,
                 provider,
@@ -608,7 +605,8 @@ impl HistoryManager {
                     t.retry_of,
                     t.asr_duration_sec,
                     t.polish_tokens,
-                    t.estimated_cost
+                    t.estimated_cost,
+                    t.polished_text
                  FROM transcriptions t
                  INNER JOIN transcriptions_fts fts ON t.id = fts.rowid
                  WHERE transcriptions_fts MATCH ?1
@@ -756,26 +754,34 @@ impl HistoryManager {
         let entries = self.get_entries_by_ids(ids)?;
         let mut srt = String::new();
 
+        // Use the first entry's timestamp as the zero point for relative offsets
+        let base_ts = entries.first().map(|e| e.timestamp).unwrap_or(0);
+
         for (i, entry) in entries.iter().enumerate() {
             let index = i + 1;
-            let start_secs = entry.timestamp;
+            let start_secs = entry.timestamp.saturating_sub(base_ts);
             let duration_ms = entry.duration_ms.unwrap_or(3000);
             let end_secs = start_secs + (duration_ms / 1000);
             let end_nanos = ((duration_ms % 1000) * 1_000_000) as u32;
 
-            let start_dt = chrono::DateTime::from_timestamp(start_secs, 0).unwrap_or_default();
-            let end_dt = chrono::DateTime::from_timestamp(end_secs, end_nanos).unwrap_or_default();
+            let start_h = (start_secs / 3600) as u32;
+            let start_m = ((start_secs % 3600) / 60) as u32;
+            let start_s = (start_secs % 60) as u32;
+
+            let end_h = (end_secs / 3600) as u32;
+            let end_m = ((end_secs % 3600) / 60) as u32;
+            let end_s = (end_secs % 60) as u32;
 
             srt.push_str(&format!("{}\n", index));
             srt.push_str(&format!(
                 "{:02}:{:02}:{:02},000 --> {:02}:{:02}:{:02},{:03}\n",
-                start_dt.hour(),
-                start_dt.minute(),
-                start_dt.second(),
-                end_dt.hour(),
-                end_dt.minute(),
-                end_dt.second(),
-                end_dt.nanosecond() / 1_000_000,
+                start_h,
+                start_m,
+                start_s,
+                end_h,
+                end_m,
+                end_s,
+                end_nanos / 1_000_000,
             ));
             srt.push_str(&format!("{}\n\n", entry.text));
         }
@@ -1049,5 +1055,45 @@ mod tests {
         assert_eq!(updated.text, "Updated text");
         assert_eq!(updated.model, "whisper-large-v3");
         assert_eq!(updated.provider, "Groq");
+    }
+
+    /// Regression test for FTS5 column-count mismatch (bug #1).
+    /// The FTS5 SELECT must include all 16 columns that `row_to_history_entry`
+    /// reads at indices 0..=15. If a column is missing, this test panics with
+    /// "no column named ..." from rusqlite.
+    #[test]
+    fn test_search_fulltext_column_count_matches_row_parser() {
+        let (hm, _tmp) = create_test_history();
+
+        // Insert an entry with polished_text populated to exercise column 15
+        hm.add_entry(&NewHistoryEntry {
+            text: "the quick brown fox jumps over the lazy dog".into(),
+            model: "whisper-1".into(),
+            duration_ms: Some(3000),
+            audio_path: None,
+            status: STATUS_SUCCESS.into(),
+            error_message: None,
+            provider: "OpenAI".into(),
+            api_base_url: "https://api.openai.com/v1".into(),
+            language: "en".into(),
+            retry_of: None,
+            asr_duration_sec: Some(3.0),
+            polish_tokens: None,
+            estimated_cost: Some(0.01),
+            polished_text: Some("The quick brown fox jumps over the lazy dog.".into()),
+            recorded_at: 0,
+        })
+        .unwrap();
+
+        // search_fulltext uses FTS5 when available, falling back to LIKE.
+        // Either path must return all 16 columns that row_to_history_entry expects.
+        let results = hm.search_fulltext("quick").unwrap();
+        assert_eq!(results.len(), 1, "search_fulltext should find the entry");
+        assert_eq!(results[0].text, "the quick brown fox jumps over the lazy dog");
+        assert_eq!(
+            results[0].polished_text.as_deref(),
+            Some("The quick brown fox jumps over the lazy dog."),
+            "polished_text (column 15) must be returned by search_fulltext"
+        );
     }
 }

@@ -33,7 +33,7 @@ pub fn register_shortcut(app_handle: &AppHandle, settings: &AppSettings) {
                     .unwrap_or_default()
                     .as_millis() as u64;
                 let last = LAST_SHORTCUT_TIME.load(Ordering::SeqCst);
-                if now - last < DEBOUNCE_MS {
+                if now.saturating_sub(last) < DEBOUNCE_MS {
                     return;
                 }
                 LAST_SHORTCUT_TIME.store(now, Ordering::SeqCst);
@@ -82,7 +82,7 @@ pub fn register_escape(app_handle: &AppHandle) {
     let _ = app_handle
         .global_shortcut()
         .on_shortcut(escape, move |_app, _shortcut, event| {
-            if event.state != ShortcutState::Released {
+            if event.state == ShortcutState::Released {
                 log::info!("Escape triggered");
                 let h = handle.clone();
                 std::thread::spawn(move || {

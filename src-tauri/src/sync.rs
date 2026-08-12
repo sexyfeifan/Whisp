@@ -154,7 +154,7 @@ pub fn import_from_sync(history: &crate::history::HistoryManager, device_name: &
             polish_tokens: None,
             estimated_cost: record.estimated_cost,
             polished_text: None,
-            recorded_at: 0,
+            recorded_at: record.timestamp,
         }) {
             Ok(_) => {
                 imported += 1;

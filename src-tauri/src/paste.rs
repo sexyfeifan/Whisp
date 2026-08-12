@@ -213,7 +213,17 @@ pub fn activate_app_by_bundle_id(bundle_id: &str) -> Result<(), String> {
         return Err("Empty bundle id".into());
     }
 
-    let script = format!("tell application id \"{}\" to activate", normalized.replace('\"', ""));
+    // Sanitize bundle ID: only allow alphanumeric, dots, hyphens, and underscores.
+    // This prevents AppleScript injection via crafted bundle IDs.
+    if !normalized
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_')
+    {
+        log::warn!("Rejected invalid bundle_id (contains unsafe characters): {}", normalized);
+        return Err("Invalid bundle id: contains unsafe characters".into());
+    }
+
+    let script = format!("tell application id "{}" to activate", normalized);
     let output = Command::new("osascript")
         .arg("-e")
         .arg(script)

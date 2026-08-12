@@ -15,7 +15,7 @@ fn transcription_endpoint(api_base_url: &str) -> Result<Url> {
     }
 
     let base = raw.trim_end_matches('/');
-    let with_version = if base.contains("/v1") {
+    let with_version = if base.ends_with("/v1") {
         base.to_string()
     } else {
         format!("{}/v1", base)

@@ -54,35 +54,44 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Cached data directory path — computed once to avoid TOCTOU race conditions
+/// when multiple threads call data_dir() concurrently on first launch.
+static DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
 /// ~/.whisp/ (migrated from ~/.nanowhisper/)
+/// Uses OnceLock to ensure the migration logic runs exactly once.
 pub fn data_dir() -> PathBuf {
-    let home = dirs::home_dir().expect("Cannot determine home directory");
-    let new_dir = home.join(".whisp");
-    let old_dir = home.join(".nanowhisper");
+    DATA_DIR
+        .get_or_init(|| {
+            let home = dirs::home_dir().expect("Cannot determine home directory");
+            let new_dir = home.join(".whisp");
+            let old_dir = home.join(".nanowhisper");
 
-    // Migrate from old directory if new doesn't exist but old does
-    if !new_dir.exists() && old_dir.exists() {
-        match std::fs::rename(&old_dir, &new_dir) {
-            Ok(_) => {
-                log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
-            }
-            Err(e) => {
-                log::warn!(
-                    "Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...",
-                    e
-                );
-                // Fallback: copy files then delete old directory
-                if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
-                    log::warn!("Copy migration also failed: {}. Using old directory.", e2);
-                    return old_dir;
+            // Migrate from old directory if new doesn't exist but old does
+            if !new_dir.exists() && old_dir.exists() {
+                match std::fs::rename(&old_dir, &new_dir) {
+                    Ok(_) => {
+                        log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...",
+                            e
+                        );
+                        // Fallback: copy files then delete old directory
+                        if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
+                            log::warn!("Copy migration also failed: {}. Using old directory.", e2);
+                            return old_dir;
+                        }
+                        let _ = std::fs::remove_dir_all(&old_dir);
+                        log::info!("Migrated data directory via copy from ~/.nanowhisper to ~/.whisp");
+                    }
                 }
-                let _ = std::fs::remove_dir_all(&old_dir);
-                log::info!("Migrated data directory via copy from ~/.nanowhisper to ~/.whisp");
             }
-        }
-    }
 
-    new_dir
+            new_dir
+        })
+        .clone()
 }
 
 // Named constants
@@ -407,6 +416,15 @@ pub fn run() {
 }
 
 static TRANSCRIBING: AtomicBool = AtomicBool::new(false);
+
+/// RAII guard that clears the TRANSCRIBING flag on drop.
+/// Used inside spawned async tasks so the flag is reset even on panic.
+struct AsyncTranscribeGuard;
+impl Drop for AsyncTranscribeGuard {
+    fn drop(&mut self) {
+        TRANSCRIBING.store(false, Ordering::SeqCst);
+    }
+}
 #[cfg(target_os = "macos")]
 static LAST_FRONTMOST_APP_BUNDLE_ID: Mutex<Option<String>> = Mutex::new(None);
 
@@ -662,6 +680,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                                 consecutive_errors, e,
                             );
                             let _ = stream_handle.emit("streaming-error", msg);
+                            break; // Stop retrying after 3 consecutive failures (#13)
                         }
                     }
                 }
@@ -738,8 +757,58 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         None
     };
 
+    // Reject near-silent audio: if peak amplitude is below the silence threshold
+    // after trimming, skip transcription to avoid wasting API calls on noise.
+    let peak_after_trim = processed_audio
+        .samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0_f32, f32::max);
+    if peak_after_trim < SILENCE_TRIM_THRESHOLD {
+        log::warn!(
+            "Recording too quiet after processing (peak={:.4}, threshold={})",
+            peak_after_trim,
+            SILENCE_TRIM_THRESHOLD
+        );
+        // Reset tray icon to idle state
+        if let Some(tray) = app_handle.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some("Whisp"));
+            let idle_icon = ORB_ICON_0.get_or_init(|| {
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb idle icon")
+            });
+            let _ = tray.set_icon(Some(idle_icon.clone()));
+            let _ = tray.set_icon_as_template(false);
+        }
+        let _ = app_handle.emit(
+            "transcription-error",
+            tr(
+                &settings.ui_language,
+                "录音太安静了，请检查麦克风或说话声音大一些。",
+                "Recording too quiet. Check your microphone or speak louder.",
+                "録音が静かすぎます。マイクを確認するか、もう少し大きな声で話してください。",
+            ),
+        );
+        let handle = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(3000));
+            close_overlay(&handle);
+        });
+        return;
+    }
+
     if duration_ms.unwrap_or_default() < MIN_TRANSCRIBE_MS {
         log::warn!("Recording too short after processing");
+        // Reset tray icon to idle state before early return (#12)
+        if let Some(tray) = app_handle.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some("Whisp"));
+            let idle_icon = ORB_ICON_0.get_or_init(|| {
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb idle icon")
+            });
+            let _ = tray.set_icon(Some(idle_icon.clone()));
+            let _ = tray.set_icon_as_template(false);
+        }
         let _ = app_handle.emit(
             "transcription-error",
             tr(
@@ -866,10 +935,11 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     );
     log::info!("Calling API with model={} via {}...", model, api_base_url);
 
-    // Prevent the RAII guard from clearing the flag — the async task will clear it
+    // Prevent the RAII guard from clearing the flag — the async task owns it now
     std::mem::forget(_guard);
 
     tauri::async_runtime::spawn(async move {
+        let _async_guard = AsyncTranscribeGuard;
         let lang = if language == "auto" {
             None
         } else {
@@ -1060,9 +1130,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
             let _ = tray.set_icon(Some(idle_icon.clone()));
             let _ = tray.set_icon_as_template(false);
         }
-
-        // Clear transcription guard
-        TRANSCRIBING.store(false, Ordering::SeqCst);
+        // TRANSCRIBING flag is cleared by AsyncTranscribeGuard on drop
     });
 }
 
@@ -1105,16 +1173,32 @@ pub fn close_overlay(app_handle: &tauri::AppHandle) {
 
 /// Implementation of confirm_pending_transcription (called from commands.rs).
 pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Result<(), String> {
+    // Check API key BEFORE consuming pending audio to avoid data loss (#11)
+    let settings = settings::get_settings();
+    if settings.api_key.trim().is_empty() {
+        return Err("API key is not configured. Please set your API key in Settings first.".to_string());
+    }
+
+    // Prevent concurrent transcription (#30)
+    if TRANSCRIBING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return Err("Transcription already in progress".to_string());
+    }
+
     let pending = PENDING_AUDIO.get_or_init(|| Mutex::new(None));
     let pending_audio = {
         let mut guard = pending.lock().unwrap_or_else(|e| e.into_inner());
         guard.take()
     };
 
-    let audio = pending_audio.ok_or("No pending recording to confirm")?;
+    let audio = pending_audio.ok_or_else(|| {
+        TRANSCRIBING.store(false, Ordering::SeqCst);
+        "No pending recording to confirm".to_string()
+    })?;
     let _ = app_handle.emit("transcribing", ());
 
-    let settings = settings::get_settings();
     let history = app_handle.state::<Arc<HistoryManager>>();
     let history_clone = history.inner().clone();
     let handle = app_handle.clone();
@@ -1153,6 +1237,8 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
     let duration_ms = Some(audio.duration_ms);
 
     tauri::async_runtime::spawn(async move {
+        // RAII guard for confirm path — clears TRANSCRIBING even on panic (#2/#30)
+        let _async_guard = AsyncTranscribeGuard;
         let lang = if language == "auto" {
             None
         } else {
@@ -1297,7 +1383,7 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                 });
             }
         }
-        TRANSCRIBING.store(false, Ordering::SeqCst);
+        // TRANSCRIBING flag is cleared by AsyncTranscribeGuard on drop
     });
 
     Ok(())

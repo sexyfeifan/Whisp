@@ -148,6 +148,14 @@ impl WhisperEngine {
             );
         }
 
+        if audio_data.is_empty() {
+            anyhow::bail!("Audio data is empty, nothing to transcribe.");
+        }
+
+        if sample_rate == 0 {
+            anyhow::bail!("Invalid sample rate: 0. Audio data may be corrupted.");
+        }
+
         // Resample to 16kHz if needed (Whisper expects 16kHz)
         let audio_16k = if sample_rate != 16000 {
             resample_to_16k(audio_data, sample_rate)

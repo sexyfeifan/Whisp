@@ -445,6 +445,12 @@ export function useApp(): AppState {
 
       audio.addEventListener("error", (e) => {
         console.error("Audio playback error:", e);
+        // Invalidate cached URL so retry can re-fetch from backend
+        setAudioUrls((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
         stopAudio();
       });
 
@@ -526,7 +532,7 @@ export function useApp(): AppState {
 
   const deleteEntry = useCallback(async (id: number) => {
     // Stop playback if deleting the currently-playing entry
-    if (playingAudioId === id) setPlayingAudioId(null);
+    if (playingAudioId === id) stopAudio();
     await invoke("delete_history_entry", { id });
     setHistory((items) => items.filter((item) => item.id !== id));
     setAudioUrls((prev) => {
@@ -535,13 +541,13 @@ export function useApp(): AppState {
       return next;
     });
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-  }, [playingAudioId]);
+  }, [playingAudioId, stopAudio]);
 
   const deleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
     // Stop playback if any selected entry is currently playing
-    if (playingAudioId !== null && selectedIds.has(playingAudioId)) setPlayingAudioId(null);
+    if (playingAudioId !== null && selectedIds.has(playingAudioId)) stopAudio();
     await invoke("delete_history_entries", { ids });
     setHistory((items) => items.filter((item) => !selectedIds.has(item.id)));
     setAudioUrls((prev) => {
@@ -550,7 +556,7 @@ export function useApp(): AppState {
       return next;
     });
     setSelectedIds(new Set());
-  }, [selectedIds, playingAudioId]);
+  }, [selectedIds, playingAudioId, stopAudio]);
 
   const clearHistory = useCallback(async () => {
     if (history.length === 0) {

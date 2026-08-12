@@ -139,17 +139,13 @@ function Overlay() {
     };
   }, []);
 
-  // Resize overlay for streaming text — widen capsule to avoid obscuring
+  // Resize overlay for streaming text — only on state transitions and
+  // boolean changes to avoid re-triggering setSize on every partial text update
   useEffect(() => {
     if (state !== "recording") return;
-    if (streamingText) {
-      // Widen to accommodate streaming text
-      getCurrentWindow().setSize(new LogicalSize(600, 80));
-    } else {
-      // Default recording size (smaller since waveform is shorter)
-      getCurrentWindow().setSize(new LogicalSize(360, 80));
-    }
-  }, [state, streamingText]);
+    const hasText = !!streamingText;
+    getCurrentWindow().setSize(new LogicalSize(hasText ? 600 : 360, 80));
+  }, [state, !!streamingText]);
 
   // Waveform animation (recording state)
   useEffect(() => {

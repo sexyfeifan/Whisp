@@ -48,7 +48,7 @@ export default function WaveformPreview({
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const hslPrimary = style.getPropertyValue("--primary").trim() || (isDark ? "260 60% 62%" : "260 62% 48%");
 
-    const [h, s, l] = hslPrimary.split(/\s+/).map(Number);
+    const [h, s, l] = hslPrimary.split(/\s+/).map(v => parseFloat(v));
     const primaryH = h ?? 260;
     const primaryS = s ?? 62;
     const primaryL = l ?? 48;

@@ -681,8 +681,12 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
             .filter_map(|s| s.parse().ok())
             .collect()
     };
-    let pa = parse(a);
-    let pb = parse(b);
+    let mut pa = parse(a);
+    let mut pb = parse(b);
+    // Pad shorter version with zeros so [2,8] and [2,8,0] compare as equal
+    let max_len = pa.len().max(pb.len());
+    pa.resize(max_len, 0);
+    pb.resize(max_len, 0);
     pa.cmp(&pb)
 }
 
@@ -821,7 +825,19 @@ pub fn clear_logs() {
 
 #[tauri::command]
 pub fn read_audio_file(path: String) -> Result<String, String> {
-    std::fs::read(&path)
+    // Security: only allow reading from the Whisp audio directory
+    let canonical = std::fs::canonicalize(&path).map_err(|e| format!("Invalid path: {}", e))?;
+    let data_dir = crate::data_dir();
+    let audio_dir = data_dir.join("audio");
+    let allowed_prefix = if audio_dir.exists() {
+        std::fs::canonicalize(&audio_dir).unwrap_or(audio_dir.clone())
+    } else {
+        audio_dir.clone()
+    };
+    if !canonical.starts_with(&allowed_prefix) {
+        return Err("Access denied: path is outside the audio directory".to_string());
+    }
+    std::fs::read(&canonical)
         .map(|bytes| base64::engine::general_purpose::STANDARD.encode(&bytes))
         .map_err(|e| e.to_string())
 }
@@ -1704,6 +1720,15 @@ pub fn import_full_backup(
                 .map_err(|e| format!("Failed to read history.json: {e}"))?;
             backup_entries = serde_json::from_str::<Vec<HistoryEntry>>(&buf).ok();
         } else if name.starts_with("audio/") && !name.ends_with('/') {
+            // Guard against zip bombs: reject individual audio files > 100MB
+            const MAX_AUDIO_ENTRY_SIZE: u64 = 100 * 1024 * 1024;
+            if entry.size() > MAX_AUDIO_ENTRY_SIZE {
+                return Err(format!(
+                    "Audio file {} is too large ({}MB > 100MB limit)",
+                    name,
+                    entry.size() / (1024 * 1024)
+                ));
+            }
             let mut buf = Vec::new();
             std::io::Read::read_to_end(&mut entry, &mut buf).map_err(|e| format!("Failed to read {name}: {e}"))?;
             audio_files.insert(name, buf);
@@ -1940,9 +1965,13 @@ pub fn export_transcription(
 /// The frontend can then use tauri-plugin-opener to open it with the system default app.
 #[tauri::command]
 pub fn save_export_to_file(content: String, filename: String) -> Result<String, String> {
+    // Prevent path traversal: only allow a plain filename, no path separators
+    let safe_name = std::path::Path::new(&filename)
+        .file_name()
+        .ok_or_else(|| "Invalid filename".to_string())?;
     let dir = std::env::temp_dir().join("whisp_exports");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(&filename);
+    let path = dir.join(safe_name);
     std::fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
 }

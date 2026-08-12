@@ -131,7 +131,7 @@ pub async fn process_streaming_chunk(
         st.samples.extend_from_slice(new_samples);
 
         let duration_since = st.duration_since_last_sent();
-        if duration_since < config.chunk_duration_secs as f64 {
+        if duration_since < config.chunk_duration_secs.max(1) as f64 {
             return Ok(String::new());
         }
 

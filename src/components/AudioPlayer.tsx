@@ -71,6 +71,10 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
         audio.addEventListener("ended", () => {
           setIsPlaying(false);
           cancelAnimationFrame(animationRef.current);
+          // Fire final time update so consumers know playback ended
+          const d = audio.duration || 0;
+          setCurrentTime(d);
+          onTimeUpdateRef.current?.(d, d);
         });
 
         audio.volume = 1;
@@ -86,6 +90,10 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
     return () => {
       if (audioRef.current) {
         audioRef.current.pause();
+        // Revoke object URL to free memory
+        if (audioRef.current.src.startsWith("blob:")) {
+          URL.revokeObjectURL(audioRef.current.src);
+        }
         audioRef.current.src = "";
       }
       cancelAnimationFrame(animationRef.current);
@@ -136,8 +144,11 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       const d = audioRef.current.duration || 0;
       setCurrentTime(t);
       onTimeUpdateRef.current?.(t, d);
+      // Only continue the loop if audio is actually playing
+      if (!audioRef.current.paused) {
+        animationRef.current = requestAnimationFrame(updateTime);
+      }
     }
-    animationRef.current = requestAnimationFrame(updateTime);
   }, []); // No dependencies — stable reference, uses refs for latest values
 
   const togglePlay = useCallback(() => {

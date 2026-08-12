@@ -5,6 +5,7 @@ import { SettingsRecordingPage } from "./pages/SettingsRecordingPage";
 import { SettingsBehaviorPage } from "./pages/SettingsBehaviorPage";
 import { SettingsAppPage } from "./pages/SettingsAppPage";
 import { SettingsModelsPage } from "./pages/SettingsModelsPage";
+import { SettingsPolishPage } from "./pages/SettingsPolishPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { StatsPage } from "./pages/StatsPage";
@@ -34,6 +35,8 @@ function App() {
       return <SettingsBehaviorPage {...app} />;
     case "settingsApp":
       return <SettingsAppPage {...app} />;
+    case "settingsPolish":
+      return <SettingsPolishPage {...app} />;
     case "settingsModels":
       return <SettingsModelsPage {...app} />;
     case "diagnostics":
