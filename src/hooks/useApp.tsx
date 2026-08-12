@@ -39,7 +39,6 @@ export interface AppState {
   savingSettings: boolean;
   settingsFeedback: { tone: "success" | "error"; message: string } | null;
   setSettingsFeedback: React.Dispatch<React.SetStateAction<{ tone: "success" | "error"; message: string } | null>>;
-  confirmingClear: boolean;
   appVersion: string;
   selectedIds: Set<number>;
   setSelectedIds: React.Dispatch<React.SetStateAction<Set<number>>>;
@@ -116,7 +115,6 @@ export function useApp(): AppState {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
-  const [confirmingClear, setConfirmingClear] = useState(false);
   const clearTimerRef = useRef<number | null>(null);
   const [appVersion, setAppVersion] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -565,11 +563,11 @@ export function useApp(): AppState {
     }
     if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
     try {
-      await invoke("clear_history"); setHistory([]); setConfirmingClear(false);
+      await invoke("clear_history"); setHistory([]);
       setPlayingAudioId(null); setAudioUrls({});
       setSettingsFeedback({ tone: "success", message: m.clearSuccess });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
-    } catch (error) { setConfirmingClear(false); setErrorMsg(`${m.clearFailed} ${String(error)}`); }
+    } catch (error) { setErrorMsg(`${m.clearFailed} ${String(error)}`); }
   }, [history, m]);
 
   const retryEntry = useCallback(async (id: number) => {
@@ -652,7 +650,7 @@ export function useApp(): AppState {
     retrying, microphoneOk, accessibilityOk, errorMsg, apiKeyStatus, apiKeyError,
     showModelGuide, setShowModelGuide, searchQuery, setSearchQuery, statusFilter,
     setStatusFilter, savingSettings, settingsFeedback, setSettingsFeedback,
-    confirmingClear, appVersion, selectedIds, setSelectedIds, hasMore,
+    appVersion, selectedIds, setSelectedIds, hasMore,
     shortcutConflictMsg, updateStatus, downloading, downloadMsg, updateInfo,
     polishErrorMsg, uploadingFile, transcribeFile, playingAudioId, audioUrls,
  audioProgress, audioDuration, stopAudio, seekAudio,

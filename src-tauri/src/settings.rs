@@ -727,7 +727,9 @@ mod tests {
         let json = serde_json::to_string(&disk).unwrap();
         // api_key is always present in JSON (belt-and-suspenders fallback)
         assert!(json.contains("\"api_key\""));
-        assert!(json.contains("«redacted:sk-…»"));
+        // Roundtrip check — serde_json may escape Unicode chars, so deserialize back
+        let parsed: DiskSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.api_key, "«redacted:sk-…»");
     }
 
     #[test]
@@ -787,7 +789,9 @@ mod tests {
 
         let json = serde_json::to_string(&disk).unwrap();
         assert!(json.contains("\"api_key\""));
-        assert!(json.contains("«redacted:sk-…»"));
+        // Roundtrip check — serde_json may escape Unicode chars, so deserialize back
+        let parsed: DiskSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.api_key, "«redacted:sk-…»");
     }
 
     #[test]
