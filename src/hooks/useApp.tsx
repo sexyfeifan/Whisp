@@ -332,8 +332,8 @@ export function useApp(): AppState {
     await waitForPermission("check_accessibility", setAccessibilityOk);
   }, [waitForPermission]);
 
-  const uiLanguage: UiLanguage = settings?.ui_language ?? "zh-CN";
-  const m = messages[uiLanguage] as Record<string, string>;
+  const uiLanguage: UiLanguage = (settings?.ui_language as UiLanguage) ?? "zh-CN";
+  const m: Record<string, string> = (messages[uiLanguage] ?? messages["zh-CN"]) || {};
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((current) => {
@@ -355,14 +355,14 @@ export function useApp(): AppState {
     setSavingSettings(true); setSettingsFeedback(null);
     try {
       await invoke("save_settings", { settings });
-      setSettingsFeedback({ tone: "success", message: (messages[settings.ui_language] as Record<string, string>).settingsSaved });
+      setSettingsFeedback({ tone: "success", message: m.settingsSaved });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
       return true;
     } catch (error) {
       setSettingsFeedback({ tone: "error", message: String(error) });
       return false;
     } finally { setSavingSettings(false); }
-  }, [settings]);
+  }, [settings, m]);
 
   const testApiKey = useCallback(async (apiKey: string, apiBaseUrl: string, model: string) => {
     if (!apiKey || !apiBaseUrl) return;
@@ -376,7 +376,7 @@ export function useApp(): AppState {
       setApiKeyStatus(isUpstreamOverload ? "warn" : "error");
       setApiKeyError(`${detail}\n${m.optionalValidationHint}`);
     }
-  }, [m.optionalValidationHint]);
+  }, [m, m.optionalValidationHint]);
 
   const copyText = useCallback(async (text: string, id: number) => {
     await writeText(text); setCopied(id);

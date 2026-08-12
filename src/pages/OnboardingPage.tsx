@@ -186,7 +186,7 @@ export function OnboardingPage(app: AppState) {
                     onClick={() => app.testApiKey(settings.api_key, settings.api_base_url, settings.model)}
                     disabled={!settings.api_key || !settings.api_base_url || apiKeyStatus === "testing"}
                   >
-                    {apiKeyStatus === "testing" ? m.testing : apiKeyStatus === "ok" ? m.connected : apiKeyStatus === "warn" ? m.optionalValidationHint.split("\u3002")[0] : m.testConnection}
+                    {apiKeyStatus === "testing" ? m.testing : apiKeyStatus === "ok" ? m.connected : apiKeyStatus === "warn" ? (m.optionalValidationHint || m.testConnection).split("\u3002")[0] : m.testConnection}
                   </Button>
                   {(apiKeyStatus === "error" || apiKeyStatus === "warn") && apiKeyError && (
                     <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-xs whitespace-pre-wrap" style={{ color: apiKeyStatus === "warn" ? "hsl(var(--warning))" : "hsl(var(--destructive))" }}>{apiKeyError}</motion.p>
