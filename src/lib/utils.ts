@@ -12,7 +12,6 @@ export function translateShortcut(shortcut: string): string {
   return shortcut
     .replace("CmdOrCtrl", modKey)
     .replace("Cmd", "\u2318")
-    .replace("Ctrl", "Ctrl")
     .replace("Shift", "\u21e7")
     .replace("Alt", isMac ? "\u2325" : "Alt")
     .replace(/\+/g, " ");

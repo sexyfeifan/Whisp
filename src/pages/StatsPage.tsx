@@ -28,16 +28,14 @@ interface DayBucket {
   count: number;
 }
 
-function computeDailyUsage(history: AppState["history"]): DayBucket[] {
+function computeDailyUsage(history: AppState["history"], m?: Record<string, string>): DayBucket[] {
   const now = new Date();
   const buckets: DayBucket[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     d.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(d);
-    dayEnd.setHours(23, 59, 59, 999);
-    const label = i === 0 ? "Today" : i === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const label = i === 0 ? (m.today ?? "Today") : i === 1 ? (m.yesterday ?? "Yesterday") : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
     buckets.push({ label, date: d, count: 0 });
   }
   for (const entry of history) {
@@ -62,8 +60,8 @@ interface ModelBucket {
 function computeTopModels(history: AppState["history"]): ModelBucket[] {
   const map = new Map<string, number>();
   for (const entry of history) {
-    const m = entry.model || "unknown";
-    map.set(m, (map.get(m) || 0) + 1);
+    const modelName = entry.model || "unknown";
+    map.set(modelName, (map.get(modelName) || 0) + 1);
   }
   return Array.from(map.entries())
     .map(([model, count]) => ({ model, count }))
@@ -113,7 +111,7 @@ function BarChart({ data }: { data: DayBucket[] }) {
   const gap = plotW / data.length;
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img">
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="Daily usage bar chart">
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
         const y = padTop + plotH * (1 - frac);
@@ -177,7 +175,7 @@ function BarChart({ data }: { data: DayBucket[] }) {
   );
 }
 
-function PieChart({ data }: { data: ModelBucket[] }) {
+function PieChart({ data, m }: { data: ModelBucket[]; m?: Record<string, string> }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   if (total === 0) return null;
   const r = 60;
@@ -204,7 +202,7 @@ function PieChart({ data }: { data: ModelBucket[] }) {
   });
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img">
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="Top models pie chart">
       {slices.map((s, i) => (
         <path key={i} d={s.dPath} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="hsl(var(--background))" strokeWidth="1.5" />
       ))}
@@ -213,7 +211,7 @@ function PieChart({ data }: { data: ModelBucket[] }) {
         {total}
       </text>
       <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="hsl(var(--steel))">
-        total
+        {m.pieChartTotal ?? "total"}
       </text>
 
       {/* Legend */}
@@ -270,7 +268,7 @@ export function StatsPage(app: AppState) {
     settings,
   } = app;
 
-  const dailyData = useMemo(() => computeDailyUsage(history), [history]);
+  const dailyData = useMemo(() => computeDailyUsage(history, m), [history, m]);
   const topModels = useMemo(() => computeTopModels(history), [history]);
   const todayStats = useMemo(() => computeTodayStats(history), [history]);
   const monthlyStats = useMemo(() => computeMonthlyStats(history), [history]);
@@ -363,7 +361,7 @@ export function StatsPage(app: AppState) {
                   {mStats.statsNoData ?? "No data yet"}
                 </div>
               ) : (
-                <PieChart data={topModels} />
+                <PieChart data={topModels} m={m} />
               )}
             </Card>
           </div>

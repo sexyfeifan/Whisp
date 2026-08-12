@@ -166,8 +166,8 @@ export function OnboardingPage(app: AppState) {
                   </motion.div>
                   <Input type="text" value={settings.api_base_url} onChange={(event) => updateSettings({ api_base_url: event.target.value })} placeholder={defaultApiBaseUrl} />
                   <Input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-proj-..." />
-                  <Input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
-                  <datalist id="model-options">
+                  <Input list="onboarding-model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
+                  <datalist id="onboarding-model-options">
                     {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                   </datalist>
                   <div className="flex items-center justify-end">

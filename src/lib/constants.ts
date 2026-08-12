@@ -162,7 +162,7 @@ export const modelCatalog: ModelCatalogItem[] = [
     baseUrlHint: "https://api.xiaomimimo.com/v1",
   },
   {
-    name: "mimo-v2.5-asr",
+    name: "mimo-v2.5-asr-token-plan",
     provider: "MiMo Token Plan",
     description: {
       "zh-CN": "小米 MiMo 语音识别，Token Plan 计费。",

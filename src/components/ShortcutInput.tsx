@@ -50,6 +50,8 @@ export function ShortcutInput({
     <div>
       <div
         tabIndex={0}
+        role="button"
+        aria-label={recording ? promptText : translateShortcut(shortcut)}
         className="w-full px-3 py-2 rounded-lg text-sm outline-none text-center cursor-pointer"
         style={{
           background: "hsl(var(--canvas))",

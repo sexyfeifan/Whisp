@@ -8,7 +8,7 @@ interface AudioPlayerProps {
   onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
-export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
+export function AudioPlayer({ audioPath, durationMs, onTimeUpdate }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const waveformRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
@@ -18,6 +18,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [waveformData, setWaveformData] = useState<number[]>([]);
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
 
 
   // Generate waveform data from WAV bytes
@@ -64,7 +65,10 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
         audioRef.current = audio;
 
         audio.addEventListener("loadedmetadata", () => {
-          setDuration(audio.duration);
+          // Prefer caller-provided durationMs (from DB) over metadata, which can be
+          // unreliable for some WAV encodings or while the stream is still buffering.
+          const d = (durationMs && durationMs > 0) ? durationMs / 1000 : audio.duration;
+          setDuration(d);
           generateWaveform(bytes);
         });
 
@@ -72,7 +76,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
           setIsPlaying(false);
           cancelAnimationFrame(animationRef.current);
           // Fire final time update so consumers know playback ended
-          const d = audio.duration || 0;
+          const d = (durationMs && durationMs > 0) ? durationMs / 1000 : (audio.duration || 0);
           setCurrentTime(d);
           onTimeUpdateRef.current?.(d, d);
         });
@@ -98,7 +102,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       }
       cancelAnimationFrame(animationRef.current);
     };
-  }, [audioPath, generateWaveform]);
+  }, [audioPath, durationMs, generateWaveform]);
 
   // Draw waveform on canvas
   useEffect(() => {
@@ -158,11 +162,16 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
     if (isPlaying) {
       audio.pause();
       cancelAnimationFrame(animationRef.current);
+      setIsPlaying(false);
     } else {
-      audio.play().catch((e) => console.warn("Audio play failed:", e));
-      animationRef.current = requestAnimationFrame(updateTime);
+      audio.play().then(() => {
+        setIsPlaying(true);
+        animationRef.current = requestAnimationFrame(updateTime);
+      }).catch((e) => {
+        console.warn("Audio play failed:", e);
+        setIsPlaying(false);
+      });
     }
-    setIsPlaying(!isPlaying);
   }, [isPlaying, updateTime]);
 
   const seek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -190,6 +199,12 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
       <div
         className="relative h-12 cursor-pointer group"
         onClick={seek}
+        onMouseMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          setHoverTime(ratio * duration);
+        }}
+        onMouseLeave={() => setHoverTime(null)}
       >
         <canvas
           ref={waveformRef}
@@ -199,7 +214,7 @@ export function AudioPlayer({ audioPath, onTimeUpdate }: AudioPlayerProps) {
         {/* Hover time tooltip */}
         <div className="absolute inset-x-0 -top-6 flex justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "hsl(var(--ink))", color: "white" }}>
-            {formatTime(currentTime)} / {formatTime(duration)}
+            {formatTime(hoverTime ?? currentTime)} / {formatTime(duration)}
           </span>
         </div>
       </div>

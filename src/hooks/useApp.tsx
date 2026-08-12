@@ -195,10 +195,10 @@ export function useApp(): AppState {
     setDownloadMsg(null);
     try {
       if (!url || !filename) {
-        const platform = navigator.platform.toLowerCase();
-        const isMacPlatform = platform.includes("mac");
-        const isWin = platform.includes("win");
-        const isArm = navigator.userAgent.includes("aarch64") || navigator.userAgent.includes("arm64");
+        const platform = navigator.userAgent;
+        const isMacPlatform = /Mac/i.test(platform);
+        const isWin = /Win/i.test(platform);
+        const isArm = /arm64|aarch64/i.test(platform) || ("userAgentData" in navigator && (navigator as Navigator & { userAgentData?: { architecture?: string } }).userAgentData?.architecture === "arm");
 
         const assets = updateInfo?.assets || [];
         const asset = assets.find((a) => {
@@ -215,20 +215,20 @@ export function useApp(): AppState {
       }
 
       if (!url || !filename) {
-        setDownloadMsg("No downloadable asset found.");
+        setDownloadMsg(m.noDownloadableAsset);
         setDownloading(false);
         return;
       }
 
-      setDownloadMsg(`Downloading ${filename}...`);
+      setDownloadMsg(`${m.downloadingFile} ${filename}...`);
       const msg = await invoke<string>("download_and_install_update", { url, filename });
       setDownloadMsg(msg);
     } catch (error) {
-      setDownloadMsg(`Download failed: ${error}`);
+      setDownloadMsg(`${m.downloadFailed}: ${error}`);
     } finally {
       setDownloading(false);
     }
-  }, [updateInfo]);
+  }, [updateInfo, m]);
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
 
@@ -340,12 +340,15 @@ export function useApp(): AppState {
       if ("api_key" in patch || "api_base_url" in patch || "model" in patch) {
         setApiKeyStatus("untested"); setApiKeyError(null);
       }
-      window.clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = window.setTimeout(() => {
-        invoke("save_settings", { settings: next }).catch(() => {});
-      }, 800);
       return next;
     });
+    window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(() => {
+      setSettings((current) => {
+        if (current) { invoke("save_settings", { settings: current }).catch(() => {}); }
+        return current;
+      });
+    }, 800);
   }, []);
 
   const persistSettings = useCallback(async () => {
@@ -455,7 +458,13 @@ export function useApp(): AppState {
       // Reset progress before starting new playback (prevents stale highlight on text)
       setAudioProgress(0);
       setAudioDuration(0);
-      await audio.play();
+      try {
+        await audio.play();
+      } catch (playError) {
+        console.warn("Audio play failed:", playError);
+        stopAudio();
+        return;
+      }
       setPlayingAudioId(id);
 
       // Animation loop for progress tracking — scoped to this entry id to prevent

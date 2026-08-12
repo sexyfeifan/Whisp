@@ -124,8 +124,8 @@ export function SettingsApiPage(app: AppState) {
               </div>
               <div>
                 <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.model}</label>
-                <Input list="model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
-                <datalist id="model-options">
+                <Input list="settings-model-options" value={settings.model} onChange={(event) => updateSettings({ model: event.target.value })} placeholder="gpt-4o-transcribe" />
+                <datalist id="settings-model-options">
                   {suggestedModels.map((modelName) => (<option key={modelName} value={modelName} />))}
                 </datalist>
                 <div className="flex items-center justify-end mt-1">
@@ -161,7 +161,7 @@ export function SettingsApiPage(app: AppState) {
             <SettingsSection
               icon={<Sparkles size={14} />}
               title={m.aiSummary}
-              description="Configure a separate API endpoint for AI summaries. Leave empty to use the main transcription API."
+              description={m.aiSummaryConfigDesc}
             >
               <div>
                 <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.endpointPresets}</label>

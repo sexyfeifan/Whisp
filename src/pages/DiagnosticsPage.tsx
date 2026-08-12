@@ -150,7 +150,7 @@ export function DiagnosticsPage(app: AppState) {
                   <Button variant="secondary" size="sm" onClick={copyAllLogs}>{m.copyAll}</Button>
                   <Button variant="secondary" size="sm" onClick={clearLogs}>{m.clearLogs}</Button>
                   <Button variant={logsAutoScroll ? "primary" : "secondary"} size="sm" onClick={() => setLogsAutoScroll(!logsAutoScroll)}>
-                    {logsAutoScroll ? "Auto-scroll ON" : "Auto-scroll OFF"}
+                    {logsAutoScroll ? m.autoScrollOn : m.autoScrollOff}
                   </Button>
                 </div>
               </div>
@@ -166,7 +166,7 @@ export function DiagnosticsPage(app: AppState) {
                 }}
               >
                 {logs.length === 0 ? (
-                  <div className="p-4 text-center" style={{ color: "hsl(var(--steel))" }}>{"\u6682\u65e0\u65e5\u5fd7"}</div>
+                  <div className="p-4 text-center" style={{ color: "hsl(var(--steel))" }}>{m.noLogs}</div>
                 ) : (
                   <div className="p-2 space-y-0.5">
                     {logs.map((entry, idx) => (

@@ -85,10 +85,10 @@ const handleUploadConfirm = async (polish: boolean) => {
       reader.readAsDataURL(file);
     });
     await transcribeFile(base64, fileName, polish);
-    setUploadStatus({ type: "success", message: `✓ "${fileName}" ${polish ? "已转写并润色" : "已转写完成"}` });
+    setUploadStatus({ type: "success", message: `✓ "${fileName}" ${polish ? m.uploadTranscribedWithPolish : m.uploadTranscribed}` });
   } catch (e) {
     console.error("Transcription failed:", e);
-    setUploadStatus({ type: "error", message: `✕ "${fileName}" 转写失败: ${String(e).slice(0, 100)}` });
+    setUploadStatus({ type: "error", message: `✕ "${fileName}" ${m.uploadFailed}: ${String(e).slice(0, 100)}` });
   }
   // Auto-clear status after 5 seconds
   setTimeout(() => setUploadStatus(null), 5000);
@@ -115,7 +115,7 @@ const handleUploadConfirm = async (polish: boolean) => {
     try {
       const result = await invoke<SummaryResult>("generate_summary", { entryId });
       setSummaryModal({ entry: { id: entryId, text }, result, loading: false });
-    } catch (e: any) {
+    } catch (e: unknown) {
       const raw = String(e);
       const enhanced = raw.includes("404") || raw.includes("Not Found") || raw.includes("model")
         ? `${raw}\n\nHint: Your API provider may not support chat completions. The AI Summary feature requires a chat/completions endpoint (not just Whisper). Please verify your API settings include a compatible model.`
@@ -332,7 +332,8 @@ const handleUploadConfirm = async (polish: boolean) => {
                         <div className="rounded-md border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.06)] p-2 relative">
                           <button
                             className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded hover:bg-[hsl(var(--destructive)/0.15)] transition-colors"
-                            title="删除此记录"
+                            title={m.deleteRecord}
+                            aria-label={m.deleteRecord}
                             onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }}
                           >
                             <X size={12} style={{ color: "hsl(var(--destructive))" }} />
@@ -358,12 +359,12 @@ const handleUploadConfirm = async (polish: boolean) => {
                                 onClick={(e) => { e.stopPropagation(); setShowPolished(prev => ({...prev, [entry.id]: true})); }}
                                 className={cn('text-xs px-2 py-0.5 rounded transition-colors',
                                   showPolished[entry.id] !== false ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--steel))] hover:bg-[hsl(var(--surface))]')}
-                              >AI 润色</button>
+                              >{m.aiPolish}</button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setShowPolished(prev => ({...prev, [entry.id]: false})); }}
                                 className={cn('text-xs px-2 py-0.5 rounded transition-colors',
                                   showPolished[entry.id] === false ? 'bg-[hsl(var(--primary))] text-white' : 'text-[hsl(var(--steel))] hover:bg-[hsl(var(--surface))]')}
-                              >原文</button>
+                              >{m.originalText}</button>
                             </div>
                           )}
                           <div
@@ -529,7 +530,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                 <Sparkles size={18} style={{ color: "hsl(var(--primary))" }} />
                 <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>{m.aiSummary}</h2>
               </div>
-              <button onClick={() => setSummaryModal(null)} className="p-1 rounded-lg hover:bg-[hsl(var(--surface))] transition-colors" style={{ color: "hsl(var(--steel))" }}>
+              <button onClick={() => setSummaryModal(null)} aria-label={m.close ?? "Close"} className="p-1 rounded-lg hover:bg-[hsl(var(--surface))] transition-colors" style={{ color: "hsl(var(--steel))" }}>
                 <X size={18} />
               </button>
             </div>

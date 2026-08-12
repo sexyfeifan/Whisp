@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Keyboard, Settings as SettingsIcon, Download, Check, ExternalLink, X, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -147,7 +148,7 @@ export function SettingsAppPage(app: AppState) {
                       </div>
                     )}
                     {updateInfo.releaseUrl && (
-                      <Button variant="secondary" size="sm" onClick={() => window.open(updateInfo.releaseUrl)}>
+                      <Button variant="secondary" size="sm" onClick={() => openPath(updateInfo.releaseUrl)}>
                         <ExternalLink size={12} className="mr-1" />
                         {m.viewOnGitHub}
                       </Button>

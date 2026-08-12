@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Box, Download, Trash2, RefreshCw, HardDrive, Info, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
@@ -72,11 +72,11 @@ export function SettingsModelsPage(app: AppState) {
   }, [loadModels]);
 
   // Determine which known models are not yet downloaded
-  const downloadedNames = new Set(downloadedModels.map((m) => m.name));
-  const notDownloaded = knownModels.filter((k) => !downloadedNames.has(k.name));
+  const downloadedNames = useMemo(() => new Set(downloadedModels.map((model) => model.name)), [downloadedModels]);
+  const notDownloaded = useMemo(() => knownModels.filter((k) => !downloadedNames.has(k.name)), [knownModels, downloadedNames]);
 
   // Build a lookup for known model metadata to annotate downloaded models
-  const knownLookup = new Map(knownModels.map((k) => [k.name, k]));
+  const knownLookup = useMemo(() => new Map(knownModels.map((k) => [k.name, k])), [knownModels]);
 
   const handleDelete = async (modelName: string) => {
     setDeleting(modelName);
@@ -190,10 +190,9 @@ export function SettingsModelsPage(app: AppState) {
               <div className="flex items-start gap-2">
                 <Info size={16} className="mt-0.5 shrink-0" style={{ color: "hsl(var(--steel))" }} />
                 <div>
-                  <p className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>离线语音识别模型</p>
+                  <p className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.offlineModelsTitle ?? "离线语音识别模型"}</p>
                   <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
-                    下载的 Whisper 模型可作为离线语音识别的备用方案。当 API 转写服务不可用时，
-                    系统会自动使用本地模型进行转写。您也可以在设置中开启"优先使用本地模型"。
+                    {m.offlineModelDesc}
                   </p>
                 </div>
               </div>
@@ -341,7 +340,6 @@ export function SettingsModelsPage(app: AppState) {
                             variant="primary"
                             size="sm"
                             onClick={() => handleDownload(model.name)}
-                            disabled={downloading.has(model.name)}
                             className="w-full"
                           >
                             <Download size={12} className="mr-1" />
