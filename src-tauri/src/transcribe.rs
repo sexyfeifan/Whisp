@@ -278,23 +278,100 @@ fn generate_silent_wav() -> Vec<u8> {
     buf
 }
 
+/// Parse RIFF/WAV chunk structure to locate the `data` chunk dynamically.
+///
+/// Returns `Some((header, audio_data, data_size_field_offset))` where:
+/// - `header` — everything from byte 0 up to (but not including) the data payload
+/// - `audio_data` — the raw PCM samples inside the data chunk
+/// - `data_size_field_offset` — byte offset of the 4-byte LE data-size field within `header`
+///
+/// Returns `None` if the file is not a valid RIFF/WAV or has no data chunk.
+fn parse_wav_data_chunk(wav_data: &[u8]) -> Option<(&[u8], &[u8], usize)> {
+    if wav_data.len() < 12 {
+        return None;
+    }
+    if &wav_data[0..4] != b"RIFF" {
+        return None;
+    }
+    if &wav_data[8..12] != b"WAVE" {
+        return None;
+    }
+
+    // Walk RIFF sub-chunks starting after "RIFF" + size + "WAVE" (offset 12)
+    let mut pos = 12usize;
+    loop {
+        // Need at least 8 bytes for chunk tag + size
+        if pos + 8 > wav_data.len() {
+            return None;
+        }
+
+        let chunk_tag = &wav_data[pos..pos + 4];
+        let chunk_size = u32::from_le_bytes([
+            wav_data[pos + 4],
+            wav_data[pos + 5],
+            wav_data[pos + 6],
+            wav_data[pos + 7],
+        ]) as usize;
+
+        let payload_start = pos + 8;
+        let payload_end = payload_start.checked_add(chunk_size).unwrap_or(usize::MAX);
+        if payload_end > wav_data.len() {
+            return None; // chunk extends past end of file
+        }
+
+        if chunk_tag == b"data" {
+            let header = &wav_data[..payload_start];
+            let audio_data = &wav_data[payload_start..payload_end];
+            let data_size_field_offset = pos + 4;
+            return Some((header, audio_data, data_size_field_offset));
+        }
+
+        // RIFF chunks are 2-byte (word) aligned; skip padding byte if size is odd
+        let next_pos = if chunk_size % 2 == 0 {
+            payload_end
+        } else {
+            payload_end + 1
+        };
+        if next_pos <= payload_end {
+            return None; // overflow / degenerate
+        }
+        pos = next_pos;
+    }
+}
+
 fn split_wav_into_chunks(wav_data: &[u8], max_chunk_size: usize) -> Vec<Vec<u8>> {
     if wav_data.len() <= max_chunk_size {
         return vec![wav_data.to_vec()];
     }
 
-    // WAV header is typically 44 bytes
-    let header_size = 44usize;
-    if wav_data.len() <= header_size {
+    // Try to parse the RIFF structure dynamically.
+    // Fall back to the legacy 44-byte header assumption for backward compatibility.
+    let (header, audio_data, data_size_field_offset) = match parse_wav_data_chunk(wav_data) {
+        Some(result) => result,
+        None => {
+            // Legacy fallback: assume a standard 44-byte header
+            let header_size = 44usize;
+            if wav_data.len() <= header_size {
+                return vec![wav_data.to_vec()];
+            }
+            (
+                &wav_data[..header_size],
+                &wav_data[header_size..],
+                header_size - 4, // data size field at offset 40
+            )
+        }
+    };
+
+    let header_size = header.len();
+
+    // Guard: chunk must fit at least the header
+    if max_chunk_size <= header_size {
         return vec![wav_data.to_vec()];
     }
 
-    let header = &wav_data[..header_size];
-    let audio_data = &wav_data[header_size..];
-    let chunk_audio_size = max_chunk_size - header_size;
-
+    let chunk_audio_capacity = max_chunk_size - header_size;
     // Align to sample boundary (2 bytes for 16-bit mono)
-    let aligned_chunk_size = (chunk_audio_size / 2) * 2;
+    let aligned_chunk_size = (chunk_audio_capacity / 2) * 2;
 
     let mut chunks = Vec::new();
     let mut offset = 0;
@@ -302,18 +379,23 @@ fn split_wav_into_chunks(wav_data: &[u8], max_chunk_size: usize) -> Vec<Vec<u8>>
         let end = (offset + aligned_chunk_size).min(audio_data.len());
         // Align end to sample boundary
         let aligned_end = (end / 2) * 2;
+        if aligned_end <= offset {
+            break;
+        }
         let chunk_audio = &audio_data[offset..aligned_end];
 
         let chunk_data_size = chunk_audio.len() as u32;
-        let file_size = 36 + chunk_data_size;
+        // RIFF file size = total content after "RIFF" + size field = header_size - 8 + audio
+        let riff_file_size = (header_size as u32 - 8) + chunk_data_size;
 
         let mut chunk = Vec::with_capacity(header_size + chunk_audio.len());
         chunk.extend_from_slice(b"RIFF");
-        chunk.extend_from_slice(&file_size.to_le_bytes());
-        chunk.extend_from_slice(&header[8..header_size]); // rest of header
-                                                          // Update data chunk size in header
-                                                          // The data size field is at offset 40 (header_size - 4)
-        chunk[40..44].copy_from_slice(&chunk_data_size.to_le_bytes());
+        chunk.extend_from_slice(&riff_file_size.to_le_bytes());
+        chunk.extend_from_slice(&header[8..header_size]); // fmt chunk, "data" tag, etc.
+
+        // Patch the data chunk size field in the rebuilt header
+        chunk[data_size_field_offset..data_size_field_offset + 4].copy_from_slice(&chunk_data_size.to_le_bytes());
+
         chunk.extend_from_slice(chunk_audio);
 
         chunks.push(chunk);

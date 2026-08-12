@@ -219,11 +219,14 @@ pub fn activate_app_by_bundle_id(bundle_id: &str) -> Result<(), String> {
         .chars()
         .all(|c| c.is_alphanumeric() || c == '.' || c == '-' || c == '_')
     {
-        log::warn!("Rejected invalid bundle_id (contains unsafe characters): {}", normalized);
+        log::warn!(
+            "Rejected invalid bundle_id (contains unsafe characters): {}",
+            normalized
+        );
         return Err("Invalid bundle id: contains unsafe characters".into());
     }
 
-    let script = format!("tell application id "{}" to activate", normalized);
+    let script = format!("tell application id \"{normalized}\" to activate");
     let output = Command::new("osascript")
         .arg("-e")
         .arg(script)

@@ -54,44 +54,45 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
     Ok(())
 }
 
-/// Cached data directory path — computed once to avoid TOCTOU race conditions
-/// when multiple threads call data_dir() concurrently on first launch.
-static DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+/// Ensures the nanowhisper → whisp migration runs exactly once across threads.
+static MIGRATED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
 /// ~/.whisp/ (migrated from ~/.nanowhisper/)
-/// Uses OnceLock to ensure the migration logic runs exactly once.
+/// Migration is protected by OnceLock to avoid TOCTOU races on first launch.
 pub fn data_dir() -> PathBuf {
-    DATA_DIR
-        .get_or_init(|| {
-            let home = dirs::home_dir().expect("Cannot determine home directory");
-            let new_dir = home.join(".whisp");
-            let old_dir = home.join(".nanowhisper");
+    let home = dirs::home_dir().expect("Cannot determine home directory");
+    let new_dir = home.join(".whisp");
+    let old_dir = home.join(".nanowhisper");
 
-            // Migrate from old directory if new doesn't exist but old does
-            if !new_dir.exists() && old_dir.exists() {
-                match std::fs::rename(&old_dir, &new_dir) {
-                    Ok(_) => {
-                        log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
+    // Run migration exactly once — even if multiple threads call data_dir() concurrently
+    MIGRATED.get_or_init(|| {
+        if !new_dir.exists() && old_dir.exists() {
+            match std::fs::rename(&old_dir, &new_dir) {
+                Ok(_) => {
+                    log::info!("Migrated data directory from ~/.nanowhisper to ~/.whisp");
+                }
+                Err(e) => {
+                    log::warn!(
+                        "Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...",
+                        e
+                    );
+                    if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
+                        log::warn!("Copy migration also failed: {}. Using old directory.", e2);
+                        return; // old_dir stays as-is
                     }
-                    Err(e) => {
-                        log::warn!(
-                            "Rename migration failed (possibly cross-filesystem): {}. Trying copy+delete...",
-                            e
-                        );
-                        // Fallback: copy files then delete old directory
-                        if let Err(e2) = copy_dir_recursive(&old_dir, &new_dir) {
-                            log::warn!("Copy migration also failed: {}. Using old directory.", e2);
-                            return old_dir;
-                        }
-                        let _ = std::fs::remove_dir_all(&old_dir);
-                        log::info!("Migrated data directory via copy from ~/.nanowhisper to ~/.whisp");
-                    }
+                    let _ = std::fs::remove_dir_all(&old_dir);
+                    log::info!("Migrated data directory via copy from ~/.nanowhisper to ~/.whisp");
                 }
             }
+        }
+    });
 
-            new_dir
-        })
-        .clone()
+    // Return fresh path each call — respects test HOME changes
+    if new_dir.exists() {
+        new_dir
+    } else {
+        old_dir
+    }
 }
 
 // Named constants
@@ -759,11 +760,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
 
     // Reject near-silent audio: if peak amplitude is below the silence threshold
     // after trimming, skip transcription to avoid wasting API calls on noise.
-    let peak_after_trim = processed_audio
-        .samples
-        .iter()
-        .map(|s| s.abs())
-        .fold(0.0_f32, f32::max);
+    let peak_after_trim = processed_audio.samples.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
     if peak_after_trim < SILENCE_TRIM_THRESHOLD {
         log::warn!(
             "Recording too quiet after processing (peak={:.4}, threshold={})",
