@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.12.27 (2026-09-01)
+
+- Restored the animated Thinking Orb in the recording, silence-detection, and transcription states.
+- Restored the v2.12.23 recording overlay proportions, waveform colours, and restrained capsule treatment.
+- Kept the v2.12.26 main-interface styling and desktop behaviour unchanged.
+
 ## v2.12.26 (2026-09-01)
 
 - Restored History as the first and primary destination in the sidebar.

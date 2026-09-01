@@ -1,26 +1,21 @@
 /* ═══════════════════════════════════════════
-   Whisp Overlay — Luminous Iris Capsule
+   Whisp Overlay — Elegant Capsule Design
    ═══════════════════════════════════════════ */
 
 :root {
-  --overlay-fg: rgba(31, 30, 43, 0.94);
-  --overlay-dim: rgba(85, 82, 104, 0.6);
-  --overlay-border: rgba(99, 83, 194, 0.14);
-  --overlay-accent: hsl(250, 64%, 57%);
-  --overlay-glow: hsl(276, 72%, 63%);
-  --overlay-accent-soft: hsla(250, 68%, 57%, 0.12);
-  --overlay-wave-rgb: 103, 91, 231;
+  --overlay-fg: rgba(26, 26, 26, 0.92);
+  --overlay-dim: rgba(87, 83, 78, 0.5);
+  --overlay-border: rgba(0, 0, 0, 0.06);
+  --overlay-accent: hsl(258, 72%, 58%);
+  --overlay-accent-soft: hsla(258, 72%, 58%, 0.12);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --overlay-fg: rgba(242, 240, 252, 0.96);
-    --overlay-dim: rgba(183, 178, 207, 0.62);
-    --overlay-border: rgba(177, 163, 255, 0.16);
-    --overlay-accent: hsl(248, 82%, 72%);
-    --overlay-glow: hsl(276, 76%, 69%);
-    --overlay-accent-soft: hsla(248, 82%, 72%, 0.14);
-    --overlay-wave-rgb: 159, 144, 255;
+    --overlay-fg: rgba(240, 238, 234, 0.95);
+    --overlay-dim: rgba(164, 160, 151, 0.5);
+    --overlay-border: rgba(255, 255, 255, 0.06);
+    --overlay-accent-soft: hsla(258, 72%, 68%, 0.1);
   }
 }
 
@@ -45,7 +40,7 @@ html, body {
   backdrop-filter: blur(32px) saturate(1.4);
   border: 1px solid var(--overlay-border);
   border-radius: 9999px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025), 0 10px 30px rgba(36, 28, 72, 0.12);
+  box-shadow: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -64,36 +59,9 @@ html, body {
   padding: 0 14px;
 }
 
-.state-glyph {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--overlay-fg);
-  background: var(--overlay-accent-soft);
-  border: 1px solid var(--overlay-border);
-  flex-shrink: 0;
-}
-
-.state-glyph.dim {
-  color: var(--overlay-dim);
-}
-
-.state-glyph.recording {
-  color: white;
-  background: linear-gradient(135deg, var(--overlay-accent), var(--overlay-glow));
-  border-color: transparent;
-  box-shadow: 0 5px 14px var(--overlay-accent-soft);
-}
-
-.spinning {
-  animation: overlay-spin 0.9s linear infinite;
-}
-
-@keyframes overlay-spin {
-  to { transform: rotate(360deg); }
+.orb-row > :first-child {
+  transform: scale(0.88);
+  transform-origin: center center;
 }
 
 .orb-label {
@@ -171,6 +139,11 @@ html, body {
   justify-content: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.recording-top-row > :first-child {
+  transform: scale(0.88);
+  transform-origin: center center;
 }
 
 .recording-text-row {
@@ -281,18 +254,17 @@ html, body {
 }
 
 .preview-btn-confirm {
-  background: linear-gradient(135deg, var(--overlay-accent), var(--overlay-glow));
+  background: var(--overlay-accent);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 4px 12px var(--overlay-accent-soft);
 }
 
 .preview-btn-confirm:hover:not(:disabled) {
-  filter: brightness(1.06);
+  background: hsl(258, 72%, 52%);
 }
 
 .preview-btn-confirm:active:not(:disabled) {
-  filter: brightness(0.94);
+  background: hsl(258, 72%, 46%);
 }
 
 .preview-btn-discard {
@@ -306,16 +278,16 @@ html, body {
 
 @media (prefers-color-scheme: dark) {
   .preview-btn-confirm {
-    background: linear-gradient(135deg, var(--overlay-accent), var(--overlay-glow));
-    color: hsl(240, 25%, 10%);
+    background: hsl(258, 65%, 68%);
+    color: hsl(0, 0%, 5%);
   }
 
   .preview-btn-confirm:hover:not(:disabled) {
-    filter: brightness(1.06);
+    background: hsl(258, 65%, 60%);
   }
 
   .preview-btn-confirm:active:not(:disabled) {
-    filter: brightness(0.94);
+    background: hsl(258, 65%, 54%);
   }
 }
 

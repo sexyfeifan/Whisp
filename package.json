@@ -1,7 +1,7 @@
 {
   "name": "whisp",
   "private": true,
-  "version": "2.12.26",
+  "version": "2.12.27",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -25,7 +25,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^3.6.0",
-    "tailwindcss": "^4.1"
+    "tailwindcss": "^4.1",
+    "thinking-orbs": "^0.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^8.57.0",
