@@ -192,9 +192,9 @@ const handleUploadConfirm = async (polish: boolean) => {
         {/* Upload status feedback */}
         {uploadStatus && (
           <div className="mx-6 mb-2 px-4 py-2 rounded-lg text-sm font-medium" style={{
-            background: uploadStatus.type === "success" ? "hsl(142, 76%, 92%)" : "hsl(0, 84%, 94%)",
-            color: uploadStatus.type === "success" ? "hsl(142, 76%, 28%)" : "hsl(0, 84%, 40%)",
-            border: `1px solid ${uploadStatus.type === "success" ? "hsl(142, 76%, 75%)" : "hsl(0, 84%, 80%)"}`,
+            background: uploadStatus.type === "success" ? "hsl(var(--success) / 0.12)" : "hsl(var(--destructive) / 0.12)",
+            color: uploadStatus.type === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))",
+            border: `1px solid ${uploadStatus.type === "success" ? "hsl(var(--success) / 0.28)" : "hsl(var(--destructive) / 0.28)"}`,
           }}>
             {uploadStatus.message}
           </div>
@@ -203,24 +203,28 @@ const handleUploadConfirm = async (polish: boolean) => {
         {/* Stat cards */}
         <div className="px-6 pb-3 grid grid-cols-4 gap-3">
           <StatCard
-            icon={<FileAudio size={18} className="text-[hsl(var(--primary))]" />}
+            icon={<FileAudio size={18} />}
             label={m.statsTotal}
             value={String(stats.total)}
+            tone="var(--chart-1)"
           />
           <StatCard
-            icon={<Clock size={18} className="text-[hsl(var(--primary))]" />}
+            icon={<Clock size={18} />}
             label={m.statsToday}
             value={String(todayCount)}
+            tone="var(--chart-3)"
           />
           <StatCard
-            icon={<Check size={18} className="text-[hsl(var(--primary))]" />}
+            icon={<Check size={18} />}
             label={m.statsSuccess}
             value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : "\u2014"}
+            tone="var(--success)"
           />
           <StatCard
-            icon={<Volume2 size={18} className="text-[hsl(var(--primary))]" />}
+            icon={<Volume2 size={18} />}
             label={m.audioSaved}
             value={String(stats.audioSaved)}
+            tone="var(--chart-2)"
           />
         </div>
         {(stats.totalCost > 0 || stats.totalTokens > 0) && (
@@ -404,7 +408,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                                 return (
                                   <span style={{ position: "relative" }}>
                                     <span style={{
-                                      background: `linear-gradient(to right, hsla(175, 60%, 48%, 0.28) ${highlightPct}%, transparent ${highlightPct}%)`,
+                                      background: `linear-gradient(to right, hsl(var(--primary) / 0.18) ${highlightPct}%, transparent ${highlightPct}%)`,
                                       color: "hsl(var(--ink))",
                                       borderRadius: 3,
                                       transition: "background 0.08s linear",

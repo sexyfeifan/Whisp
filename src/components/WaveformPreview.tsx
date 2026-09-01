@@ -46,20 +46,20 @@ export default function WaveformPreview({
     // --- get theme colours ---
     const style = getComputedStyle(document.documentElement);
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const hslPrimary = style.getPropertyValue("--primary").trim() || (isDark ? "260 60% 62%" : "260 62% 48%");
+    const hslPrimary = style.getPropertyValue("--primary").trim() || (isDark ? "248 82% 72%" : "250 64% 57%");
 
     const [h, s, l] = hslPrimary.split(/\s+/).map(v => parseFloat(v));
-    const primaryH = h ?? 260;
-    const primaryS = s ?? 62;
-    const primaryL = l ?? 48;
+    const primaryH = h ?? 250;
+    const primaryS = s ?? 64;
+    const primaryL = l ?? 57;
 
     // --- empty / no data ---
     if (!data || data.amplitudes.length === 0) {
       // Draw a flat line
       const midY = height / 2;
       ctx.strokeStyle = isDark
-        ? "rgba(155, 138, 254, 0.25)"
-        : "rgba(86, 69, 212, 0.2)";
+        ? "rgba(159, 144, 255, 0.28)"
+        : "rgba(103, 91, 231, 0.22)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(0, midY);

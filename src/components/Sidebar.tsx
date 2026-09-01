@@ -1,7 +1,7 @@
 import type React from "react";
 import { Download, Moon, Sun } from "lucide-react";
-import logoUrl from "../assets/logo.png";
 import type { View } from "../lib/constants";
+import { BrandMark } from "./BrandMark";
 
 interface NavItem {
   id: View;
@@ -36,27 +36,34 @@ export function Sidebar({
   return (
     <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
-        <img src={logoUrl} alt="" width={22} height={22} />
+        <BrandMark size={22} />
         <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
       </div>
 
       <div className="flex-1 px-3 space-y-0.5">
         {navItems.map((item, idx) => {
           const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
-          const showSeparator = item.group !== prevGroup && item.group === "footer";
+          const showGroupLabel = item.group !== prevGroup && (item.group === "config" || item.group === "tools");
           const isActive = view === item.id;
           return (
             <div key={item.id}>
-              {showSeparator && <div className="mx-3 my-2 h-px" style={{ background: "hsl(var(--sidebar-border))" }} />}
+              {showGroupLabel && (
+                <div
+                  className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                  style={{ color: "hsl(var(--stone))" }}
+                >
+                  {item.group === "config" ? (m.settings ?? "Settings") : (m.tools ?? "Tools")}
+                </div>
+              )}
               <button
                 onClick={() => { flushAutoSave(); setView(item.id); }}
                 className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? "bg-[hsl(var(--primary))]"
+                    ? "bg-[hsl(var(--sidebar-item-active-bg))] shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]"
                     : "hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
                 }`}
                 style={{
-                  color: isActive ? "hsl(var(--on-primary))" : "hsl(var(--sidebar-text))",
+                  color: isActive ? "hsl(var(--sidebar-text-active))" : "hsl(var(--sidebar-text))",
                   fontWeight: isActive ? 500 : 400,
                 }}
               >

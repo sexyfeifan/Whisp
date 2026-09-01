@@ -15,8 +15,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           /* Notion: 8px rounded rectangles, NOT pills */
           "rounded-[8px]",
           {
-            /* Primary — Notion purple CTA */
-            "bg-[hsl(var(--primary))] text-[hsl(var(--on-primary))] hover:bg-[hsl(var(--primary-pressed))]": variant === "primary",
+            /* Primary — luminous iris CTA */
+            "bg-[linear-gradient(135deg,hsl(var(--primary)),hsl(var(--brand-glow)))] text-[hsl(var(--on-primary))] shadow-[0_6px_16px_hsl(var(--primary)/0.18)] hover:brightness-105": variant === "primary",
             /* Default — dark ink CTA */
             "bg-[hsl(var(--ink-deep))] text-[hsl(var(--on-primary))] hover:opacity-90": variant === "default",
             /* Secondary — outlined */

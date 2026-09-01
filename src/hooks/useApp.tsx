@@ -644,14 +644,14 @@ export function useApp(): AppState {
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
 
   const navItems: Array<{ id: View; icon: React.ReactNode; label: string; group?: string }> = useMemo(() => [
-    { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats", group: "main" },
     { id: "history", icon: <History size={16} />, label: m.history, group: "main" },
+    { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats", group: "main" },
     { id: "settingsApi", icon: <Shield size={16} />, label: m.apiConfiguration, group: "config" },
     { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
     { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
     { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
-    { id: "settingsModels", icon: <Box size={16} />, label: (m as Record<string, string>).modelsManagement ?? "Models", group: "config" },
-    { id: "diagnostics", icon: <Terminal size={16} />, label: m.diagnostics, group: "footer" },
+    { id: "settingsModels", icon: <Box size={16} />, label: (m as Record<string, string>).modelsManagement ?? "Models", group: "tools" },
+    { id: "diagnostics", icon: <Terminal size={16} />, label: m.diagnostics, group: "tools" },
   ], [m]);
 
   return {

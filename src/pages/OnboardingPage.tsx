@@ -6,9 +6,9 @@ import { Input } from "../components/ui/input";
 import { FilterChip } from "../components/FilterChip";
 import { ModelGuide } from "../components/ModelGuide";
 import { ShortcutInput } from "../components/ShortcutInput";
+import { BrandMark } from "../components/BrandMark";
 import type { AppState } from "../hooks/useApp";
 import { endpointPresets, suggestedModels, defaultApiBaseUrl } from "../lib/constants";
-import logoUrl from "../assets/logo.png";
 
 const stepVariants = {
   enter: (direction: number) => ({ x: direction > 0 ? 200 : -200, opacity: 0 }),
@@ -52,7 +52,7 @@ export function OnboardingPage(app: AppState) {
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
       <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
         <div className="flex items-center gap-2 px-4 py-4">
-          <img src={logoUrl} alt="" width={24} height={24} />
+          <BrandMark size={24} />
           <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
         </div>
       </div>
@@ -70,16 +70,14 @@ export function OnboardingPage(app: AppState) {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            <motion.img
-              src={logoUrl}
-              alt=""
-              width={48}
-              height={48}
+            <motion.div
               className="mb-3"
               initial={{ rotate: -10, scale: 0 }}
               animate={{ rotate: 0, scale: 1 }}
               transition={{ duration: 0.6, type: "spring", bounce: 0.4 }}
-            />
+            >
+              <BrandMark size={48} />
+            </motion.div>
             <h1 className="text-xl font-semibold">{m.onboardingTitle}</h1>
             <p className="text-xs" style={{ color: "hsl(var(--steel))" }}>{m.appSubtitle}</p>
           </motion.div>

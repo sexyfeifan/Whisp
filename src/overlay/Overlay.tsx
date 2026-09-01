@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { ThinkingOrb } from "thinking-orbs";
+import { AudioLines, LoaderCircle, Pause } from "lucide-react";
 import WaveformPreview, { type WaveformData } from "../components/WaveformPreview";
 
 type OverlayState = "recording" | "transcribing" | "silence-stopping" | "error" | "cancelled" | "preview";
@@ -179,16 +179,16 @@ function Overlay() {
       ctx.clearRect(0, 0, canvasWidth, CANVAS_HEIGHT);
       const midY = CANVAS_HEIGHT / 2;
       const maxHalfH = CANVAS_HEIGHT / 2 - 2;
-      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const waveRgb = getComputedStyle(document.documentElement)
+        .getPropertyValue("--overlay-wave-rgb")
+        .trim() || "103, 91, 231";
 
       for (let i = 0; i < historyRef.current.length; i++) {
         const amp = historyRef.current[i];
         const halfH = Math.max(1, amp * maxHalfH);
         const x = i * (COL_WIDTH + COL_GAP);
         const alpha = 0.25 + amp * 0.7;
-        ctx.fillStyle = isDark
-          ? `rgba(155, 138, 254, ${alpha})`
-          : `rgba(86, 69, 212, ${alpha})`;
+        ctx.fillStyle = `rgba(${waveRgb}, ${alpha})`;
         ctx.beginPath();
         ctx.roundRect(x, midY - halfH, COL_WIDTH, halfH * 2, COL_WIDTH / 2);
         ctx.fill();
@@ -238,12 +238,12 @@ function Overlay() {
     <div className={`overlay-body subtitle-${subtitleStyle}`} onPointerDown={handlePointerDown} data-state={state}>
       {state === "transcribing" ? (
         <div className="orb-row">
-          <ThinkingOrb state="composing" size={64} speed={0.75} />
+          <span className="state-glyph"><LoaderCircle size={17} className="spinning" /></span>
           <span className="orb-label">{STRINGS.transcribing}</span>
         </div>
       ) : state === "silence-stopping" ? (
         <div className="orb-row">
-          <ThinkingOrb state="breathing" size={64} speed={0.5} />
+          <span className="state-glyph dim"><Pause size={16} /></span>
           <span className="orb-label dim">{STRINGS.silenceStopping}</span>
         </div>
       ) : state === "error" ? (
@@ -288,7 +288,7 @@ function Overlay() {
       ) : (
         <div className="recording-layout">
           <div className="recording-top-row">
-            <ThinkingOrb state="searching" size={64} speed={0.6} theme="auto" />
+            <span className="state-glyph recording"><AudioLines size={17} /></span>
             <canvas ref={canvasRef} className="wave-canvas" style={{ width: 100, height: CANVAS_HEIGHT }} />
             <span className="orb-timer">{elapsedSec}s</span>
           </div>

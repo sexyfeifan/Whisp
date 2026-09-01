@@ -6,8 +6,7 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
     <div
       ref={ref}
       className={cn(
-        /* Notion: 12px radius, 1px hairline border, canvas bg */
-        "rounded-[12px] border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas))] text-[hsl(var(--card-foreground))]",
+        "rounded-[12px] border border-[hsl(var(--hairline))] bg-[hsl(var(--canvas))] text-[hsl(var(--card-foreground))] shadow-[0_1px_2px_hsl(var(--ink-deep)/0.035),0_8px_24px_hsl(var(--primary)/0.025)]",
         className
       )}
       {...props}
@@ -60,37 +59,4 @@ const CardContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 );
 CardContent.displayName = "CardContent";
 
-/* Pastel-tinted feature cards (Notion style) */
-type TintColor = "peach" | "rose" | "mint" | "teal" | "sky" | "yellow" | "cream" | "gray";
-
-const tintMap: Record<TintColor, string> = {
-  peach: "bg-[hsl(var(--tint-peach))]",
-  rose: "bg-[hsl(var(--tint-rose))]",
-  mint: "bg-[hsl(var(--tint-mint))]",
-  teal: "bg-[hsl(var(--tint-teal))]",
-  sky: "bg-[hsl(var(--tint-sky))]",
-  yellow: "bg-[hsl(var(--tint-yellow))]",
-  cream: "bg-[hsl(var(--tint-cream))]",
-  gray: "bg-[hsl(var(--tint-gray))]",
-};
-
-interface TintCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  tint: TintColor;
-}
-
-const TintCard = React.forwardRef<HTMLDivElement, TintCardProps>(
-  ({ className, tint, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(
-        "rounded-[12px] p-6 text-[hsl(var(--charcoal))]",
-        tintMap[tint],
-        className
-      )}
-      {...props}
-    />
-  )
-);
-TintCard.displayName = "TintCard";
-
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, TintCard };
+export { Card, CardHeader, CardTitle, CardDescription, CardContent };

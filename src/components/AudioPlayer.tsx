@@ -122,6 +122,9 @@ export function AudioPlayer({ audioPath, durationMs, onTimeUpdate }: AudioPlayer
     const height = rect.height;
     const barWidth = width / waveformData.length;
     const progressRatio = duration > 0 ? currentTime / duration : 0;
+    const styles = getComputedStyle(document.documentElement);
+    const primary = styles.getPropertyValue("--primary").trim() || "250 64% 57%";
+    const hairline = styles.getPropertyValue("--hairline-strong").trim() || "242 18% 78%";
 
     ctx.clearRect(0, 0, width, height);
 
@@ -132,7 +135,7 @@ export function AudioPlayer({ audioPath, durationMs, onTimeUpdate }: AudioPlayer
 
       // Color: played portion in primary color, rest in muted
       const isPlayed = i / waveformData.length <= progressRatio;
-      ctx.fillStyle = isPlayed ? "hsl(175, 60%, 40%)" : "hsl(220, 15%, 85%)";
+      ctx.fillStyle = isPlayed ? `hsl(${primary})` : `hsl(${hairline})`;
       ctx.fillRect(x + 1, y, barWidth - 2, barHeight);
     });
   }, [waveformData, currentTime, duration]);

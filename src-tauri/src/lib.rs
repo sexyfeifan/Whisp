@@ -32,6 +32,40 @@ use tauri::{Emitter, Listener, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
 
+const AUTOSTART_ARG: &str = "--from-autostart";
+
+fn is_autostart_launch<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    args.into_iter().any(|arg| arg.as_ref() == AUTOSTART_ARG)
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::{is_autostart_launch, AUTOSTART_ARG};
+
+    #[test]
+    fn manual_launch_is_not_treated_as_autostart() {
+        assert!(!is_autostart_launch(["/Applications/Whisp.app/Contents/MacOS/whisp"]));
+    }
+
+    #[test]
+    fn autostart_flag_is_detected_in_any_position() {
+        assert!(is_autostart_launch([
+            "/Applications/Whisp.app/Contents/MacOS/whisp",
+            "--some-other-flag",
+            AUTOSTART_ARG,
+        ]));
+    }
+
+    #[test]
+    fn similar_but_invalid_flag_does_not_hide_manual_launch() {
+        assert!(!is_autostart_launch(["--from-autostart-disabled"]));
+    }
+}
+
 // Note: The `unwrap_or_else(|e| e.into_inner())` pattern is used throughout
 // this codebase to recover poisoned Mutex guards. While this means we continue
 // with potentially inconsistent state after a panic, all writes are idempotent
@@ -133,9 +167,25 @@ pub fn run() {
     log_buffer::init();
     // Load .env file if present (for development)
     let _ = dotenvy::dotenv();
+    let launched_from_autostart = is_autostart_launch(std::env::args());
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        // This must be the first plugin: it prevents a second process from
+        // creating another tray icon. A deliberate manual launch focuses the
+        // existing settings window; an autostart collision stays silent.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            if is_autostart_launch(&args) {
+                log::info!("Ignored duplicate autostart launch");
+                return;
+            }
+
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -207,8 +257,13 @@ pub fn run() {
             commands::import_full_backup,
             commands::list_plugins,
         ])
-        .setup(|app| {
+        .setup(move |app| {
             let app_handle = app.handle().clone();
+
+            // Whisp is a menu-bar utility on macOS. Keep it out of the Dock;
+            // the settings window remains available from the tray menu.
+            #[cfg(target_os = "macos")]
+            app.handle().set_activation_policy(tauri::ActivationPolicy::Accessory)?;
 
             // Initialize history manager with graceful degradation.
             // If the DB is corrupted, attempt to delete and recreate it once.
@@ -381,12 +436,20 @@ pub fn run() {
                 tray::rebuild_tray_menu(&tray_handle);
             });
 
-            // Show main window
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.show();
+            // Autostart is intentionally silent. Manual launches still open
+            // the settings window, including the first-run onboarding flow.
+            if !launched_from_autostart {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
             }
 
-            log::info!("App started. Shortcut: {}", settings.shortcut);
+            log::info!(
+                "App started. Shortcut: {}, autostart: {}",
+                settings.shortcut,
+                launched_from_autostart
+            );
             log::info!("API key configured: {}", !settings.api_key.is_empty());
 
             Ok(())

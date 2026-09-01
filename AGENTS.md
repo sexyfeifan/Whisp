@@ -22,6 +22,12 @@ npm run dev
 npm run build
 ```
 
+## Versioning
+
+- Every user-facing update increments the patch version by exactly `0.0.1`.
+- `package.json` is the version source of truth. After changing it, run `npm run sync-version` before testing or packaging.
+- The sync command keeps `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, and `src-tauri/tauri.conf.json` aligned.
+
 ### Testing
 
 ```bash

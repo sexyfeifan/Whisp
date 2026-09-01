@@ -1,5 +1,30 @@
 # Changelog
 
+## v2.12.26 (2026-09-01)
+
+- Restored History as the first and primary destination in the sidebar.
+- Grouped navigation into daily use, Settings, and Tools to reduce scanning effort.
+- Moved model management and diagnostics out of the primary settings flow.
+
+## v2.12.25 (2026-09-01)
+
+- Replaced the overly neutral 2.12.24 palette with a refined ink-and-iris visual system.
+- Added luminous indigo and violet brand accents, cool-spectrum data colours, and richer dark surfaces.
+- Improved visual hierarchy across navigation, cards, charts, waveforms, and the recording overlay.
+- Kept semantic green, amber, and red focused on status feedback.
+
+## v2.12.24 (2026-09-01)
+
+- Replaced the mixed teal, pink, purple, and rainbow UI palette with a quiet cool-gray system.
+- Simplified sidebar selection, brand mark, recording overlay, waveforms, and statistics colours.
+- Reserved colour for success, warning, and error feedback.
+- Added a version-sync command and established a `0.0.1` patch increment rule for every update.
+
+## v2.12.23 (2026-09-01)
+
+- Prevented duplicate app instances and duplicate menu-bar icons.
+- Launch at login now starts silently in the menu bar without showing the main window.
+
 ## v2.8.0 (2026-08-08)
 
 ### Security Fixes

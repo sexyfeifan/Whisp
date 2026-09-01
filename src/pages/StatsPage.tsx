@@ -10,16 +10,16 @@ import type { AppState } from "../hooks/useApp";
 import { viewVariants } from "../lib/constants";
 import { formatDuration } from "../lib/utils";
 
-// Warm palette for charts — Notion-inspired
+// Cool-spectrum colours distinguish data while keeping the visual language cohesive.
 const CHART_COLORS = [
-  "#E16259", // warm red
-  "#F2A65A", // warm orange
-  "#F4D03F", // warm yellow
-  "#58D68D", // warm green
-  "#5DADE2", // blue
-  "#AF7AC5", // purple
-  "#EC7063", // coral
-  "#7FB3D8", // steel blue
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--chart-6))",
+  "hsl(var(--chart-7))",
+  "hsl(var(--chart-8))",
 ];
 
 interface DayBucket {
@@ -236,16 +236,20 @@ function PieChart({ data, m }: { data: ModelBucket[]; m: Record<string, string> 
   );
 }
 
-function SummaryCard({ icon, label, value, sub }: {
+function SummaryCard({ icon, label, value, sub, tone = "var(--chart-1)" }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
+  tone?: string;
 }) {
   return (
-    <Card className="p-4 bg-[hsl(var(--surface))]">
+    <Card className="p-4 bg-[hsl(var(--canvas))]">
       <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-[hsl(var(--primary)/0.1)] flex items-center justify-center shrink-0">
+        <div
+          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+          style={{ color: `hsl(${tone})`, background: `hsl(${tone} / 0.12)` }}
+        >
           {icon}
         </div>
         <div className="min-w-0">
@@ -308,31 +312,35 @@ export function StatsPage(app: AppState) {
           {/* Summary cards row */}
           <div className="grid grid-cols-4 gap-3 mb-6">
             <SummaryCard
-              icon={<FileAudio size={18} className="text-[hsl(var(--primary))]" />}
+              icon={<FileAudio size={18} />}
               label={mStats.statsTotalTranscriptions ?? "Total Transcriptions"}
               value={String(stats.total)}
+              tone="var(--chart-1)"
             />
             <SummaryCard
-              icon={<DollarSign size={18} className="text-[hsl(var(--primary))]" />}
+              icon={<DollarSign size={18} />}
               label={mStats.totalCost ?? "Total Cost"}
               value={stats.totalCost > 0 ? `¥${stats.totalCost.toFixed(2)}` : "—"}
+              tone="var(--chart-2)"
             />
             <SummaryCard
-              icon={<Hash size={18} className="text-[hsl(var(--primary))]" />}
+              icon={<Hash size={18} />}
               label={mStats.totalTokens ?? "Total Tokens"}
               value={stats.totalTokens > 0 ? stats.totalTokens.toLocaleString() : "—"}
+              tone="var(--chart-3)"
             />
             <SummaryCard
-              icon={<Clock size={18} className="text-[hsl(var(--primary))]" />}
+              icon={<Clock size={18} />}
               label={mStats.statsAvgDuration ?? "Avg Duration"}
               value={avgDurationAll > 0 ? formatDuration(avgDurationAll) : "—"}
+              tone="var(--chart-6)"
             />
           </div>
 
           {/* Two-column layout: daily chart + pie chart */}
           <div className="grid grid-cols-2 gap-4 mb-6">
             {/* Daily usage chart */}
-            <Card className="p-5 bg-[hsl(var(--surface))]">
+            <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp size={16} className="text-[hsl(var(--primary))]" />
                 <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
@@ -349,7 +357,7 @@ export function StatsPage(app: AppState) {
             </Card>
 
             {/* Top models pie chart */}
-            <Card className="p-5 bg-[hsl(var(--surface))]">
+            <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-2">
                 <BarChart3 size={16} className="text-[hsl(var(--primary))]" />
                 <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
@@ -369,7 +377,7 @@ export function StatsPage(app: AppState) {
           {/* Today & Monthly comparison */}
           <div className="grid grid-cols-2 gap-4">
             {/* Today */}
-            <Card className="p-5 bg-[hsl(var(--surface))]">
+            <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={16} className="text-[hsl(var(--primary))]" />
                 <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
@@ -409,7 +417,7 @@ export function StatsPage(app: AppState) {
             </Card>
 
             {/* Monthly */}
-            <Card className="p-5 bg-[hsl(var(--surface))]">
+            <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={16} className="text-[hsl(var(--primary))]" />
                 <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
