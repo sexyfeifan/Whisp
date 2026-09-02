@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.12.37 (2026-09-02)
+
+- (add changes here)
+
+
 ## v2.12.34 (2026-09-02)
 
 - (add changes here)
