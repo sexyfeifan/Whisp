@@ -51,7 +51,7 @@ impl AudioRecorder {
         (samples, rate)
     }
 
-    pub fn start(&self, app_handle: AppHandle, silence_timeout_sec: u64, silence_threshold: f32) -> Result<()> {
+    pub fn start(&self, app_handle: AppHandle, silence_timeout_sec: u64, _silence_threshold: f32) -> Result<()> {
         if self.is_recording() {
             return Ok(());
         }
@@ -136,11 +136,25 @@ impl AudioRecorder {
             // This prevents brief pauses during speech from triggering auto-stop
             let min_chunks_before_silence = (sample_rate as u64 * 3) / 512;
 
+            // VAD detector with adaptive threshold
+            let mut vad = VadDetector::new(512);
+
+            // Pre-recording buffer: keep the last 0.5 seconds of audio so we
+            // can prepend it when speech is first detected.
+            let pre_buf_samples = (sample_rate as usize / 2) as usize; // 0.5 s
+            let mut pre_recording_buf = PreRecordingBuffer::new(pre_buf_samples);
+            let mut speech_started = false;
+            let mut final_buffer: Vec<f32> = Vec::new();
+
             let drain_audio = |audio_rx: &mpsc::Receiver<Vec<f32>>,
                                buffer: &mut Vec<f32>,
                                app_handle: &AppHandle,
                                silent_chunks: &mut u64,
-                               total_chunks: &mut u64| {
+                               total_chunks: &mut u64,
+                               vad: &mut VadDetector,
+                               pre_recording_buf: &mut PreRecordingBuffer,
+                               speech_started: &mut bool,
+                               final_buffer: &mut Vec<f32>| {
                 while let Ok(chunk) = audio_rx.try_recv() {
                     buffer.extend_from_slice(&chunk);
 
@@ -152,14 +166,43 @@ impl AudioRecorder {
                         let recent = &buffer[buffer.len().saturating_sub(512)..];
                         let rms = (recent.iter().map(|s| s * s).sum::<f32>() / recent.len() as f32).sqrt();
                         let _ = app_handle.emit("audio-level", rms.min(1.0));
+
+                        // Feed frame into VAD
+                        if !*speech_started {
+                            // During calibration, process_frame collects noise
+                            // samples and always returns false.
+                            let speech_onset = vad.process_frame(recent);
+
+                            if speech_onset {
+                                // Speech onset detected — flush the pre-recording
+                                // buffer (samples *before* this frame) into
+                                // final_buffer, then mark speech as started.
+                                *speech_started = true;
+                                let pre = pre_recording_buf.take();
+                                log::info!("VAD: speech started, prepended {} pre-speech samples", pre.len());
+                                final_buffer.extend_from_slice(&pre);
+                            } else {
+                                // Pre-speech: keep a rolling buffer of recent audio
+                                pre_recording_buf.push(recent);
+                            }
+                        } else {
+                            // Already in speech — just track VAD state
+                            let _ = vad.process_frame(recent);
+                        }
+
                         // Only count silence after minimum recording duration
-                        if *total_chunks > min_chunks_before_silence {
-                            if rms < silence_threshold {
+                        if *total_chunks > min_chunks_before_silence && *speech_started {
+                            if !vad.is_speech_active() {
                                 *silent_chunks += 1;
                             } else {
                                 *silent_chunks = 0;
                             }
                         }
+                    }
+
+                    // Once speech has started, accumulate into final buffer
+                    if *speech_started {
+                        final_buffer.extend_from_slice(&chunk);
                     }
                 }
             };
@@ -172,6 +215,10 @@ impl AudioRecorder {
                     &app_handle,
                     &mut silent_chunks,
                     &mut total_chunks,
+                    &mut vad,
+                    &mut pre_recording_buf,
+                    &mut speech_started,
+                    &mut final_buffer,
                 );
 
                 // Copy new samples to streaming buffer for real-time transcription
@@ -183,8 +230,8 @@ impl AudioRecorder {
                     last_streaming_write = buffer.len();
                 }
 
-                // Silence auto-stop
-                if silent_chunks >= silence_chunks_limit {
+                // Silence auto-stop (only after speech has started)
+                if speech_started && silent_chunks >= silence_chunks_limit {
                     log::info!("Silence timeout reached, auto-stopping recording");
                     drain_audio(
                         &audio_rx,
@@ -192,10 +239,14 @@ impl AudioRecorder {
                         &app_handle,
                         &mut silent_chunks,
                         &mut total_chunks,
+                        &mut vad,
+                        &mut pre_recording_buf,
+                        &mut speech_started,
+                        &mut final_buffer,
                     );
                     *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     let audio = RecordedAudio {
-                        samples: std::mem::take(&mut buffer),
+                        samples: std::mem::take(&mut final_buffer),
                         sample_rate,
                     };
                     let _ = auto_stop_tx.send(audio);
@@ -213,10 +264,20 @@ impl AudioRecorder {
                             &app_handle,
                             &mut silent_chunks,
                             &mut total_chunks,
+                            &mut vad,
+                            &mut pre_recording_buf,
+                            &mut speech_started,
+                            &mut final_buffer,
                         );
                         *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
+                        // Use final_buffer (contains pre-speech + speech) if
+                        // speech was detected; otherwise fall back to full buffer
                         let audio = RecordedAudio {
-                            samples: std::mem::take(&mut buffer),
+                            samples: if speech_started {
+                                std::mem::take(&mut final_buffer)
+                            } else {
+                                std::mem::take(&mut buffer)
+                            },
                             sample_rate,
                         };
                         let _ = reply.send(audio);
@@ -417,6 +478,192 @@ pub fn signal_to_noise_ratio(audio: &RecordedAudio) -> f32 {
     20.0 * (peak / noise_floor).log10()
 }
 
+// ── Voice Activity Detection ────────────────────────────────────────────────
+
+/// Voice Activity Detector with adaptive noise-floor calibration.
+///
+/// During the first ~1 second of audio the detector calibrates its noise floor.
+/// After calibration, a frame is classified as "speech" when its RMS energy
+/// exceeds `noise_floor * 3.0 + minimum_threshold`.  Hysteresis is applied:
+/// * 3 consecutive speech frames → speech **start**
+/// * 5 consecutive silence frames → speech **end**
+pub struct VadDetector {
+    /// Adaptive threshold after calibration (noise_floor * multiplier + minimum)
+    energy_threshold: f32,
+    /// Count of consecutive frames above threshold
+    speech_frames: usize,
+    /// Count of consecutive frames below threshold
+    silence_frames: usize,
+    /// Number of samples per frame (e.g. 512)
+    frame_size: usize,
+    /// Current state: true = inside a speech segment
+    is_speech: bool,
+    /// Estimated noise-floor RMS
+    noise_floor: f32,
+    /// Collects per-frame RMS values during calibration
+    noise_samples: Vec<f32>,
+    /// True once the initial calibration window has completed
+    calibration_complete: bool,
+}
+
+impl VadDetector {
+    /// Frames needed for calibration (~1 second at 16 kHz / 512 samples).
+    const CALIBRATION_FRAMES: usize = 32;
+    /// Minimum number of consecutive speech frames to declare speech start.
+    const SPEECH_HANGON: usize = 3;
+    /// Minimum number of consecutive silence frames to declare speech end.
+    const SILECE_HANGON: usize = 5;
+    /// Floor for the adaptive threshold so quiet environments still work.
+    const MIN_THRESHOLD: f32 = 0.01;
+    /// Multiplier applied to the calibrated noise floor.
+    const THRESHOLD_MULTIPLIER: f32 = 3.0;
+
+    pub fn new(frame_size: usize) -> Self {
+        Self {
+            energy_threshold: Self::MIN_THRESHOLD,
+            speech_frames: 0,
+            silence_frames: 0,
+            frame_size,
+            is_speech: false,
+            noise_floor: 0.0,
+            noise_samples: Vec::with_capacity(Self::CALIBRATION_FRAMES),
+            calibration_complete: false,
+        }
+    }
+
+    /// Feed a slice of mono f32 samples (typically `frame_size` long).
+    /// Returns `true` when the detector transitions to speech-active.
+    pub fn process_frame(&mut self, samples: &[f32]) -> bool {
+        let rms = compute_rms(samples);
+
+        // ── calibration phase ──
+        if !self.calibration_complete {
+            self.noise_samples.push(rms);
+            if self.noise_samples.len() >= Self::CALIBRATION_FRAMES {
+                self.calibration_complete = true;
+                // Use the 75th-percentile of collected noise samples as the
+                // noise floor.  This is more robust than the mean because a
+                // single noisy frame during calibration won't skew the result.
+                let mut sorted = self.noise_samples.clone();
+                sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                let p75_idx = (sorted.len() as f32 * 0.75) as usize;
+                self.noise_floor = sorted[p75_idx.min(sorted.len() - 1)];
+                self.energy_threshold =
+                    (self.noise_floor * Self::THRESHOLD_MULTIPLIER).max(Self::MIN_THRESHOLD);
+                log::info!(
+                    "VAD calibration complete: noise_floor={:.4}, threshold={:.4}",
+                    self.noise_floor,
+                    self.energy_threshold
+                );
+            }
+            return false;
+        }
+
+        // ── detection phase ──
+        let above = rms >= self.energy_threshold;
+        let was_speech = self.is_speech;
+
+        if above {
+            self.speech_frames += 1;
+            self.silence_frames = 0;
+        } else {
+            self.silence_frames += 1;
+            self.speech_frames = 0;
+        }
+
+        if !self.is_speech && self.speech_frames >= Self::SPEECH_HANGON {
+            self.is_speech = true;
+        } else if self.is_speech && self.silence_frames >= Self::SILECE_HANGON {
+            self.is_speech = false;
+        }
+
+        // Return true on the *transition* to speech
+        self.is_speech && !was_speech
+    }
+
+    /// Returns `true` while the detector considers us inside a speech segment.
+    pub fn is_speech_active(&self) -> bool {
+        self.is_speech
+    }
+
+    /// Returns `true` once the calibration window has finished.
+    pub fn is_calibrated(&self) -> bool {
+        self.calibration_complete
+    }
+
+    /// Calibration progress in `[0.0, 1.0]`.
+    pub fn calibration_progress(&self) -> f32 {
+        if self.calibration_complete {
+            1.0
+        } else {
+            self.noise_samples.len() as f32 / Self::CALIBRATION_FRAMES as f32
+        }
+    }
+
+    /// The current adaptive threshold (after calibration).
+    pub fn threshold(&self) -> f32 {
+        self.energy_threshold
+    }
+
+    /// The estimated noise floor (after calibration).
+    pub fn noise_floor(&self) -> f32 {
+        self.noise_floor
+    }
+}
+
+/// Compute the RMS energy of a slice of samples.
+fn compute_rms(samples: &[f32]) -> f32 {
+    if samples.is_empty() {
+        return 0.0;
+    }
+    let sum_sq: f32 = samples.iter().map(|s| s * s).sum();
+    (sum_sq / samples.len() as f32).sqrt()
+}
+
+// ── Pre-recording buffer ────────────────────────────────────────────────────
+
+/// Rolling buffer that keeps the last N seconds of audio so we can prepend
+/// context before the detected speech onset.
+///
+/// At 16 kHz a 0.5 s buffer = 8 000 samples ≈ 64 KB of f32 — negligible.
+pub struct PreRecordingBuffer {
+    buffer: Vec<f32>,
+    max_samples: usize,
+}
+
+impl PreRecordingBuffer {
+    /// `duration_samples` is the number of samples to retain (e.g. 0.5 s × 16 kHz = 8000).
+    pub fn new(duration_samples: usize) -> Self {
+        Self {
+            buffer: Vec::with_capacity(duration_samples),
+            max_samples: duration_samples,
+        }
+    }
+
+    /// Push new samples into the rolling buffer, discarding the oldest when full.
+    pub fn push(&mut self, samples: &[f32]) {
+        self.buffer.extend_from_slice(samples);
+        if self.buffer.len() > self.max_samples {
+            let excess = self.buffer.len() - self.max_samples;
+            self.buffer.drain(..excess);
+        }
+    }
+
+    /// Consume the buffer, returning the stored samples and resetting the buffer.
+    pub fn take(&mut self) -> Vec<f32> {
+        std::mem::take(&mut self.buffer)
+    }
+
+    /// Current number of buffered samples.
+    pub fn len(&self) -> usize {
+        self.buffer.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buffer.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -569,5 +816,225 @@ mod tests {
         let snr = signal_to_noise_ratio(&audio);
         // Peak (0.8) / median (~0.001) → ~58 dB; should be substantially positive
         assert!(snr > 30.0, "expected high SNR, got {snr}");
+    }
+
+    // --- VadDetector tests ---
+
+    #[test]
+    fn test_vad_calibration_progress() {
+        let mut vad = VadDetector::new(512);
+        assert!(!vad.is_calibrated());
+        assert_eq!(vad.calibration_progress(), 0.0);
+
+        // Feed 16 silence frames (halfway through calibration)
+        for _ in 0..16 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+        assert!(!vad.is_calibrated());
+        assert!((vad.calibration_progress() - 0.5).abs() < 0.01);
+
+        // Feed remaining 16 frames
+        for _ in 0..16 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+        assert!(vad.is_calibrated());
+        assert_eq!(vad.calibration_progress(), 1.0);
+    }
+
+    #[test]
+    fn test_vad_threshold_adapts_to_noise() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate with very quiet noise (RMS ≈ 0.002)
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.002; 512]);
+        }
+        assert!(vad.is_calibrated());
+        // Threshold should be noise_floor * 3.0, but floored at 0.01
+        assert!(vad.threshold() >= 0.01);
+        assert!(vad.noise_floor() > 0.0);
+    }
+
+    #[test]
+    fn test_vad_no_speech_during_silence() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate with silence
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+
+        // Continue with silence — should never declare speech
+        for _ in 0..100 {
+            let onset = vad.process_frame(&vec![0.001; 512]);
+            assert!(!onset, "should not detect speech in silence");
+        }
+        assert!(!vad.is_speech_active());
+    }
+
+    #[test]
+    fn test_vad_detects_loud_signal_after_calibration() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate with silence
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+
+        // Feed 2 loud frames — not enough (needs 3 consecutive)
+        let mut onset = false;
+        onset |= vad.process_frame(&vec![0.5; 512]);
+        onset |= vad.process_frame(&vec![0.5; 512]);
+        assert!(!onset, "should not detect speech with only 2 speech frames");
+        assert!(!vad.is_speech_active());
+
+        // Third loud frame — now speech should be declared
+        onset = vad.process_frame(&vec![0.5; 512]);
+        assert!(onset, "speech onset should be detected on 3rd loud frame");
+        assert!(vad.is_speech_active());
+    }
+
+    #[test]
+    fn test_vad_speech_end_after_silence() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate with silence
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+
+        // Trigger speech onset (3 consecutive loud frames)
+        for _ in 0..3 {
+            vad.process_frame(&vec![0.5; 512]);
+        }
+        assert!(vad.is_speech_active());
+
+        // Feed 4 silence frames — not enough (needs 5)
+        for _ in 0..4 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+        assert!(vad.is_speech_active(), "should still be speech with 4 silence frames");
+
+        // 5th silence frame — speech should end
+        vad.process_frame(&vec![0.001; 512]);
+        assert!(!vad.is_speech_active(), "speech should end after 5 silence frames");
+    }
+
+    #[test]
+    fn test_vad_onset_returns_true_only_once() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+
+        // Speech onset on 3rd frame
+        assert!(!vad.process_frame(&vec![0.5; 512]));
+        assert!(!vad.process_frame(&vec![0.5; 512]));
+        assert!(vad.process_frame(&vec![0.5; 512])); // onset!
+
+        // Continuing loud frames should NOT return onset again
+        assert!(!vad.process_frame(&vec![0.5; 512]));
+        assert!(!vad.process_frame(&vec![0.5; 512]));
+    }
+
+    #[test]
+    fn test_vad_speech_resumes_after_pause() {
+        let mut vad = VadDetector::new(512);
+
+        // Calibrate
+        for _ in 0..32 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+
+        // First speech segment (3 frames → onset)
+        for _ in 0..3 {
+            vad.process_frame(&vec![0.5; 512]);
+        }
+        assert!(vad.is_speech_active());
+
+        // Silence → speech ends (5 frames)
+        for _ in 0..5 {
+            vad.process_frame(&vec![0.001; 512]);
+        }
+        assert!(!vad.is_speech_active());
+
+        // Second speech segment (3 frames → new onset)
+        let mut onset = false;
+        for _ in 0..3 {
+            onset |= vad.process_frame(&vec![0.5; 512]);
+        }
+        assert!(onset, "should detect speech onset again after pause");
+        assert!(vad.is_speech_active());
+    }
+
+    // --- PreRecordingBuffer tests ---
+
+    #[test]
+    fn test_pre_buffer_basic() {
+        let mut buf = PreRecordingBuffer::new(1000);
+        assert!(buf.is_empty());
+        assert_eq!(buf.len(), 0);
+
+        buf.push(&vec![1.0; 500]);
+        assert_eq!(buf.len(), 500);
+        assert!(!buf.is_empty());
+    }
+
+    #[test]
+    fn test_pre_buffer_rolling_eviction() {
+        let mut buf = PreRecordingBuffer::new(1000);
+
+        // Push 500 samples — buffer at capacity
+        buf.push(&vec![1.0; 500]);
+        assert_eq!(buf.len(), 500);
+
+        // Push 600 more — total would be 1100, but max is 1000
+        buf.push(&vec![2.0; 600]);
+        assert_eq!(buf.len(), 1000);
+
+        // The first 100 of the original 1.0 samples should be evicted
+        let data = buf.take();
+        assert_eq!(data.len(), 1000);
+        // The oldest 100 samples (1.0) are gone, next 400 are 1.0, then 600 are 2.0
+        assert_eq!(data[0], 1.0); // still has old samples
+        assert_eq!(data[399], 1.0); // last of the old
+        assert_eq!(data[400], 2.0); // start of new
+    }
+
+    #[test]
+    fn test_pre_buffer_take_resets() {
+        let mut buf = PreRecordingBuffer::new(1000);
+        buf.push(&vec![1.0; 500]);
+
+        let data = buf.take();
+        assert_eq!(data.len(), 500);
+        assert!(buf.is_empty());
+
+        // Second take should be empty
+        let data2 = buf.take();
+        assert!(data2.is_empty());
+    }
+
+    #[test]
+    fn test_pre_buffer_exact_capacity() {
+        let mut buf = PreRecordingBuffer::new(100);
+        buf.push(&vec![0.5; 100]);
+        assert_eq!(buf.len(), 100);
+
+        // Push exactly at capacity — no eviction needed
+        buf.push(&vec![0.0; 0]);
+        assert_eq!(buf.len(), 100);
+    }
+
+    #[test]
+    fn test_compute_rms() {
+        // Constant signal → RMS equals the constant
+        assert!((compute_rms(&vec![0.5; 100]) - 0.5).abs() < 1e-6);
+        // Silence
+        assert_eq!(compute_rms(&vec![0.0; 100]), 0.0);
+        // Empty
+        assert_eq!(compute_rms(&[]), 0.0);
     }
 }

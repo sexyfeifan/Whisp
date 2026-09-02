@@ -37,9 +37,30 @@ export function SettingsRecordingPage(app: AppState) {
               description={m.recordingSettingsDesc}
             >
               <div>
-                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.silenceTimeout}</label>
-                <Input type="number" min={0} max={3600} step={10} value={settings.silence_timeout_sec} onChange={(event) => updateSettings({ silence_timeout_sec: Math.max(0, Number(event.target.value) || 0) })} />
+                <label className="block text-[13px] font-normal mb-1" style={{ color: "hsl(var(--steel))" }}>{m.silenceTimeout}</label>
+                <p className="text-[11px] mb-2" style={{ color: "hsl(var(--steel))" }}>{m.silenceTimeoutDesc}</p>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={1}
+                    max={30}
+                    step={1}
+                    value={settings.silence_timeout_sec ?? 3}
+                    onChange={(e) => updateSettings({ silence_timeout_sec: Number(e.target.value) })}
+                    className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
+                    style={{ accentColor: "hsl(var(--accent))" }}
+                  />
+                  <span className="text-sm font-mono w-10 text-right" style={{ color: "hsl(var(--ink))" }}>
+                    {settings.silence_timeout_sec ?? 3}s
+                  </span>
+                </div>
               </div>
+              <ToggleRow
+                label={m.adaptiveThreshold}
+                description={m.adaptiveThresholdDesc}
+                value={settings.adaptive_silence_threshold ?? false}
+                onChange={(value) => updateSettings({ adaptive_silence_threshold: value })}
+              />
               <div>
                 <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.silenceThreshold}</label>
                 <Input type="number" min={0} max={1} step={0.005} value={settings.silence_threshold} onChange={(event) => updateSettings({ silence_threshold: Math.min(1, Math.max(0, Number(event.target.value) || 0)) })} />

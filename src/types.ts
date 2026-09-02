@@ -33,6 +33,7 @@ export interface AppSettings {
   retry_count: number;
   paste_delay_ms: number;
   silence_timeout_sec: number;
+  adaptive_silence_threshold: boolean;
   overlay_x: number | null;
   overlay_y: number | null;
   launch_at_startup: boolean;
