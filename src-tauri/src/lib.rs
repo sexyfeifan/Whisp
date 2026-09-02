@@ -157,10 +157,11 @@ struct PendingAudio {
 /// when the user actually spoke, not when the transcription completed.
 static RECORDING_START_TIME: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
 
-fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
+fn tr(ui_language: &str, zh: &str, en: &str, ja: &str, ko: &str) -> String {
     match ui_language {
         "en" => en.to_string(),
         "ja" => ja.to_string(),
+        "ko" => ko.to_string(),
         _ => zh.to_string(),
     }
 }
@@ -259,6 +260,13 @@ pub fn run() {
             commands::export_full_backup,
             commands::import_full_backup,
             commands::list_plugins,
+            commands::add_tag,
+            commands::remove_tag,
+            commands::get_entry_tags,
+            commands::get_all_tags,
+            commands::get_entries_by_tag,
+            commands::export_entries_batch,
+            commands::get_tags_batch,
         ])
         .setup(move |app| {
             let app_handle = app.handle().clone();
@@ -584,6 +592,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                 "麦克风启动失败，请检查权限设置。",
                 "Failed to start microphone. Check permission settings.",
                 "マイクの起動に失敗しました。権限設定を確認してください。",
+                "마이크를 시작하지 못했습니다. 권한 설정을 확인하세요.",
             ),
         );
         close_overlay(app_handle);
@@ -946,6 +955,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "录音太安静了，请检查麦克风或说话声音大一些。",
                 "Recording too quiet. Check your microphone or speak louder.",
                 "録音が静かすぎます。マイクを確認するか、もう少し大きな声で話してください。",
+                "녹음이 너무 조용합니다. 마이크를 확인하거나 더 큰 소리로 말해주세요.",
             ),
         );
         let handle = app_handle.clone();
@@ -975,6 +985,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "录音太短了，请稍微多说一点。",
                 "Recording too short. Try speaking a little longer.",
                 "録音が短すぎます。もう少し長く話してください。",
+                "녹음이 너무 짧습니다. 조금 더 길게 말해주세요.",
             ),
         );
         // Overlay self-closes after 2.5s; also schedule a fallback close
@@ -1020,6 +1031,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "录音太短或太安静了，请重试。",
                 "Recording too short or silent. Please try again.",
                 "録音が短すぎるか静かすぎます。もう一度お試しください。",
+                "녹음이 너무 짧거나 조용합니다. 다시 시도해주세요.",
             ),
         );
         let handle = app_handle.clone();
@@ -1072,6 +1084,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 "尚未配置 API Key，请打开设置完成配置。",
                 "API key not configured. Open settings to finish setup.",
                 "API キーが未設定です。設定を開いて完了してください。",
+                "API 키가 설정되지 않았습니다. 설정을 열어 완료하세요.",
             ),
         );
         // Fallback close after overlay self-closes
@@ -1345,7 +1358,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     let entry = NewHistoryEntry {
                         text: format!(
                             "{} {}",
-                            tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"),
+                            tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:", "필사 실패:"),
                             &error_message.chars().take(100).collect::<String>()
                         ),
                         model: model.clone(),

@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Copy, Trash2,
   Check, Volume2, Clock, FileAudio,
   RefreshCw, Loader2,
   Download, FileText, Sparkles, X, Upload,
+  Tag, Plus,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
@@ -41,6 +42,7 @@ export function HistoryPage(app: AppState) {
   } = app;
 
   const [exportDropdown, setExportDropdown] = useState<number | null>(null);
+  const [batchExportOpen, setBatchExportOpen] = useState(false);
   const [summaryModal, setSummaryModal] = useState<{ entry: { id: number; text: string }; result?: SummaryResult; loading: boolean; error?: string } | null>(null);
   const [exporting, setExporting] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -51,6 +53,12 @@ export function HistoryPage(app: AppState) {
   const [audioPlayingEntryId, setAudioPlayingEntryId] = useState<number | null>(null);
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioTotalDuration, setAudioTotalDuration] = useState(0);
+  // Tags state
+  const [entryTags, setEntryTags] = useState<Record<number, string[]>>({});
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [addingTagToEntry, setAddingTagToEntry] = useState<number | null>(null);
+  const [tagInputValue, setTagInputValue] = useState("");
 
 const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,7 +102,59 @@ const handleUploadConfirm = async (polish: boolean) => {
   setTimeout(() => setUploadStatus(null), 5000);
 };
 
+// Load tags for all visible entries and all distinct tags
+const loadTags = async () => {
+  try {
+    const ids = history.map((e: { id: number }) => e.id);
+    if (ids.length === 0) { setEntryTags({}); setAllTags([]); return; }
+    const [tagsMap, tags] = await Promise.all([
+      invoke<Record<number, string[]>>("get_tags_batch", { ids }),
+      invoke<string[]>("get_all_tags"),
+    ]);
+    setEntryTags(tagsMap ?? {});
+    setAllTags(tags ?? []);
+  } catch (e) { console.error("Failed to load tags:", e); }
+};
+
+// Load tags when history changes
+useEffect(() => { loadTags(); }, [history.length]);
+
+const handleAddTag = async (entryId: number, tag: string) => {
+  if (!tag.trim()) return;
+  try {
+    await invoke("add_tag", { entryId, tag: tag.trim() });
+    setTagInputValue("");
+    setAddingTagToEntry(null);
+    await loadTags();
+  } catch (e) { console.error("Failed to add tag:", e); }
+};
+
+const handleRemoveTag = async (entryId: number, tag: string) => {
+  try {
+    await invoke("remove_tag", { entryId, tag });
+    await loadTags();
+  } catch (e) { console.error("Failed to remove tag:", e); }
+};
+
+const handleBatchExport = async (fmt: string) => {
+  const ids = Array.from(selectedIds);
+  if (ids.length === 0) return;
+  try {
+    const content = await invoke<string>("export_entries_batch", { ids, format: fmt });
+    const ext = fmt === "json" ? "json" : fmt === "csv" ? "csv" : fmt === "srt" ? "srt" : fmt === "md" || fmt === "markdown" ? "md" : "txt";
+    const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const filename = `whisp_export_${ts}.${ext}`;
+    const path = await invoke<string>("save_export_to_file", { content, filename });
+    await openPath(path);
+  } catch (e) { console.error("Batch export failed:", e); }
+};
+
   if (!settings) return null;
+
+  // Apply tag filter on top of existing filters
+  const displayedHistory = tagFilter
+    ? filteredHistory.filter((entry) => entryTags[entry.id]?.includes(tagFilter))
+    : filteredHistory;
 
   const handleExport = async (entryId: number, fmt: string) => {
     setExporting(`${entryId}-${fmt}`);
@@ -138,9 +198,32 @@ const handleUploadConfirm = async (polish: boolean) => {
           </div>
           <div className="flex items-center gap-2">
             {selectedIds.size > 0 && (
-              <Button variant="danger" size="sm" onClick={deleteSelected}>
-                {m.deleteSelected} ({selectedIds.size})
-              </Button>
+              <>
+                <Button variant="danger" size="sm" onClick={deleteSelected}>
+                  {m.deleteSelected} ({selectedIds.size})
+                </Button>
+                <div className="relative">
+                  <Button variant="secondary" size="sm" onClick={() => setBatchExportOpen(!batchExportOpen)}>
+                    <Download size={14} className="mr-1" />
+                    {m.exportHistory ?? "Export"} ({selectedIds.size})
+                  </Button>
+                  {batchExportOpen && (
+                    <div className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-lg border py-1 min-w-[160px]" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }}>
+                      {(["srt", "markdown", "csv", "json", "txt"] as const).map((fmt) => (
+                        <button
+                          key={fmt}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-[hsl(var(--surface))] transition-colors flex items-center gap-2"
+                          style={{ color: "hsl(var(--ink))" }}
+                          onClick={() => { handleBatchExport(fmt); setBatchExportOpen(false); }}
+                        >
+                          <FileText size={12} />
+                          {fmt === "srt" ? m.exportSrt : fmt === "markdown" ? m.exportMarkdown : fmt === "csv" ? "CSV" : fmt === "json" ? "JSON" : m.exportTxt}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
             <Button
               variant="secondary"
@@ -268,11 +351,21 @@ const handleUploadConfirm = async (polish: boolean) => {
             <FilterChip active={statusFilter === "success"} label={m.filterSuccess} onClick={() => setStatusFilter("success")} />
             <FilterChip active={statusFilter === "failed"} label={m.filterFailed} onClick={() => setStatusFilter("failed")} />
           </div>
+          {/* Tag filter chips */}
+          {allTags.length > 0 && (
+            <div className="flex gap-2 flex-wrap items-center">
+              <Tag size={12} style={{ color: "hsl(var(--steel))" }} />
+              <FilterChip active={tagFilter === null} label={m.all ?? "All"} onClick={() => setTagFilter(null)} />
+              {allTags.map((tag) => (
+                <FilterChip key={tag} active={tagFilter === tag} label={tag} onClick={() => setTagFilter(tagFilter === tag ? null : tag)} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* History list */}
         <div className="flex-1 overflow-y-auto px-6 pb-4">
-          {filteredHistory.length === 0 ? (
+          {displayedHistory.length === 0 ? (
             history.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -299,7 +392,7 @@ const handleUploadConfirm = async (polish: boolean) => {
               animate={{ opacity: 1 }}
               className="space-y-2"
             >
-              {filteredHistory.map((entry) => {
+              {displayedHistory.map((entry) => {
                 const failed = entry.status === "failed";
                 const canRetry = Boolean(entry.audio_path);
                 return (
@@ -457,7 +550,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                             </IconButton>
                             {exportDropdown === entry.id && (
                               <div className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-lg border py-1 min-w-[160px]" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }}>
-                                {(["srt", "markdown", "csv", "txt"] as const).map((fmt) => (
+                                {(["srt", "markdown", "csv", "json", "txt"] as const).map((fmt) => (
                                   <button
                                     key={fmt}
                                     className="w-full text-left px-3 py-1.5 text-xs hover:bg-[hsl(var(--surface))] transition-colors flex items-center gap-2"
@@ -465,7 +558,7 @@ const handleUploadConfirm = async (polish: boolean) => {
                                     onClick={() => handleExport(entry.id, fmt)}
                                   >
                                     <FileText size={12} />
-                                    {fmt === "srt" ? m.exportSrt : fmt === "markdown" ? m.exportMarkdown : fmt === "csv" ? "CSV" : m.exportTxt}
+                                    {fmt === "srt" ? m.exportSrt : fmt === "markdown" ? m.exportMarkdown : fmt === "csv" ? "CSV" : fmt === "json" ? "JSON" : m.exportTxt}
                                     {exporting === `${entry.id}-${fmt}` && <Loader2 size={12} className="animate-spin ml-auto" />}
                                   </button>
                                 ))}
@@ -492,6 +585,62 @@ const handleUploadConfirm = async (polish: boolean) => {
                           <Trash2 size={14} />
                         </IconButton>
                       </div>
+                    </div>
+
+                    {/* Tags display and management */}
+                    <div className="mt-2 flex items-center gap-1 flex-wrap">
+                      {(entryTags[entry.id] ?? []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full"
+                          style={{
+                            background: "hsl(var(--primary) / 0.1)",
+                            color: "hsl(var(--primary))",
+                            border: "1px solid hsl(var(--primary) / 0.2)",
+                          }}
+                        >
+                          <Tag size={8} />
+                          {tag}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveTag(entry.id, tag); }}
+                            className="hover:opacity-70 transition-opacity"
+                            style={{ color: "hsl(var(--primary))" }}
+                          >
+                            <X size={8} />
+                          </button>
+                        </span>
+                      ))}
+                      {addingTagToEntry === entry.id ? (
+                        <form
+                          onSubmit={(e) => { e.preventDefault(); handleAddTag(entry.id, tagInputValue); }}
+                          className="inline-flex items-center"
+                        >
+                          <input
+                            type="text"
+                            value={tagInputValue}
+                            onChange={(e) => setTagInputValue(e.target.value)}
+                            onBlur={() => { if (!tagInputValue.trim()) setAddingTagToEntry(null); }}
+                            autoFocus
+                            placeholder="tag name"
+                            className="text-[10px] px-1.5 py-0.5 rounded border w-16"
+                            style={{
+                              background: "hsl(var(--surface))",
+                              borderColor: "hsl(var(--hairline))",
+                              color: "hsl(var(--ink))",
+                              outline: "none",
+                            }}
+                          />
+                        </form>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAddingTagToEntry(entry.id); setTagInputValue(""); }}
+                          className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full hover:bg-[hsl(var(--surface))] transition-colors"
+                          style={{ color: "hsl(var(--steel))" }}
+                        >
+                          <Plus size={8} />
+                          tag
+                        </button>
+                      )}
                     </div>
 
                     {/* Audio player with waveform, progress bar, and controls */}

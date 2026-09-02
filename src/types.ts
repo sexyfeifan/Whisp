@@ -23,7 +23,7 @@ export interface AppSettings {
   api_base_url: string;
   model: string;
   language: string;
-  ui_language: "zh-CN" | "en" | "ja";
+  ui_language: "zh-CN" | "en" | "ja" | "ko";
   shortcut: string;
   sound_enabled: boolean;
   auto_paste_enabled: boolean;

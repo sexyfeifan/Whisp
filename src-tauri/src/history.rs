@@ -58,6 +58,19 @@ static MIGRATIONS: &[M] = &[
         END;",
     ),
     M::up("ALTER TABLE transcriptions ADD COLUMN polished_text TEXT;"),
+    // Tags system
+    M::up(
+        "CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            entry_id INTEGER NOT NULL,
+            tag TEXT NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+            FOREIGN KEY (entry_id) REFERENCES transcriptions(id) ON DELETE CASCADE,
+            UNIQUE(entry_id, tag)
+        );",
+    ),
+    M::up("CREATE INDEX IF NOT EXISTS idx_tags_entry_id ON tags(entry_id);"),
+    M::up("CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);"),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -787,6 +800,168 @@ impl HistoryManager {
         }
 
         Ok(srt)
+    }
+
+    // --- Tags ---
+
+    /// Add a tag to a history entry. No-op if the tag already exists.
+    pub fn add_tag(&self, entry_id: i64, tag: &str) -> Result<()> {
+        let tag = tag.trim().to_lowercase();
+        if tag.is_empty() {
+            return Ok(());
+        }
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "INSERT OR IGNORE INTO tags (entry_id, tag) VALUES (?1, ?2)",
+            rusqlite::params![entry_id, tag],
+        )?;
+        Ok(())
+    }
+
+    /// Remove a tag from a history entry.
+    pub fn remove_tag(&self, entry_id: i64, tag: &str) -> Result<()> {
+        let tag = tag.trim().to_lowercase();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "DELETE FROM tags WHERE entry_id = ?1 AND tag = ?2",
+            rusqlite::params![entry_id, tag],
+        )?;
+        Ok(())
+    }
+
+    /// Get all tags for a given history entry.
+    pub fn get_tags(&self, entry_id: i64) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT tag FROM tags WHERE entry_id = ?1 ORDER BY tag ASC",
+        )?;
+        let tags = stmt
+            .query_map([entry_id], |row| row.get::<_, String>(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(tags)
+    }
+
+    /// Get all tags for multiple entries in one query. Returns a map of entry_id -> tags.
+    pub fn get_tags_batch(&self, ids: &[i64]) -> Result<std::collections::HashMap<i64, Vec<String>>> {
+        if ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let placeholders: String = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT entry_id, tag FROM tags WHERE entry_id IN ({}) ORDER BY tag ASC",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&query)?;
+        let mut map: std::collections::HashMap<i64, Vec<String>> = std::collections::HashMap::new();
+        let rows = stmt.query_map(rusqlite::params_from_iter(ids.iter()), |row| {
+            let entry_id: i64 = row.get(0)?;
+            let tag: String = row.get(1)?;
+            Ok((entry_id, tag))
+        })?;
+        for row in rows {
+            let (entry_id, tag) = row?;
+            map.entry(entry_id).or_default().push(tag);
+        }
+        Ok(map)
+    }
+
+    /// Get all distinct tags in the database.
+    pub fn get_all_tags(&self) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT tag FROM tags ORDER BY tag ASC",
+        )?;
+        let tags = stmt
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(tags)
+    }
+
+    /// Get entries that have a specific tag.
+    pub fn get_entries_by_tag(&self, tag: &str) -> Result<Vec<HistoryEntry>> {
+        let tag = tag.trim().to_lowercase();
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare(
+            "SELECT
+                t.id, t.text, t.model, t.timestamp, t.duration_ms, t.audio_path,
+                t.status, t.error_message, t.provider, t.api_base_url, t.language,
+                t.retry_of, t.asr_duration_sec, t.polish_tokens, t.estimated_cost, t.polished_text
+             FROM transcriptions t
+             INNER JOIN tags tg ON t.id = tg.entry_id
+             WHERE tg.tag = ?1
+             ORDER BY t.timestamp DESC",
+        )?;
+        let entries = stmt
+            .query_map([&tag], row_to_history_entry)?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(entries)
+    }
+
+    // --- Unified Export ---
+
+    /// Export entries in the specified format. Supports: txt, md/markdown, csv, json, srt.
+    pub fn export_entries(&self, format: &str, ids: &[i64]) -> Result<String> {
+        match format {
+            "json" => self.export_json(ids),
+            "csv" => self.export_csv_entries(ids),
+            "srt" => self.export_srt(ids),
+            "md" | "markdown" => self.export_markdown(ids),
+            _ => self.export_txt(ids),
+        }
+    }
+
+    /// Export entries as plain text (one entry per block).
+    pub fn export_txt(&self, ids: &[i64]) -> Result<String> {
+        let entries = self.get_entries_by_ids(ids)?;
+        let mut out = String::new();
+        for entry in &entries {
+            let dt = chrono::DateTime::from_timestamp(entry.timestamp, 0).unwrap_or_default();
+            let formatted = dt.format("%Y-%m-%d %H:%M").to_string();
+            out.push_str(&format!("[{}] {}\n", formatted, entry.text));
+            if let Some(ref polished) = entry.polished_text {
+                out.push_str(&format!("  (Polished: {})\n", polished));
+            }
+            out.push('\n');
+        }
+        Ok(out)
+    }
+
+    /// Export entries as JSON array.
+    pub fn export_json(&self, ids: &[i64]) -> Result<String> {
+        let entries = self.get_entries_by_ids(ids)?;
+        serde_json::to_string_pretty(&entries).map_err(|e| anyhow::anyhow!(e))
+    }
+
+    /// Export entries as CSV with all fields.
+    pub fn export_csv_entries(&self, ids: &[i64]) -> Result<String> {
+        let entries = self.get_entries_by_ids(ids)?;
+        let mut wtr = csv::Writer::from_writer(vec![]);
+        wtr.write_record([
+            "id", "timestamp", "text", "model", "provider", "language",
+            "status", "duration_ms", "polished_text", "estimated_cost",
+        ]).map_err(|e| anyhow::anyhow!(e))?;
+        for entry in &entries {
+            wtr.write_record(&[
+                entry.id.to_string(),
+                entry.timestamp.to_string(),
+                entry.text.clone(),
+                entry.model.clone(),
+                entry.provider.clone(),
+                entry.language.clone(),
+                entry.status.clone(),
+                entry.duration_ms.map(|d| d.to_string()).unwrap_or_default(),
+                entry.polished_text.clone().unwrap_or_default(),
+                entry.estimated_cost.map(|c| c.to_string()).unwrap_or_default(),
+            ]).map_err(|e| anyhow::anyhow!(e))?;
+        }
+        let data = wtr.into_inner().map_err(|e| anyhow::anyhow!(e))?;
+        String::from_utf8(data).map_err(|e| anyhow::anyhow!(e))
     }
 
     /// Export selected history entries as a Markdown document.

@@ -70,14 +70,14 @@ export function formatDuration(durationMs: number | null): string {
 
 export function displaySpeechLanguage(language: string, uiLanguage: UiLanguage): string {
   const labelMap: Record<string, Record<UiLanguage, string>> = {
-    auto: { "zh-CN": "\u81ea\u52a8\u8bc6\u522b", en: "Auto", ja: "\u81ea\u52d5" },
-    zh: { "zh-CN": "\u4e2d\u6587", en: "Chinese", ja: "\u4e2d\u56fd\u8a9e" },
-    en: { "zh-CN": "\u82f1\u8bed", en: "English", ja: "\u82f1\u8a9e" },
-    ja: { "zh-CN": "\u65e5\u8bed", en: "Japanese", ja: "\u65e5\u672c\u8a9e" },
-    ko: { "zh-CN": "\u97e9\u8bed", en: "Korean", ja: "\u97d3\u56fd\u8a9e" },
-    es: { "zh-CN": "\u897f\u73ed\u7259\u8bed", en: "Spanish", ja: "\u30b9\u30da\u30a4\u30f3\u8a9e" },
-    fr: { "zh-CN": "\u6cd5\u8bed", en: "French", ja: "\u30d5\u30e9\u30f3\u30b9\u8a9e" },
-    de: { "zh-CN": "\u5fb7\u8bed", en: "German", ja: "\u30c9\u30a4\u30c4\u8a9e" },
+    auto: { "zh-CN": "\u81ea\u52a8\u8bc6\u522b", en: "Auto", ja: "\u81ea\u52d5", ko: "자동" },
+    zh: { "zh-CN": "\u4e2d\u6587", en: "Chinese", ja: "\u4e2d\u56fd\u8a9e", ko: "중국어" },
+    en: { "zh-CN": "\u82f1\u8bed", en: "English", ja: "\u82f1\u8a9e", ko: "영어" },
+    ja: { "zh-CN": "\u65e5\u8bed", en: "Japanese", ja: "\u65e5\u672c\u8a9e", ko: "일본어" },
+    ko: { "zh-CN": "\u97e9\u8bed", en: "Korean", ja: "\u97d3\u56fd\u8a9e", ko: "한국어" },
+    es: { "zh-CN": "\u897f\u73ed\u7259\u8bed", en: "Spanish", ja: "\u30b9\u30da\u30a4\u30f3\u8a9e", ko: "스페인어" },
+    fr: { "zh-CN": "\u6cd5\u8bed", en: "French", ja: "\u30d5\u30e9\u30f3\u30b9\u8a9e", ko: "프랑스어" },
+    de: { "zh-CN": "\u5fb7\u8bed", en: "German", ja: "\u30c9\u30a4\u30c4\u8a9e", ko: "독일어" },
   };
   return labelMap[language]?.[uiLanguage] ?? language.toUpperCase();
 }

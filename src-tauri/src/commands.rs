@@ -6,10 +6,11 @@ use crate::shortcut::{
     unregister_global_record_hotkey,
 };
 
-fn tr(ui_language: &str, zh: &str, en: &str, ja: &str) -> String {
+fn tr(ui_language: &str, zh: &str, en: &str, ja: &str, ko: &str) -> String {
     match ui_language {
         "en" => en.to_string(),
         "ja" => ja.to_string(),
+        "ko" => ko.to_string(),
         _ => zh.to_string(),
     }
 }
@@ -466,15 +467,52 @@ pub fn discard_pending_recording(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn trigger_sync(history: State<'_, Arc<HistoryManager>>) -> Result<serde_json::Value, String> {
+pub fn trigger_sync(app: AppHandle, history: State<'_, Arc<HistoryManager>>) -> Result<serde_json::Value, String> {
     let settings = crate::settings::get_settings();
-    let device = &settings.device_name;
-    let (exported, imported) = crate::sync::full_sync(history.inner().as_ref(), device)?;
+    let device = settings.device_name.clone();
+
+    // Emit 'syncing' status
+    let _ = app.emit("sync-status", serde_json::json!({
+        "status": "syncing",
+        "details": { "device_name": &device }
+    }));
+
+    let result = crate::sync::full_sync(history.inner().as_ref(), &device)?;
+
+    // Emit conflict events for each resolved conflict
+    for conflict in &result.conflict_details {
+        let _ = app.emit("sync-status", serde_json::json!({
+            "status": "conflict",
+            "details": {
+                "entry_id": conflict.entry_id,
+                "winner": conflict.winner,
+                "local_updated_at": conflict.local_updated_at,
+                "remote_updated_at": conflict.remote_updated_at,
+                "remote_device": conflict.remote_device,
+            }
+        }));
+    }
+
+    // Emit 'completed' status
+    let _ = app.emit("sync-status", serde_json::json!({
+        "status": "completed",
+        "details": {
+            "exported": result.exported,
+            "imported": result.imported,
+            "conflicts_resolved": result.conflicts_resolved,
+            "skipped": result.skipped,
+            "sync_timestamp": result.sync_timestamp,
+        }
+    }));
+
     Ok(serde_json::json!({
-        "exported": exported,
-        "imported": imported,
-        "device": device,
-        "sync_dir": settings.sync_dir,
+        "exported": result.exported,
+        "imported": result.imported,
+        "conflicts_resolved": result.conflicts_resolved,
+        "skipped": result.skipped,
+        "device": result.device_name,
+        "sync_dir": result.sync_dir,
+        "sync_timestamp": result.sync_timestamp,
     }))
 }
 
@@ -482,11 +520,13 @@ pub fn trigger_sync(history: State<'_, Arc<HistoryManager>>) -> Result<serde_jso
 pub fn get_sync_status() -> Result<serde_json::Value, String> {
     let settings = crate::settings::get_settings();
     let dir = crate::sync::sync_dir();
+    let last_sync = crate::sync::get_last_sync_timestamp(&settings.device_name);
     Ok(serde_json::json!({
         "configured": dir.is_some(),
         "sync_dir": settings.sync_dir,
         "device_name": settings.device_name,
         "dir_exists": dir.map(|d| d.exists()).unwrap_or(false),
+        "last_sync_timestamp": last_sync,
     }))
 }
 
@@ -1286,6 +1326,10 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
                     "ダウンロード完了: {}。インストーラーが開きます。Whisp を Applications にドラッグしてください。",
                     file_path.display()
                 ),
+                &format!(
+                    "다운로드 완료: {}. 설치 창이 열립니다. Whisp를 Applications로 드래그하여 업데이트하세요.",
+                    file_path.display()
+                ),
             ));
         }
         let _ = std::process::Command::new("open").arg(&file_path).spawn();
@@ -1294,6 +1338,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
             &format!("已下载并打开: {}", file_path.display()),
             &format!("Downloaded and opened: {}", file_path.display()),
             &format!("ダウンロードして開きました: {}", file_path.display()),
+            &format!("다운로드 및 열기 완료: {}", file_path.display()),
         ));
     }
 
@@ -1313,6 +1358,10 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
                 "ダウンロード完了: {}。インストーラーが起動します。",
                 file_path.display()
             ),
+            &format!(
+                "다운로드 완료: {}. 설치 프로그램이 곧 시작됩니다.",
+                file_path.display()
+            ),
         ));
     }
 
@@ -1323,6 +1372,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
             &format!("已下载到: {}", file_path.display()),
             &format!("Downloaded to: {}", file_path.display()),
             &format!("ダウンロード完了: {}", file_path.display()),
+            &format!("다운로드 완료: {}", file_path.display()),
         ));
     }
 }
@@ -1979,6 +2029,44 @@ pub fn save_export_to_file(content: String, filename: String) -> Result<String, 
     let path = dir.join(safe_name);
     std::fs::write(&path, content).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
+}
+
+// --- Tags ---
+
+#[tauri::command]
+pub fn add_tag(history: State<'_, Arc<HistoryManager>>, entry_id: i64, tag: String) -> Result<(), String> {
+    history.add_tag(entry_id, &tag).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_tag(history: State<'_, Arc<HistoryManager>>, entry_id: i64, tag: String) -> Result<(), String> {
+    history.remove_tag(entry_id, &tag).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_entry_tags(history: State<'_, Arc<HistoryManager>>, entry_id: i64) -> Result<Vec<String>, String> {
+    history.get_tags(entry_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_all_tags(history: State<'_, Arc<HistoryManager>>) -> Result<Vec<String>, String> {
+    history.get_all_tags().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_entries_by_tag(history: State<'_, Arc<HistoryManager>>, tag: String) -> Result<Vec<HistoryEntry>, String> {
+    history.get_entries_by_tag(&tag).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn export_entries_batch(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>, format: String) -> Result<String, String> {
+    history.export_entries(&format, &ids).map_err(|e| e.to_string())
+}
+
+/// Get tags for multiple entries at once (for list views).
+#[tauri::command]
+pub fn get_tags_batch(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>) -> Result<std::collections::HashMap<i64, Vec<String>>, String> {
+    history.get_tags_batch(&ids).map_err(|e| e.to_string())
 }
 
 // --- AI Summary ---
