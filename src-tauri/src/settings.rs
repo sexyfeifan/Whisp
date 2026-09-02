@@ -118,6 +118,9 @@ pub struct AppSettings {
     /// Overlay subtitle color style (default: "white-black")
     #[serde(default = "default_overlay_subtitle_style")]
     pub overlay_subtitle_style: String,
+    /// Auto-fallback to local Whisper when cloud API fails (default: true)
+    #[serde(default = "default_auto_fallback_to_local")]
+    pub auto_fallback_to_local: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,6 +227,9 @@ struct DiskSettings {
     pub diarization_num_speakers: u32,
     #[serde(default = "default_overlay_subtitle_style")]
     pub overlay_subtitle_style: String,
+    /// Auto-fallback to local Whisper when cloud API fails (default: true)
+    #[serde(default = "default_auto_fallback_to_local")]
+    pub auto_fallback_to_local: bool,
 }
 
 fn default_api_key() -> String {
@@ -344,6 +350,10 @@ fn default_overlay_subtitle_style() -> String {
     "white-black".to_string()
 }
 
+fn default_auto_fallback_to_local() -> bool {
+    true
+}
+
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
@@ -394,6 +404,7 @@ impl Default for AppSettings {
             diarization_api_base_url: default_diarization_api_base_url(),
             diarization_num_speakers: 0,
             overlay_subtitle_style: default_overlay_subtitle_style(),
+            auto_fallback_to_local: default_auto_fallback_to_local(),
         }
     }
 }
@@ -532,6 +543,7 @@ fn save_disk_settings(settings: &AppSettings, _keychain_ok: bool) -> Result<(), 
         diarization_api_base_url: settings.diarization_api_base_url.clone(),
         diarization_num_speakers: settings.diarization_num_speakers,
         overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
+        auto_fallback_to_local: settings.auto_fallback_to_local,
     };
     let json = serde_json::to_string_pretty(&disk).map_err(|e| e.to_string())?;
     std::fs::write(&path, json).map_err(|e| e.to_string())
@@ -587,6 +599,7 @@ pub fn get_settings() -> AppSettings {
         diarization_api_base_url: disk.diarization_api_base_url,
         diarization_num_speakers: disk.diarization_num_speakers,
         overlay_subtitle_style: disk.overlay_subtitle_style,
+        auto_fallback_to_local: disk.auto_fallback_to_local,
     };
 
     // Keychain is best-effort; disk is always the fallback source of truth
@@ -722,6 +735,7 @@ mod tests {
             diarization_api_base_url: settings.diarization_api_base_url.clone(),
             diarization_num_speakers: settings.diarization_num_speakers,
             overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
+            auto_fallback_to_local: settings.auto_fallback_to_local,
         };
 
         let json = serde_json::to_string(&disk).unwrap();
@@ -783,6 +797,7 @@ mod tests {
             diarization_api_base_url: settings.diarization_api_base_url.clone(),
             diarization_num_speakers: settings.diarization_num_speakers,
             overlay_subtitle_style: settings.overlay_subtitle_style.clone(),
+            auto_fallback_to_local: settings.auto_fallback_to_local,
         };
 
         let json = serde_json::to_string(&disk).unwrap();

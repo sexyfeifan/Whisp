@@ -1442,6 +1442,11 @@ pub fn list_known_models() -> Vec<crate::whisper::KnownModel> {
     crate::whisper::list_known_models(&settings.ui_language)
 }
 
+#[tauri::command]
+pub fn get_recommended_model() -> crate::whisper::ModelRecommendation {
+    crate::whisper::recommended_model()
+}
+
 #[derive(Clone, Serialize)]
 pub struct ModelDownloadProgress {
     pub model_name: String,

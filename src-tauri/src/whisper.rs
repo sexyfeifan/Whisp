@@ -217,9 +217,9 @@ impl WhisperEngine {
         let mut full_text = String::new();
 
         for i in 0..num_segments {
-            let text = state.get_segment_text(i)?;
-            let start = state.get_segment_t0(i)? as i64 * 10; // convert to ms
-            let end = state.get_segment_t1(i)? as i64 * 10;
+            let text = state.full_get_segment_text(i)?;
+            let start = state.full_get_segment_t0(i)? as i64 * 10; // convert to ms
+            let end = state.full_get_segment_t1(i)? as i64 * 10;
 
             full_text.push_str(&text);
             segments.push(WhisperSegment {
@@ -363,6 +363,113 @@ pub struct KnownModel {
     pub description: String,
     pub languages: String,
     pub params: String,
+}
+
+/// Get total system memory in bytes using platform-specific APIs.
+/// Returns 0 if detection fails (conservative fallback).
+fn total_memory_bytes() -> u64 {
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: sysctl hw.memsize
+        std::process::Command::new("sysctl")
+            .args(["-n", "hw.memsize"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .unwrap_or(0)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: parse MemTotal from /proc/meminfo
+        std::fs::read_to_string("/proc/meminfo")
+            .ok()
+            .and_then(|content| {
+                content.lines().find_map(|line| {
+                    line.strip_prefix("MemTotal:").and_then(|rest| {
+                        let kb: u64 = rest.split_whitespace().next()?.parse().ok()?;
+                        Some(kb * 1024)
+                    })
+                })
+            })
+            .unwrap_or(0)
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: use GetPhysicallyInstalledSystemMemory via PowerShell
+        std::process::Command::new("powershell")
+            .args(["-Command", "(Get-CimInstance Win32_PhysicalMemoryArray).MaxCapacity"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .map(|kb| kb * 1024)
+            .unwrap_or(0)
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    {
+        0
+    }
+}
+
+/// Recommendation result returned to the frontend
+#[derive(Debug, Clone, Serialize)]
+pub struct ModelRecommendation {
+    /// The recommended model name (e.g. "ggml-base")
+    pub recommended: String,
+    /// Total system memory in bytes (0 if unknown)
+    pub total_memory_bytes: u64,
+    /// Human-readable reason for the recommendation
+    pub reason: String,
+}
+
+/// Recommend a Whisper model based on available system memory.
+///
+/// - < 8 GB RAM  → ggml-tiny   (smallest, fastest, good for resource-limited machines)
+/// - 8–16 GB RAM → ggml-base   (good balance of speed and accuracy)
+/// - > 16 GB RAM → ggml-medium (strong accuracy, great for Chinese)
+pub fn recommended_model() -> ModelRecommendation {
+    let mem = total_memory_bytes();
+    let mem_gb = mem as f64 / (1024.0 * 1024.0 * 1024.0);
+
+    if mem == 0 {
+        // Unknown memory — conservative default
+        ModelRecommendation {
+            recommended: "ggml-base".to_string(),
+            total_memory_bytes: 0,
+            reason: "System memory unknown; base model is a safe default.".to_string(),
+        }
+    } else if mem_gb < 8.0 {
+        ModelRecommendation {
+            recommended: "ggml-tiny".to_string(),
+            total_memory_bytes: mem,
+            reason: format!(
+                "{:.1} GB RAM detected — tiny model recommended for machines with < 8 GB.",
+                mem_gb
+            ),
+        }
+    } else if mem_gb <= 16.0 {
+        ModelRecommendation {
+            recommended: "ggml-base".to_string(),
+            total_memory_bytes: mem,
+            reason: format!(
+                "{:.1} GB RAM detected — base model offers a good speed/accuracy balance.",
+                mem_gb
+            ),
+        }
+    } else {
+        ModelRecommendation {
+            recommended: "ggml-medium".to_string(),
+            total_memory_bytes: mem,
+            reason: format!(
+                "{:.1} GB RAM detected — medium model provides strong accuracy.",
+                mem_gb
+            ),
+        }
+    }
 }
 
 /// Minimum chunk size for rubato's sinc resampler

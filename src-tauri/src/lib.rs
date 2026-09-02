@@ -20,6 +20,7 @@ mod translate;
 mod tray;
 mod whisper;
 
+use anyhow::Context;
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use recorder::{audio_rms, encode_wav, is_mostly_silent, trim_silence, AudioRecorder};
 use shortcut::SHORTCUT_PROCESSING;
@@ -241,6 +242,7 @@ pub fn run() {
             commands::transcribe_offline,
             commands::list_offline_models,
             commands::list_known_models,
+            commands::get_recommended_model,
             commands::download_whisper_model,
             commands::delete_model,
             commands::get_model_disk_usage,
@@ -756,6 +758,90 @@ fn start_recording(app_handle: &tauri::AppHandle) {
     shortcut::register_escape(app_handle);
 }
 
+/// Attempt transcription using local Whisper engine as fallback.
+/// Returns Ok(text) if successful, Err if local Whisper is unavailable or fails.
+fn try_local_whisper_fallback(
+    wav_data: &[u8],
+    language: &str,
+    whisper_config_json: &str,
+) -> anyhow::Result<String> {
+    use crate::whisper::WhisperEngine;
+
+    // Parse stored whisper config to get model path
+    let config: crate::whisper::WhisperConfig = if whisper_config_json.trim().is_empty() {
+        WhisperEngine::new().get_config()
+    } else {
+        serde_json::from_str(whisper_config_json)
+            .unwrap_or_else(|_| WhisperEngine::new().get_config())
+    };
+
+    if config.model_path.is_empty() {
+        anyhow::bail!("No local Whisper model configured");
+    }
+
+    if !std::path::Path::new(&config.model_path).exists() {
+        anyhow::bail!(
+            "Local Whisper model not found: {}",
+            config.model_path
+        );
+    }
+
+    // Decode WAV bytes to f32 samples using hound
+    let reader = hound::WavReader::new(std::io::Cursor::new(wav_data))
+        .context("Failed to parse WAV data for local Whisper")?;
+    let spec = reader.spec();
+    let sample_rate = spec.sample_rate;
+    let channels = spec.channels as u32;
+
+    let samples: Vec<f32> = if spec.sample_format == hound::SampleFormat::Float {
+        reader
+            .into_samples::<f32>()
+            .map(|s| s.map_err(|e| anyhow::anyhow!("Failed to read sample: {}", e)))
+            .collect::<anyhow::Result<Vec<_>>>()?
+    } else {
+        reader
+            .into_samples::<i16>()
+            .map(|s| {
+                s.map_err(|e| anyhow::anyhow!("Failed to read sample: {}", e))
+                    .map(|s| s as f32 / i16::MAX as f32)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+    };
+
+    // Convert to mono if needed
+    let mono_samples = if channels > 1 {
+        samples
+            .chunks(channels as usize)
+            .map(|chunk| chunk.iter().sum::<f32>() / channels as f32)
+            .collect::<Vec<_>>()
+    } else {
+        samples
+    };
+
+    log::info!(
+        "Local Whisper fallback: {} samples at {}Hz",
+        mono_samples.len(),
+        sample_rate
+    );
+
+    let engine = WhisperEngine::new();
+    let lang = if language == "auto" || language.is_empty() {
+        config.language.clone()
+    } else {
+        language.to_string()
+    };
+    engine.set_config(crate::whisper::WhisperConfig {
+        model_path: config.model_path,
+        language: lang,
+        n_threads: config.n_threads,
+        translate: config.translate,
+        prompt: config.prompt,
+    });
+
+    let result = engine.transcribe(&mono_samples, sample_rate)?;
+    Ok(result.text)
+}
+
 fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     // Guard: prevent concurrent transcriptions
     if TRANSCRIBING
@@ -1019,6 +1105,8 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
     let ai_polish_prompt = settings.ai_polish_prompt.clone();
     let audio_retention_limit = settings.audio_retention_limit;
     let ui_language = settings.ui_language.clone();
+    let auto_fallback_to_local = settings.auto_fallback_to_local;
+    let whisper_config_json = settings.whisper_config_json.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
 
     log::info!(
@@ -1170,44 +1258,112 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 let _ = history.add_entry(&entry);
                 let _ = history.cleanup_old_audio(audio_retention_limit);
             }
-            Err(e) => {
-                log::error!("Transcription failed: {}", e);
+            Err(cloud_err) => {
+                log::error!("Cloud API transcription failed: {}", cloud_err);
 
-                let error_message = e.to_string();
-                let entry = NewHistoryEntry {
-                    text: format!(
-                        "{} {}",
-                        tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"),
-                        &error_message.chars().take(100).collect::<String>()
-                    ),
-                    model: model.clone(),
-                    duration_ms,
-                    audio_path: audio_path_str.clone(),
-                    status: STATUS_FAILED.to_string(),
-                    error_message: Some(error_message.clone()),
-                    provider: provider.clone(),
-                    api_base_url: api_base_url.clone(),
-                    language: language.clone(),
-                    retry_of: None,
-                    asr_duration_sec: None,
-                    polish_tokens: None,
-                    estimated_cost: None,
-                    polished_text: None,
-                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
+                // Attempt auto-fallback to local Whisper
+                let fallback_text = if auto_fallback_to_local {
+                    log::info!("Cloud API failed, falling back to local Whisper...");
+                    match try_local_whisper_fallback(&wav_data, &language, &whisper_config_json) {
+                        Ok(text) => {
+                            log::info!("Local Whisper fallback succeeded, text_length={}", text.len());
+                            let _ = handle.emit("transcription-fallback", serde_json::json!({
+                                "reason": cloud_err.to_string(),
+                                "provider": "local_whisper",
+                            }));
+                            Some(text)
+                        }
+                        Err(fallback_err) => {
+                            log::warn!("Local Whisper fallback also failed: {}", fallback_err);
+                            None
+                        }
+                    }
+                } else {
+                    None
                 };
-                let _ = history.add_entry(&entry);
-                let _ = history.cleanup_old_audio(audio_retention_limit);
 
-                // Emit error to overlay — overlay will show it and self-close after 2.5s
-                let _ = handle.emit("transcription-error", &error_message);
-                // Emit to main window for retry toast
-                let _ = handle.emit("transcription-failed", &error_message);
-                // Fallback close in case overlay missed the event
-                let fallback_handle = handle.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
-                    close_overlay(&fallback_handle);
-                });
+                if let Some(text) = fallback_text {
+                    // Fallback succeeded — treat like a successful transcription
+                    let (text, plugin_results) = plugin::run_plugin_hook("post-transcription", &text).await;
+                    for result in &plugin_results {
+                        if let Some(ref err) = result.error {
+                            log::warn!("Plugin {} failed: {}", result.plugin_name, err);
+                        }
+                    }
+
+                    let raw_text = text.clone();
+                    let display_text = raw_text.clone();
+
+                    let _ = handle.clipboard().write_text(&display_text);
+                    close_overlay(&handle);
+
+                    if auto_paste_enabled {
+                        let paste_handle = handle.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(paste_delay_ms.max(50)));
+                            if let Err(e) = paste::simulate_paste(&paste_handle) {
+                                log::error!("Paste failed: {}", e);
+                            }
+                        });
+                    }
+
+                    let entry = NewHistoryEntry {
+                        text: raw_text.clone(),
+                        model: format!("{} (local fallback)", model),
+                        duration_ms,
+                        audio_path: audio_path_str.clone(),
+                        status: STATUS_SUCCESS.to_string(),
+                        error_message: None,
+                        provider: "Local Whisper".to_string(),
+                        api_base_url: String::new(),
+                        language: language.clone(),
+                        retry_of: None,
+                        asr_duration_sec: None,
+                        polish_tokens: None,
+                        estimated_cost: None,
+                        polished_text: None,
+                        recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
+                    };
+                    let _ = history.add_entry(&entry);
+                    let _ = history.cleanup_old_audio(audio_retention_limit);
+                } else {
+                    // Both cloud and local failed (or fallback disabled)
+                    let error_message = cloud_err.to_string();
+                    let entry = NewHistoryEntry {
+                        text: format!(
+                            "{} {}",
+                            tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:"),
+                            &error_message.chars().take(100).collect::<String>()
+                        ),
+                        model: model.clone(),
+                        duration_ms,
+                        audio_path: audio_path_str.clone(),
+                        status: STATUS_FAILED.to_string(),
+                        error_message: Some(error_message.clone()),
+                        provider: provider.clone(),
+                        api_base_url: api_base_url.clone(),
+                        language: language.clone(),
+                        retry_of: None,
+                        asr_duration_sec: None,
+                        polish_tokens: None,
+                        estimated_cost: None,
+                        polished_text: None,
+                        recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
+                    };
+                    let _ = history.add_entry(&entry);
+                    let _ = history.cleanup_old_audio(audio_retention_limit);
+
+                    // Emit error to overlay — overlay will show it and self-close after 2.5s
+                    let _ = handle.emit("transcription-error", &error_message);
+                    // Emit to main window for retry toast
+                    let _ = handle.emit("transcription-failed", &error_message);
+                    // Fallback close in case overlay missed the event
+                    let fallback_handle = handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_millis(3000)).await;
+                        close_overlay(&fallback_handle);
+                    });
+                }
             }
         }
 
@@ -1325,6 +1481,8 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
     let ai_polish_prompt = settings.ai_polish_prompt.clone();
     let audio_retention_limit = settings.audio_retention_limit;
     let _ui_language = settings.ui_language.clone();
+    let auto_fallback_to_local = settings.auto_fallback_to_local;
+    let whisper_config_json = settings.whisper_config_json.clone();
     let http_client = app_handle.state::<reqwest::Client>().inner().clone();
     let wav_data = audio.wav_data;
     let audio_path = audio.audio_path;
@@ -1449,32 +1607,99 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     Err(e) => log::error!("Failed to save history: {}", e),
                 }
             }
-            Err(e) => {
-                log::error!("Transcription failed: {}", e);
-                let error_msg = e.to_string();
-                let _ = handle.emit("transcription-error", error_msg.clone());
-                let _ = history_clone.add_entry(&NewHistoryEntry {
-                    text: String::new(),
-                    model: model.clone(),
-                    duration_ms,
-                    audio_path,
-                    status: STATUS_FAILED.to_string(),
-                    error_message: Some(error_msg),
-                    provider: provider.clone(),
-                    api_base_url: api_base_url.clone(),
-                    language: language.clone(),
-                    retry_of: None,
-                    asr_duration_sec: None,
-                    polish_tokens: None,
-                    estimated_cost: None,
-                    polished_text: None,
-                    recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
-                });
-                let handle2 = handle.clone();
-                std::thread::spawn(move || {
-                    std::thread::sleep(Duration::from_millis(3000));
-                    close_overlay(&handle2);
-                });
+            Err(cloud_err) => {
+                log::error!("Cloud API transcription failed (preview confirm): {}", cloud_err);
+
+                // Attempt auto-fallback to local Whisper
+                let fallback_text = if auto_fallback_to_local {
+                    log::info!("Cloud API failed, falling back to local Whisper (preview confirm)...");
+                    match try_local_whisper_fallback(&wav_data, &language, &whisper_config_json) {
+                        Ok(text) => {
+                            log::info!("Local Whisper fallback succeeded (preview confirm), text_length={}", text.len());
+                            let _ = handle.emit("transcription-fallback", serde_json::json!({
+                                "reason": cloud_err.to_string(),
+                                "provider": "local_whisper",
+                            }));
+                            Some(text)
+                        }
+                        Err(fallback_err) => {
+                            log::warn!("Local Whisper fallback also failed (preview confirm): {}", fallback_err);
+                            None
+                        }
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(text) = fallback_text {
+                    // Fallback succeeded — treat like a successful transcription
+                    let (text, plugin_results) = plugin::run_plugin_hook("post-transcription", &text).await;
+                    for result in &plugin_results {
+                        if let Some(ref err) = result.error {
+                            log::warn!("Plugin {} failed: {}", result.plugin_name, err);
+                        }
+                    }
+
+                    let raw_text = text.clone();
+                    let display_text = raw_text.clone();
+
+                    let _ = handle.clipboard().write_text(&display_text);
+                    close_overlay(&handle);
+
+                    if auto_paste_enabled {
+                        let paste_handle = handle.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(paste_delay_ms));
+                            paste::simulate_paste(&paste_handle).ok();
+                        });
+                    }
+
+                    let _ = handle.emit("transcription-done", &display_text);
+
+                    let _ = history_clone.add_entry(&NewHistoryEntry {
+                        text: raw_text.clone(),
+                        model: format!("{} (local fallback)", model),
+                        duration_ms,
+                        audio_path,
+                        status: STATUS_SUCCESS.to_string(),
+                        error_message: None,
+                        provider: "Local Whisper".to_string(),
+                        api_base_url: String::new(),
+                        language: language.clone(),
+                        retry_of: None,
+                        asr_duration_sec: None,
+                        polish_tokens: None,
+                        estimated_cost: None,
+                        polished_text: None,
+                        recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
+                    });
+                } else {
+                    // Both cloud and local failed (or fallback disabled)
+                    let error_msg = cloud_err.to_string();
+                    let _ = handle.emit("transcription-error", error_msg.clone());
+                    let _ = history_clone.add_entry(&NewHistoryEntry {
+                        text: String::new(),
+                        model: model.clone(),
+                        duration_ms,
+                        audio_path,
+                        status: STATUS_FAILED.to_string(),
+                        error_message: Some(error_msg),
+                        provider: provider.clone(),
+                        api_base_url: api_base_url.clone(),
+                        language: language.clone(),
+                        retry_of: None,
+                        asr_duration_sec: None,
+                        polish_tokens: None,
+                        estimated_cost: None,
+                        polished_text: None,
+                        recorded_at: RECORDING_START_TIME.swap(0, std::sync::atomic::Ordering::Relaxed),
+                    });
+                    let handle2 = handle.clone();
+                    std::thread::spawn(move || {
+                        std::thread::sleep(Duration::from_millis(3000));
+                        close_overlay(&handle2);
+                    });
+                }
             }
         }
         // TRANSCRIBING flag is cleared by AsyncTranscribeGuard on drop

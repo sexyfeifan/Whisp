@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Box, Download, Trash2, RefreshCw, HardDrive, Info, Loader2 } from "lucide-react";
+import { Box, Download, Trash2, RefreshCw, HardDrive, Info, Loader2, Star, Cpu } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Button } from "../components/ui/button";
@@ -22,6 +22,12 @@ interface KnownModel {
   description: string;
   languages: string;
   params: string;
+}
+
+interface ModelRecommendation {
+  recommended: string;
+  total_memory_bytes: number;
+  reason: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -48,18 +54,21 @@ export function SettingsModelsPage(app: AppState) {
   const [downloadProgress, setDownloadProgress] = useState<{ [key: string]: { pct: number; downloaded: number; total: number; speed: number } }>({});
   const dlTrackingRef = useRef<Record<string, { lastBytes: number; lastTime: number }>>({});
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const [recommendation, setRecommendation] = useState<ModelRecommendation | null>(null);
 
   const loadModels = useCallback(async () => {
     setLoading(true);
     try {
-      const [models, known, usage] = await Promise.all([
+      const [models, known, usage, rec] = await Promise.all([
         invoke<ModelInfo[]>("list_whisper_models"),
         invoke<KnownModel[]>("list_known_models"),
         invoke<number>("get_model_disk_usage"),
+        invoke<ModelRecommendation>("get_recommended_model"),
       ]);
       setDownloadedModels(models);
       setKnownModels(known);
       setDiskUsage(usage);
+      setRecommendation(rec);
     } catch (error) {
       console.error("Failed to load models:", error);
     } finally {
@@ -208,6 +217,31 @@ export function SettingsModelsPage(app: AppState) {
               </div>
             </div>
 
+            {/* Model Recommendation */}
+            {recommendation && (
+              <div className="rounded-lg p-4" style={{ border: "1px solid hsl(var(--primary) / 0.3)", background: "hsl(var(--primary) / 0.05)" }}>
+                <div className="flex items-start gap-2">
+                  <Cpu size={16} className="mt-0.5 shrink-0" style={{ color: "hsl(var(--primary))" }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>
+                      {m.recommendedModel ?? "Recommended Model"}:{" "}
+                      <span className="font-bold" style={{ color: "hsl(var(--primary))" }}>
+                        {recommendation.recommended}
+                      </span>
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
+                      {recommendation.reason}
+                    </p>
+                    {recommendation.total_memory_bytes > 0 && (
+                      <p className="text-[10px] mt-1" style={{ color: "hsl(var(--muted))" }}>
+                        🧠 {formatBytes(recommendation.total_memory_bytes)} RAM
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Downloaded Models */}
             <SettingsSection
               icon={<Box size={14} />}
@@ -286,8 +320,16 @@ export function SettingsModelsPage(app: AppState) {
                       style={{ background: "hsl(var(--surface))" }}
                     >
                       <div className="flex-1 min-w-0 mr-3">
-                        <div className="text-sm font-medium truncate" style={{ color: "hsl(var(--ink))" }}>
-                          {model.name}
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate" style={{ color: "hsl(var(--ink))" }}>
+                            {model.name}
+                          </span>
+                          {recommendation && model.name === recommendation.recommended && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium shrink-0" style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}>
+                              <Star size={10} />
+                              {m.recommended ?? "Recommended"}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] mt-0.5" style={{ color: "hsl(var(--steel))" }}>
                           {model.description}
