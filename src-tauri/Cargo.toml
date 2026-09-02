@@ -1,6 +1,6 @@
 [package]
 name = "whisp"
-version = "2.12.29"
+version = "2.12.30"
 edition = "2021"
 license = "Apache-2.0"
 
