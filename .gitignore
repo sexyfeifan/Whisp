@@ -1,6 +1,7 @@
 node_modules/
 dist/
 src-tauri/target/
+src-tauri/gen/
 .DS_Store
 *.log
 .env
@@ -17,3 +18,4 @@ dmg/
 legacy/
 _design/
 Beta/
+历史版本/
