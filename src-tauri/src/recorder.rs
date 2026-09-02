@@ -371,6 +371,52 @@ pub fn trim_silence(audio: &RecordedAudio, floor_threshold: f32, padding_ms: u32
     trimmed
 }
 
+/// Calculate the RMS (root mean square) energy of the audio.
+/// Returns a value in [0.0, 1.0] where 0.0 is silence and 1.0 is maximum amplitude.
+pub fn audio_rms(audio: &RecordedAudio) -> f32 {
+    if audio.samples.is_empty() {
+        return 0.0;
+    }
+    let sum_of_squares: f32 = audio.samples.iter().map(|s| s * s).sum();
+    (sum_of_squares / audio.samples.len() as f32).sqrt()
+}
+
+/// Returns true if the audio is mostly silent (RMS energy below the threshold).
+/// Default threshold of ~0.005 filters out recordings where the user accidentally
+/// triggered recording in a quiet room.
+pub fn is_mostly_silent(audio: &RecordedAudio, threshold: f32) -> bool {
+    audio_rms(audio) < threshold
+}
+
+/// Estimate the signal-to-noise ratio of the audio in decibels.
+/// Uses peak signal vs. median absolute sample energy as a simple proxy.
+/// Returns a value in dB (higher = better quality).
+pub fn signal_to_noise_ratio(audio: &RecordedAudio) -> f32 {
+    if audio.samples.is_empty() {
+        return 0.0;
+    }
+
+    // Peak signal
+    let peak = audio
+        .samples
+        .iter()
+        .map(|s| s.abs())
+        .fold(0.0_f32, f32::max);
+    if peak == 0.0 {
+        return 0.0;
+    }
+
+    // Median absolute sample as noise floor estimate
+    let mut abs_samples: Vec<f32> = audio.samples.iter().map(|s| s.abs()).collect();
+    abs_samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = abs_samples[abs_samples.len() / 2];
+
+    // SNR = 20 * log10(peak / noise_floor)
+    // Guard against log(0) when median is zero (very quiet signal with spikes)
+    let noise_floor = if median > 0.0 { median } else { f32::MIN_POSITIVE };
+    20.0 * (peak / noise_floor).log10()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,5 +474,100 @@ mod tests {
         let audio = make_audio(vec![0.5; 100], 0);
         let trimmed = trim_silence(&audio, 0.015, 120);
         assert_eq!(trimmed.samples.len(), 100); // Should return original
+    }
+
+    // --- audio_rms tests ---
+
+    #[test]
+    fn test_audio_rms_empty() {
+        let audio = make_audio(vec![], 16000);
+        assert_eq!(audio_rms(&audio), 0.0);
+    }
+
+    #[test]
+    fn test_audio_rms_silence() {
+        let audio = make_audio(vec![0.0; 16000], 16000);
+        assert_eq!(audio_rms(&audio), 0.0);
+    }
+
+    #[test]
+    fn test_audio_rms_known_value() {
+        // Constant signal of 0.5 → RMS = 0.5
+        let audio = make_audio(vec![0.5; 1000], 16000);
+        let rms = audio_rms(&audio);
+        assert!((rms - 0.5).abs() < 1e-6, "expected ~0.5, got {rms}");
+    }
+
+    #[test]
+    fn test_audio_rms_mixed() {
+        // Alternating +1/-1 → RMS = 1.0
+        let samples: Vec<f32> = (0..1000).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect();
+        let audio = make_audio(samples, 16000);
+        let rms = audio_rms(&audio);
+        assert!((rms - 1.0).abs() < 1e-6, "expected ~1.0, got {rms}");
+    }
+
+    // --- is_mostly_silent tests ---
+
+    #[test]
+    fn test_is_mostly_silent_empty() {
+        let audio = make_audio(vec![], 16000);
+        assert!(is_mostly_silent(&audio, 0.005));
+    }
+
+    #[test]
+    fn test_is_mostly_silent_quiet() {
+        let audio = make_audio(vec![0.001; 16000], 16000);
+        assert!(is_mostly_silent(&audio, 0.005));
+    }
+
+    #[test]
+    fn test_is_mostly_silent_loud() {
+        let audio = make_audio(vec![0.5; 16000], 16000);
+        assert!(!is_mostly_silent(&audio, 0.005));
+    }
+
+    #[test]
+    fn test_is_mostly_silent_at_threshold() {
+        // RMS slightly above threshold → NOT silent
+        let audio = make_audio(vec![0.006; 100], 16000);
+        assert!(!is_mostly_silent(&audio, 0.005));
+        // RMS slightly below threshold → IS silent
+        let audio_quiet = make_audio(vec![0.004; 100], 16000);
+        assert!(is_mostly_silent(&audio_quiet, 0.005));
+    }
+
+    // --- signal_to_noise_ratio tests ---
+
+    #[test]
+    fn test_snr_empty() {
+        let audio = make_audio(vec![], 16000);
+        assert_eq!(signal_to_noise_ratio(&audio), 0.0);
+    }
+
+    #[test]
+    fn test_snr_all_zeros() {
+        let audio = make_audio(vec![0.0; 16000], 16000);
+        assert_eq!(signal_to_noise_ratio(&audio), 0.0);
+    }
+
+    #[test]
+    fn test_snr_clean_signal() {
+        // Constant signal: peak = median → SNR = 0 dB
+        let audio = make_audio(vec![0.5; 1000], 16000);
+        let snr = signal_to_noise_ratio(&audio);
+        assert!((snr - 0.0).abs() < 0.1, "expected ~0 dB, got {snr}");
+    }
+
+    #[test]
+    fn test_snr_signal_with_noise() {
+        // Mostly quiet (0.001) with a few loud peaks (0.8)
+        let mut samples = vec![0.001; 16000];
+        samples[8000] = 0.8;
+        samples[8001] = -0.8;
+        let audio = make_audio(samples, 16000);
+        let snr = signal_to_noise_ratio(&audio);
+        // Peak (0.8) / median (~0.001) → ~58 dB; should be substantially positive
+        assert!(snr > 30.0, "expected high SNR, got {snr}");
     }
 }

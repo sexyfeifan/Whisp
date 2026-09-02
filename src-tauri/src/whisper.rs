@@ -365,12 +365,95 @@ pub struct KnownModel {
     pub params: String,
 }
 
-/// Resample audio to 16kHz using linear interpolation
+/// Minimum chunk size for rubato's sinc resampler
+const RUBATO_CHUNK_SIZE: usize = 1024;
+
+/// Resample audio to 16kHz using rubato sinc interpolation.
+/// Falls back to linear interpolation for very short audio (< RUBATO_CHUNK_SIZE samples)
+/// where rubato cannot operate.
 fn resample_to_16k(audio: &[f32], from_rate: u32) -> Vec<f32> {
     if from_rate == 16000 {
         return audio.to_vec();
     }
 
+    if audio.is_empty() {
+        return Vec::new();
+    }
+
+    // For very short audio, rubato needs at least one full chunk; fall back to linear
+    if audio.len() < RUBATO_CHUNK_SIZE {
+        return resample_to_16k_linear(audio, from_rate);
+    }
+
+    resample_to_16k_sinc(audio, from_rate).unwrap_or_else(|e| {
+        log::warn!("Sinc resample failed ({}), falling back to linear interpolation", e);
+        resample_to_16k_linear(audio, from_rate)
+    })
+}
+
+/// Sinc resampling using rubato's SincFixedIn resampler.
+fn resample_to_16k_sinc(audio: &[f32], from_rate: u32) -> Result<Vec<f32>> {
+    use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolationType};
+
+    let params = SincInterpolationParameters {
+        sinc_len: 256,
+        f_cutoff: 0.95,
+        interpolation: SincInterpolationType::Linear,
+        oversampling_factor: 256,
+        window: rubato::WindowFunction::BlackmanHarris2,
+    };
+
+    let mut resampler = SincFixedIn::<f32>::new(
+        16000.0 / from_rate as f64,
+        2.0, // max relative ratio (generous bound)
+        params,
+        RUBATO_CHUNK_SIZE,
+        1, // mono channel
+    )
+    .with_context(|| "Failed to create rubato resampler")?;
+
+    let expected_len = (audio.len() as f64 * 16000.0 / from_rate as f64).round() as usize;
+    let mut output = Vec::with_capacity(expected_len + RUBATO_CHUNK_SIZE);
+    let mut pos = 0;
+
+    while pos < audio.len() {
+        let end = (pos + RUBATO_CHUNK_SIZE).min(audio.len());
+        let chunk = &audio[pos..end];
+
+        if chunk.len() == RUBATO_CHUNK_SIZE {
+            // Full chunk: use process()
+            let input_frames = vec![chunk.to_vec()];
+            let out_frames = resampler
+                .process(&input_frames, None)
+                .with_context(|| "rubato resample chunk failed")?;
+            output.extend_from_slice(&out_frames[0]);
+        } else {
+            // Final partial chunk: use process_partial() which handles arbitrary sizes
+            let input_frames = vec![chunk.to_vec()];
+            let out_frames = resampler
+                .process_partial(Some(&input_frames), None)
+                .with_context(|| "rubato resample partial chunk failed")?;
+            output.extend_from_slice(&out_frames[0]);
+        }
+
+        pos = end;
+    }
+
+    // Flush any remaining samples in the resampler's internal buffer
+    let mut remaining = resampler
+        .process_partial::<Vec<f32>>(None, None)
+        .with_context(|| "rubato flush failed")?;
+    if let Some(flushed) = remaining.pop() {
+        output.extend_from_slice(&flushed);
+    }
+
+    // Trim to expected length — rubato's internal latency buffering can add extra samples
+    output.truncate(expected_len);
+    Ok(output)
+}
+
+/// Fallback linear interpolation resampling for short audio
+fn resample_to_16k_linear(audio: &[f32], from_rate: u32) -> Vec<f32> {
     let ratio = from_rate as f64 / 16000.0;
     let output_len = (audio.len() as f64 / ratio) as usize;
     let mut output = Vec::with_capacity(output_len);
@@ -422,8 +505,8 @@ mod tests {
     fn test_resample_downsample() {
         let audio: Vec<f32> = (0..48000).map(|i| (i as f32 / 48000.0)).collect();
         let resampled = resample_to_16k(&audio, 48000);
-        // Should be approximately 16000 samples
-        assert!((resampled.len() as i32 - 16000).unsigned_abs() <= 1);
+        // After trimming to expected length, should be exactly 16000
+        assert_eq!(resampled.len(), 16000, "Expected exactly 16000, got {}", resampled.len());
     }
 
     #[test]
@@ -431,5 +514,43 @@ mod tests {
         let audio: Vec<f32> = vec![];
         let resampled = resample_to_16k(&audio, 44100);
         assert!(resampled.is_empty());
+    }
+
+    #[test]
+    fn test_resample_sinc_quality() {
+        // Generate a 440Hz sine wave at 48kHz, 1 second long
+        let sr = 48000u32;
+        let freq = 440.0f64;
+        let duration = 1.0f64;
+        let n_samples = (sr as f64 * duration) as usize;
+        let audio: Vec<f32> = (0..n_samples)
+            .map(|i| (2.0 * std::f64::consts::PI * freq * i as f64 / sr as f64).sin() as f32)
+            .collect();
+
+        let resampled = resample_to_16k(&audio, sr);
+
+        // The resampled signal should be exactly 1 second at 16kHz
+        assert_eq!(resampled.len(), 16000, "Expected exactly 16000, got {}", resampled.len());
+
+        // Count zero crossings to estimate dominant frequency
+        let mut zero_crossings = 0usize;
+        for i in 1..resampled.len() {
+            if (resampled[i - 1] >= 0.0 && resampled[i] < 0.0)
+                || (resampled[i - 1] < 0.0 && resampled[i] >= 0.0)
+            {
+                zero_crossings += 1;
+            }
+        }
+
+        // Each cycle has 2 zero crossings; frequency = crossings / (2 * duration)
+        let estimated_freq = zero_crossings as f64 / (2.0 * duration);
+        // Allow ±15% tolerance (resampling + discrete counting introduces some error)
+        assert!(
+            (estimated_freq - freq).abs() / freq < 0.15,
+            "Expected ~{}Hz, estimated {}Hz (zero_crossings={})",
+            freq,
+            estimated_freq,
+            zero_crossings
+        );
     }
 }

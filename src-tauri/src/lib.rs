@@ -21,7 +21,7 @@ mod tray;
 mod whisper;
 
 use history::{HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
-use recorder::{encode_wav, trim_silence, AudioRecorder};
+use recorder::{audio_rms, encode_wav, is_mostly_silent, trim_silence, AudioRecorder};
 use shortcut::SHORTCUT_PROCESSING;
 
 use std::path::PathBuf;
@@ -896,6 +896,40 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
         }
     };
     log::info!("WAV size: {} bytes", wav_data.len());
+
+    // Emit audio quality info to the frontend (RMS energy level)
+    let rms = audio_rms(&processed_audio);
+    log::info!("Audio quality: RMS={:.4}", rms);
+    let _ = app_handle.emit("audio-quality", rms);
+
+    // Reject mostly-silent audio using RMS-based check
+    if is_mostly_silent(&processed_audio, 0.005) {
+        log::warn!("Recording mostly silent (RMS={:.4}), skipping transcription", rms);
+        if let Some(tray) = app_handle.tray_by_id("main") {
+            let _ = tray.set_tooltip(Some("Whisp"));
+            let idle_icon = ORB_ICON_0.get_or_init(|| {
+                let bytes = include_bytes!("../icons/tray_orb_0.png");
+                tauri::image::Image::from_bytes(bytes).expect("Failed to load orb idle icon")
+            });
+            let _ = tray.set_icon(Some(idle_icon.clone()));
+            let _ = tray.set_icon_as_template(false);
+        }
+        let _ = app_handle.emit(
+            "transcription-error",
+            tr(
+                &settings.ui_language,
+                "录音太短或太安静了，请重试。",
+                "Recording too short or silent. Please try again.",
+                "録音が短すぎるか静かすぎます。もう一度お試しください。",
+            ),
+        );
+        let handle = app_handle.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(3000));
+            close_overlay(&handle);
+        });
+        return;
+    }
 
     let audio_path_str = if settings.save_audio_files {
         let timestamp = chrono::Utc::now().format("%Y%m%d_%H%M%S%.3f").to_string();

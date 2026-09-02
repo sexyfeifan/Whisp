@@ -7,6 +7,8 @@ import WaveformPreview, { type WaveformData } from "../components/WaveformPrevie
 
 type OverlayState = "recording" | "transcribing" | "silence-stopping" | "error" | "cancelled" | "preview";
 
+type AudioQualityLevel = "good" | "ok" | "poor" | "silent";
+
 const params = new URLSearchParams(window.location.search);
 const lang = params.get("lang") ?? "zh-CN";
 const subtitleStyle = params.get("subtitleStyle") ?? "white-black";
@@ -47,6 +49,7 @@ function Overlay() {
   const [confirming, setConfirming] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [audioQuality, setAudioQuality] = useState<AudioQualityLevel | null>(null);
   const levelRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<number[]>([]);
@@ -106,6 +109,13 @@ function Overlay() {
     const unlisten9 = listen<string>("streaming-error", (e) => {
       console.warn("Streaming error:", e.payload);
     });
+    const unlisten10 = listen<number>("audio-quality", (e) => {
+      const rms = e.payload;
+      if (rms < 0.005) setAudioQuality("silent");
+      else if (rms < 0.02) setAudioQuality("poor");
+      else if (rms < 0.05) setAudioQuality("ok");
+      else setAudioQuality("good");
+    });
     return () => {
       unlisten1.then((f) => f());
       unlisten2.then((f) => f());
@@ -116,6 +126,7 @@ function Overlay() {
       unlisten7.then((f) => f());
       unlisten8.then((f) => f());
       unlisten9.then((f) => f());
+      unlisten10.then((f) => f());
     };
   }, []);
 
@@ -240,6 +251,36 @@ function Overlay() {
         <div className="orb-row">
           <ThinkingOrb state="composing" size={64} speed={0.75} />
           <span className="orb-label">{STRINGS.transcribing}</span>
+          {audioQuality && (
+            <span
+              className="quality-dot"
+              title={audioQuality}
+              style={{
+                display: "inline-block",
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                marginLeft: 8,
+                flexShrink: 0,
+                backgroundColor:
+                  audioQuality === "good"
+                    ? "#4ade80"
+                    : audioQuality === "ok"
+                    ? "#facc15"
+                    : audioQuality === "poor"
+                    ? "#f87171"
+                    : "#9ca3af",
+                boxShadow:
+                  audioQuality === "good"
+                    ? "0 0 6px rgba(74,222,128,0.6)"
+                    : audioQuality === "ok"
+                    ? "0 0 6px rgba(250,204,21,0.6)"
+                    : audioQuality === "poor"
+                    ? "0 0 6px rgba(248,113,113,0.6)"
+                    : "none",
+              }}
+            />
+          )}
         </div>
       ) : state === "silence-stopping" ? (
         <div className="orb-row">
