@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.12.28 (2026-09-02)
+
+- (add changes here)
+
+
 ## v2.12.27 (2026-09-01)
 
 - Restored the animated Thinking Orb in the recording, silence-detection, and transcription states.
