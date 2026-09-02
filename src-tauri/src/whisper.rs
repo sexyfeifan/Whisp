@@ -196,6 +196,7 @@ impl WhisperEngine {
         } else {
             config.n_threads as i32
         };
+        log::info!("Whisper transcription using {} threads", n_threads);
         params.set_n_threads(n_threads);
         params.set_language(if config.language == "auto" {
             None

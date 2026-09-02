@@ -4,6 +4,36 @@ use reqwest::multipart;
 use reqwest::{StatusCode, Url};
 use std::time::Duration;
 
+/// Pre-warm HTTP connection by making a lightweight HEAD request.
+/// Establishes TCP+TLS handshake so the connection is ready when transcription begins.
+/// Returns a reqwest Client with connection pooling enabled.
+pub async fn prewarm_connection(api_base_url: &str) -> reqwest::Client {
+    let client = reqwest::Client::builder()
+        .pool_max_idle_per_host(2)
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("Failed to build prewarm HTTP client");
+
+    // Extract base URL for HEAD request (strip path components)
+    let base_url = if let Ok(url) = Url::parse(api_base_url) {
+        format!("{}://{}", url.scheme(), url.host_str().unwrap_or(""))
+    } else {
+        api_base_url.trim().trim_end_matches('/').to_string()
+    };
+
+    // Fire-and-forget HEAD request to establish connection
+    match client.head(&base_url).send().await {
+        Ok(resp) => {
+            log::info!("Connection pre-warmed to {} (status: {})", base_url, resp.status());
+        }
+        Err(e) => {
+            log::warn!("Connection pre-warm failed (non-fatal): {}", e);
+        }
+    }
+
+    client
+}
+
 fn transcription_endpoint(api_base_url: &str) -> Result<Url> {
     let raw = api_base_url.trim();
     if raw.is_empty() {
@@ -416,7 +446,17 @@ pub async fn transcribe_audio(
     timeout_secs: u64,
     retry_count: u8,
 ) -> Result<String> {
-    let timeout = Duration::from_secs(timeout_secs.max(10));
+    // Dynamic timeout: scale with audio duration so long recordings do not
+    // time out. Formula: max(user_setting, max(15, duration_sec * 1.5)).
+    // WAV 16-bit mono at 16 kHz = 32 000 bytes/sec.
+    let audio_duration_secs = wav_data.len() as f64 / 32_000.0;
+    let dynamic_timeout = (audio_duration_secs * 1.5).max(15.0) as u64;
+    let timeout = Duration::from_secs(timeout_secs.max(dynamic_timeout));
+    log::info!(
+        "Transcribe: audio={:.1}s, dynamic_timeout={}s, user_timeout={}s",
+        audio_duration_secs, dynamic_timeout, timeout_secs
+    );
+
     let attempts = retry_count.saturating_add(1);
 
     if is_mimo_asr(model) {

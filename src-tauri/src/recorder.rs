@@ -401,7 +401,10 @@ pub fn encode_wav(audio: &RecordedAudio) -> Result<Vec<u8>> {
         bits_per_sample: 16,
         sample_format: hound::SampleFormat::Int,
     };
-    let mut cursor = Cursor::new(Vec::new());
+    // Pre-allocate: 44-byte WAV header + 2 bytes per sample (16-bit mono).
+    // Avoids repeated reallocation & memcpy for long recordings.
+    let estimated_size = 44 + audio.samples.len() * 2;
+    let mut cursor = Cursor::new(Vec::with_capacity(estimated_size));
     {
         let mut writer = hound::WavWriter::new(&mut cursor, spec)?;
         for &sample in &audio.samples {

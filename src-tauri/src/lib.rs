@@ -288,6 +288,7 @@ pub fn run() {
 
             // Initialize shared HTTP client
             let http_client = reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(5))
                 .timeout(Duration::from_secs(300))
                 .build()
                 .expect("Failed to build HTTP client");
@@ -761,6 +762,12 @@ fn start_recording(app_handle: &tauri::AppHandle) {
 
     // Register Escape only while recording
     shortcut::register_escape(app_handle);
+
+    // Pre-warm HTTP connection during recording so it's ready when transcription starts
+    let prewarm_url = saved.api_base_url.clone();
+    tauri::async_runtime::spawn(async move {
+        crate::transcribe::prewarm_connection(&prewarm_url).await;
+    });
 }
 
 /// Attempt transcription using local Whisper engine as fallback.
