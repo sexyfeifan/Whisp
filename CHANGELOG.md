@@ -30,6 +30,185 @@
 
 - Prevented duplicate app instances and duplicate menu-bar icons.
 - Launch at login now starts silently in the menu bar without showing the main window.
+- Fixed TS build errors — unescaped quotes in i18n, moved m before use, installed plugin-opener.
+
+## v2.12.22 (2026-08-12)
+
+- Batch fix of 20+ bugs and code quality issues across the codebase.
+
+## v2.12.21 (2026-08-12)
+
+- Fixed all 3 pre-existing CI failures and dead code cleanup.
+- Used ASCII API key in settings tests to avoid serde_json Unicode escaping.
+
+## v2.12.20 (2026-08-12)
+
+- Batch fix of 35+ bugs from a full code audit.
+- Fixed dynamic RIFF chunk parsing for WAV splitting (#9).
+
+## v2.12.19 (2026-08-12)
+
+- Fixed crash on fresh install — i18n messages undefined when API test warns.
+
+## v2.12.18 (2026-08-10)
+
+- UI refinements across the app.
+- Added local streaming model support.
+
+## v2.12.17 (2026-08-10)
+
+- Removed volume control in favour of system volume.
+- Switched to teal accent colour.
+- Added download speed indicator.
+- Improved AI summary formatting.
+
+## v2.12.16 (2026-08-10)
+
+- Fixed 8 bugs from DeepSeek code review.
+
+## v2.12.15 (2026-08-10)
+
+- Shortened overlay waveform and widened text area.
+- Removed skip buttons from overlay.
+
+## v2.12.14 (2026-08-10)
+
+- Overlay centering improvements.
+- Added 10-second skip forward/back.
+- Progress bar deduplication.
+- Added model annotations in the UI.
+
+## v2.12.13 (2026-08-10)
+
+- Added globe tray icons for macOS.
+- Improved audio playback synchronisation.
+- Overlay redesign refinements.
+- Fixed model download issues.
+- Reverted accidental TypeScript version bump.
+
+## v2.12.12 (2026-08-10)
+
+- Transparent overlay and rounded capsule design.
+- More reliable file export functionality.
+- Fixed hsl()/hsla() colour syntax inconsistency.
+
+## v2.12.11 (2026-08-10)
+
+- Fixed display_text lifetime issue (borrowed &str → owned String).
+- Fixed voice tail clipping at end of recordings.
+- Added error copy/select and dismiss buttons.
+- Fixed borrow-of-moved-value compiler error.
+
+## v2.12.10 (2026-08-10)
+
+- Version bump to stabilise 2.12.9 release.
+
+## v2.12.9 (2026-08-10)
+
+- Added subtitle colour customisation.
+- Waveform and text now display simultaneously.
+- Enlarged tray icon to 48×48.
+- Fixed recording time display.
+- Added progress bar drag-to-seek.
+- Added upload audio-to-text conversion.
+- Added AI polish mode selection.
+- Audio chunking for MiMo 10 MB limit.
+- Added playback time display and download progress.
+- Fixed CI build failures and compiler warnings.
+
+## v2.12.8 (2026-08-10)
+
+- Improved overlay appearance and enlarged tray icon.
+- Added click-to-jump in transcription text.
+- Added pause/resume recording.
+- Added automatic paste diagnostics.
+- Updated README with v2.12 feature status.
+
+## v2.12.7 (2026-08-10)
+
+- Added overlay capsule design and orb idle icon.
+- Added paste fallback when primary method fails.
+- Faster streaming pipeline.
+- Fixed sync issues.
+
+## v2.12.6 (2026-08-10)
+
+- Added independent API key configuration for AI summary.
+- Removed unused RECORDING_ICON constant.
+- Fixed broken AudioPlayer stub.
+- Fixed text-audio synchronisation.
+- Improved AI summary error messages.
+
+## v2.12.4 (2026-08-10)
+
+- Auto-hide overlay after 1.5 seconds.
+- Added orb tray icon animation.
+- Fixed streaming sample rate.
+- Fixed play button, overlay rendering, text-audio sync, and AI summary.
+
+## v2.12.2 (2026-08-10)
+
+- Fixed tray icon restore on Linux.
+- Fixed streaming type mismatch (Mutex<Option<StreamingState>>).
+- Removed MutexGuard hold across await in streaming loop.
+- Removed polish settings page; improved i18n for clear dialog.
+- Added Chinese fallback models.
+
+## v2.12.0 (2026-08-09)
+
+- Streaming ASR (automatic speech recognition).
+- AI summary generation for transcriptions.
+- SRT, Markdown, and CSV export.
+- Speaker diarization support.
+- FTS5 full-text search across history.
+- Global hotkey for recording.
+- Custom vocabulary support.
+
+## v2.11.0 (2026-08-09)
+
+- Configurable pricing with CSV crate.
+- Waveform preview in the UI.
+- Plugin system architecture.
+- Translation (i18n) improvements.
+- Model management UI.
+- Multi-device sync via shared directory.
+
+## v2.10.0 (2026-08-09)
+
+- Added Whisper model cache management commands.
+- Model download and local caching improvements.
+
+## v2.9.0 (2026-08-09)
+
+- P0/P1/P2 comprehensive optimisation pass.
+- Fixed Vec<u8> → &[u8] coercion in validate_api_key.
+- Added mut to whisper.rs download_model response.
+- Reverted createUpdaterArtifacts (CI signing keys not configured).
+- Restored Cargo.lock from v2.8.8 to prevent dependency breakage.
+- CI pipeline fixes: Rust cache bust, debug output, test capture.
+
+## v2.8.8 (2026-08-08)
+
+- Fixed SQL trigger syntax error — removed illegal backslash escapes in FTS5 triggers.
+- Synced Cargo.lock version.
+
+## v2.8.7 (2026-08-08)
+
+- Forced ad-hoc codesign in CI for macOS builds.
+- Improved ad-hoc signing robustness and debug logging.
+
+## v2.8.6 (2026-08-08)
+
+- Disabled hardenedRuntime for macOS (missing Apple notarization keys).
+
+## v2.8.5 (2026-08-08)
+
+- Disabled hardenedRuntime for macOS (blocking Gatekeeper without notarization).
+- Added Apple notarization to macOS release CI builds.
+
+## v2.8.4 (2026-08-08)
+
+- Implemented all 7 remaining features from the v2.8 roadmap.
 
 ## v2.8.0 (2026-08-08)
 

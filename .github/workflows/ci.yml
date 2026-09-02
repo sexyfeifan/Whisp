@@ -44,7 +44,7 @@ jobs:
         run: cd src-tauri && cargo fmt -- --check
 
       - name: Run Clippy
-        run: cd src-tauri && cargo clippy 2>&1 || true
+        run: cd src-tauri && cargo clippy -- -D warnings 2>&1
 
       - name: Run Rust tests
         run: |
@@ -70,13 +70,13 @@ jobs:
         run: npm install
 
       - name: TypeScript check
-        run: npx tsc --noEmit || true
+        run: npx tsc --noEmit
 
       - name: ESLint
-        run: npx eslint src/ --ext .ts,.tsx || true
+        run: npx eslint src/ --ext .ts,.tsx
 
       - name: Frontend tests
-        run: npx vitest run || true
+        run: npx vitest run
 
   # ── ARM64 Linux cross-compilation check ──
   arm64-build:
@@ -128,3 +128,24 @@ jobs:
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
           cargo build --release --target aarch64-unknown-linux-gnu 2>&1 | tail -60
         shell: bash
+
+  # ── Version sync check ──
+  version-sync-check:
+    runs-on: ubuntu-latest
+    name: Version Sync Check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Verify version consistency
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "package.json version: $PKG_VERSION"
+          echo "Cargo.toml version: $CARGO_VERSION"
+          if [ "$PKG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::Version mismatch: package.json ($PKG_VERSION) != Cargo.toml ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "✓ Versions are in sync: $PKG_VERSION"
