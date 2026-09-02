@@ -7,6 +7,7 @@ pub mod log_buffer;
 pub mod paste;
 mod permissions;
 mod plugin;
+mod postprocess;
 mod polish;
 mod recorder;
 mod settings;

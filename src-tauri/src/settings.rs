@@ -76,6 +76,9 @@ pub struct AppSettings {
     pub vocabulary: Vec<String>,
     #[serde(default)]
     pub vocabulary_enabled: bool,
+    /// Vocabulary domain preset: "", "medical", "legal", "tech", "finance"
+    #[serde(default)]
+    pub vocabulary_preset: String,
     /// Sync directory path (e.g., ~/Dropbox/Whisp-sync/)
     #[serde(default)]
     pub sync_dir: String,
@@ -199,6 +202,8 @@ struct DiskSettings {
     pub vocabulary: Vec<String>,
     #[serde(default)]
     pub vocabulary_enabled: bool,
+    #[serde(default)]
+    pub vocabulary_preset: String,
     #[serde(default)]
     pub sync_dir: String,
     #[serde(default = "default_device_name")]
@@ -390,6 +395,7 @@ impl Default for AppSettings {
             waveform_preview_enabled: false,
             vocabulary: Vec::new(),
             vocabulary_enabled: false,
+            vocabulary_preset: String::new(),
             sync_dir: String::new(),
             device_name: default_device_name(),
             summary_model: default_summary_model(),
@@ -526,6 +532,7 @@ fn save_disk_settings(settings: &AppSettings, _keychain_ok: bool) -> Result<(), 
         whisper_config_json: settings.whisper_config_json.clone(),
         vocabulary: settings.vocabulary.clone(),
         vocabulary_enabled: settings.vocabulary_enabled,
+        vocabulary_preset: settings.vocabulary_preset.clone(),
         custom_endpoints: settings.custom_endpoints.clone(),
         translation_target: settings.translation_target.clone(),
         waveform_preview_enabled: settings.waveform_preview_enabled,
@@ -585,6 +592,7 @@ pub fn get_settings() -> AppSettings {
         waveform_preview_enabled: disk.waveform_preview_enabled,
         vocabulary: disk.vocabulary,
         vocabulary_enabled: disk.vocabulary_enabled,
+        vocabulary_preset: disk.vocabulary_preset,
         sync_dir: disk.sync_dir,
         device_name: disk.device_name,
         summary_model: disk.summary_model,
@@ -721,6 +729,7 @@ mod tests {
             global_hotkey_enabled: settings.global_hotkey_enabled,
             vocabulary: settings.vocabulary.clone(),
             vocabulary_enabled: settings.vocabulary_enabled,
+            vocabulary_preset: settings.vocabulary_preset.clone(),
             sync_dir: settings.sync_dir.clone(),
             device_name: settings.device_name.clone(),
             summary_model: settings.summary_model.clone(),
@@ -747,7 +756,7 @@ mod tests {
     #[test]
     fn test_disk_settings_includes_api_key_when_keychain_fails() {
         let mut settings = AppSettings::default();
-        settings.api_key = "sk-test-api-key".to_string();
+        settings.api_key = "sk-test-fallback-key".to_string();
 
         let disk = DiskSettings {
             api_base_url: settings.api_base_url.clone(),
@@ -774,7 +783,7 @@ mod tests {
             ai_polish_model: settings.ai_polish_model.clone(),
             ai_polish_prompt: settings.ai_polish_prompt.clone(),
             audio_retention_limit: settings.audio_retention_limit,
-            api_key: "sk-test-api-key".to_string(), // keychain_ok = false
+            api_key: "sk-test-fallback-key".to_string(), // keychain_ok = false
             whisper_config_json: settings.whisper_config_json.clone(),
             custom_endpoints: settings.custom_endpoints.clone(),
             translation_target: settings.translation_target.clone(),
@@ -783,6 +792,7 @@ mod tests {
             global_hotkey_enabled: settings.global_hotkey_enabled,
             vocabulary: settings.vocabulary.clone(),
             vocabulary_enabled: settings.vocabulary_enabled,
+            vocabulary_preset: settings.vocabulary_preset.clone(),
             sync_dir: settings.sync_dir.clone(),
             device_name: settings.device_name.clone(),
             summary_model: settings.summary_model.clone(),
@@ -802,7 +812,7 @@ mod tests {
 
         let json = serde_json::to_string(&disk).unwrap();
         assert!(json.contains("\"api_key\""));
-        assert!(json.contains("sk-test-api-key"));
+        assert!(json.contains("sk-test-fallback-key"));
     }
 
     #[test]
