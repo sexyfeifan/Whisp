@@ -25,6 +25,9 @@ pub struct AudioRecorder {
     auto_stop_rx: Mutex<Option<mpsc::Receiver<RecordedAudio>>>,
     /// Shared buffer for streaming: worker writes samples here during recording.
     streaming_buffer: Arc<Mutex<(Vec<f32>, u32)>>,
+    /// Shared VAD speech-active flag: worker thread updates this on every VAD frame.
+    /// Streaming pipeline reads it to split chunks at speech pauses.
+    vad_speech_active: Arc<Mutex<bool>>,
 }
 
 impl AudioRecorder {
@@ -35,11 +38,18 @@ impl AudioRecorder {
             is_recording: Arc::new(Mutex::new(false)),
             auto_stop_rx: Mutex::new(None),
             streaming_buffer: Arc::new(Mutex::new((Vec::new(), 0))),
+            vad_speech_active: Arc::new(Mutex::new(false)),
         }
     }
 
     pub fn is_recording(&self) -> bool {
         *self.is_recording.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Returns true if the VAD currently detects an active speech segment.
+    /// Used by the streaming transcription pipeline for VAD-aware chunk splitting.
+    pub fn is_vad_speech_active(&self) -> bool {
+        *self.vad_speech_active.lock().unwrap_or_else(|e| e.into_inner())
     }
 
     /// Get current streaming samples and sample rate. Returns (samples_since_last_call, sample_rate).
@@ -60,12 +70,17 @@ impl AudioRecorder {
         let (auto_stop_tx, auto_stop_rx) = mpsc::channel::<RecordedAudio>();
         let is_recording = self.is_recording.clone();
         let streaming_buf = self.streaming_buffer.clone();
+        let vad_active_flag = self.vad_speech_active.clone();
 
-        // Clear streaming buffer
+        // Clear streaming buffer and reset VAD flag
         {
             let mut buf = streaming_buf.lock().unwrap_or_else(|e| e.into_inner());
             buf.0.clear();
             buf.1 = 0;
+        }
+        {
+            let mut vad_flag = vad_active_flag.lock().unwrap_or_else(|e| e.into_inner());
+            *vad_flag = false;
         }
 
         // Mark as recording before spawning thread to prevent double-start
@@ -154,7 +169,8 @@ impl AudioRecorder {
                                vad: &mut VadDetector,
                                pre_recording_buf: &mut PreRecordingBuffer,
                                speech_started: &mut bool,
-                               final_buffer: &mut Vec<f32>| {
+                               final_buffer: &mut Vec<f32>,
+                               vad_active_flag: &Arc<Mutex<bool>>| {
                 while let Ok(chunk) = audio_rx.try_recv() {
                     buffer.extend_from_slice(&chunk);
 
@@ -190,6 +206,11 @@ impl AudioRecorder {
                             let _ = vad.process_frame(recent);
                         }
 
+                        // Update shared VAD speech-active flag for streaming pipeline
+                        if let Ok(mut flag) = vad_active_flag.lock() {
+                            *flag = vad.is_speech_active();
+                        }
+
                         // Only count silence after minimum recording duration
                         if *total_chunks > min_chunks_before_silence && *speech_started {
                             if !vad.is_speech_active() {
@@ -219,6 +240,7 @@ impl AudioRecorder {
                     &mut pre_recording_buf,
                     &mut speech_started,
                     &mut final_buffer,
+                    &vad_active_flag,
                 );
 
                 // Copy new samples to streaming buffer for real-time transcription
@@ -243,6 +265,7 @@ impl AudioRecorder {
                         &mut pre_recording_buf,
                         &mut speech_started,
                         &mut final_buffer,
+                        &vad_active_flag,
                     );
                     *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                     let audio = RecordedAudio {
@@ -268,6 +291,7 @@ impl AudioRecorder {
                             &mut pre_recording_buf,
                             &mut speech_started,
                             &mut final_buffer,
+                            &vad_active_flag,
                         );
                         *is_recording.lock().unwrap_or_else(|e| e.into_inner()) = false;
                         // Use final_buffer (contains pre-speech + speech) if

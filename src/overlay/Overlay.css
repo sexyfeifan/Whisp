@@ -167,6 +167,41 @@ html, body {
   opacity: 0.92;
 }
 
+/* Blinking cursor for typewriter effect */
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--overlay-accent);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.8s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Fallback mode badge */
+.fallback-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--overlay-dim);
+  background: rgba(128, 128, 128, 0.1);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 6px;
+  white-space: nowrap;
+  animation: fallback-pulse 2s ease-in-out infinite;
+}
+
+@keyframes fallback-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
 .wave-canvas {
   display: block;
   pointer-events: none;

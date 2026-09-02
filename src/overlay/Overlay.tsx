@@ -49,7 +49,11 @@ function Overlay() {
   const [confirming, setConfirming] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [displayedText, setDisplayedText] = useState("");
+  const [fallbackMode, setFallbackMode] = useState(false);
   const [audioQuality, setAudioQuality] = useState<AudioQualityLevel | null>(null);
+  const typewriterRef = useRef<number>(0);
+  const streamingTextRef = useRef("");
   const levelRef = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const historyRef = useRef<number[]>([]);
@@ -105,6 +109,7 @@ function Overlay() {
     });
     const unlisten8 = listen("streaming-final", () => {
       setStreamingText("");
+      setFallbackMode(false);
     });
     const unlisten9 = listen<string>("streaming-error", (e) => {
       console.warn("Streaming error:", e.payload);
@@ -115,6 +120,9 @@ function Overlay() {
       else if (rms < 0.02) setAudioQuality("poor");
       else if (rms < 0.05) setAudioQuality("ok");
       else setAudioQuality("good");
+    });
+    const unlisten11 = listen("transcription-fallback", () => {
+      setFallbackMode(true);
     });
     return () => {
       unlisten1.then((f) => f());
@@ -127,6 +135,7 @@ function Overlay() {
       unlisten8.then((f) => f());
       unlisten9.then((f) => f());
       unlisten10.then((f) => f());
+      unlisten11.then((f) => f());
     };
   }, []);
 
@@ -157,6 +166,39 @@ function Overlay() {
     const hasText = !!streamingText;
     getCurrentWindow().setSize(new LogicalSize(hasText ? 600 : 360, 80));
   }, [state, !!streamingText]);
+
+  // Typewriter effect: gradually reveal streaming text characters
+  useEffect(() => {
+    streamingTextRef.current = streamingText;
+
+    if (!streamingText) {
+      setDisplayedText("");
+      return;
+    }
+
+    // If new text is longer than what we've displayed, animate new chars
+    const currentLen = displayedText.length;
+    const targetLen = streamingText.length;
+
+    if (targetLen <= currentLen) {
+      // Text was replaced (e.g. reset), snap to it
+      setDisplayedText(streamingText);
+      return;
+    }
+
+    // Start typewriter animation for new characters
+    let pos = currentLen;
+    const tick = () => {
+      if (pos < streamingTextRef.current.length) {
+        pos++;
+        setDisplayedText(streamingTextRef.current.slice(0, pos));
+        typewriterRef.current = window.setTimeout(tick, 25); // ~40 chars/sec
+      }
+    };
+    tick();
+
+    return () => window.clearTimeout(typewriterRef.current);
+  }, [streamingText]);
 
   // Waveform animation (recording state)
   useEffect(() => {
@@ -334,9 +376,15 @@ function Overlay() {
             <span className="orb-timer">{elapsedSec}s</span>
           </div>
           <div className="recording-text-row">
-            <span className="streaming-text" style={{ opacity: streamingText ? 1 : 0.5 }}>
-              {streamingText || (lang === "en" ? "Listening..." : lang === "ja" ? "リスニング..." : "聆听中...")}
+            <span className="streaming-text" style={{ opacity: displayedText ? 1 : 0.5 }}>
+              {displayedText || (lang === "en" ? "Listening..." : lang === "ja" ? "リスニング..." : "聆听中...")}
+              {displayedText && <span className="typing-cursor" />}
             </span>
+            {fallbackMode && (
+              <span className="fallback-badge">
+                {lang === "en" ? "Using offline mode..." : lang === "ja" ? "オフラインモード..." : "离线模式..."}
+              </span>
+            )}
           </div>
         </div>
       )}

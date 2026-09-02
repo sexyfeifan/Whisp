@@ -680,6 +680,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                 language: stream_lang,
                 prompt: stream_prompt,
                 use_local_model: stream_use_local,
+                vad_aware_chunking: true,
             };
             let state = crate::streaming::STREAMING_STATE.get_or_init(|| std::sync::Mutex::new(None));
             {
@@ -707,6 +708,9 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                     continue;
                 }
 
+                // Read current VAD speech-active state for VAD-aware chunk splitting
+                let vad_active = recorder.is_vad_speech_active();
+
                 // Update StreamingState sample rate to match actual device rate
                 {
                     let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
@@ -727,6 +731,7 @@ fn start_recording(app_handle: &tauri::AppHandle) {
                     &stream_handle,
                     stream_timeout,
                     stream_retry,
+                    Some(vad_active),
                 )
                 .await
                 {
