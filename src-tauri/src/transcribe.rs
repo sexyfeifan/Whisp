@@ -75,7 +75,7 @@ pub fn provider_name(api_base_url: &str) -> String {
 }
 
 fn is_mimo_asr(model: &str) -> bool {
-    model.trim().to_ascii_lowercase() == "mimo-v2.5-asr"
+    model.trim().eq_ignore_ascii_case("mimo-v2.5-asr")
 }
 
 fn mimo_endpoint(api_base_url: &str) -> Result<Url> {
@@ -93,7 +93,7 @@ fn mimo_endpoint(api_base_url: &str) -> Result<Url> {
 
 fn build_mimo_json(wav_data: &[u8], model: &str, language: Option<&str>) -> Result<serde_json::Value> {
     use base64::engine::general_purpose::STANDARD;
-    let encoded = STANDARD.encode(&wav_data);
+    let encoded = STANDARD.encode(wav_data);
     let data_url = format!("data:audio/wav;base64,{}", encoded);
 
     let lang = match language {
@@ -183,6 +183,7 @@ fn extract_text(json: &serde_json::Value) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
+#[allow(dead_code)]
 fn should_retry_status(status: StatusCode) -> bool {
     status == StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
 }
@@ -344,7 +345,7 @@ fn parse_wav_data_chunk(wav_data: &[u8]) -> Option<(&[u8], &[u8], usize)> {
         ]) as usize;
 
         let payload_start = pos + 8;
-        let payload_end = payload_start.checked_add(chunk_size).unwrap_or(usize::MAX);
+        let payload_end = payload_start.saturating_add(chunk_size);
         if payload_end > wav_data.len() {
             return None; // chunk extends past end of file
         }
@@ -357,7 +358,7 @@ fn parse_wav_data_chunk(wav_data: &[u8]) -> Option<(&[u8], &[u8], usize)> {
         }
 
         // RIFF chunks are 2-byte (word) aligned; skip padding byte if size is odd
-        let next_pos = if chunk_size % 2 == 0 {
+        let next_pos = if chunk_size.is_multiple_of(2) {
             payload_end
         } else {
             payload_end + 1

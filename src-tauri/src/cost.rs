@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 /// Provider prices configuration, loadable from ~/.whisp/prices.json.
 /// Missing fields in the JSON fall back to the hardcoded defaults below.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct PriceConfig {
     #[serde(default)]
     pub asr: AsrPrices,
@@ -103,14 +104,6 @@ impl Default for PolishPrices {
     }
 }
 
-impl Default for PriceConfig {
-    fn default() -> Self {
-        Self {
-            asr: AsrPrices::default(),
-            polish: PolishPrices::default(),
-        }
-    }
-}
 
 // ── OnceLock cache + loader ──────────────────────────────────────────────────
 

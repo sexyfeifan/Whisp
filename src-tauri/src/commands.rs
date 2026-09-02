@@ -739,7 +739,7 @@ pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
     let client = app
         .try_state::<reqwest::Client>()
         .map(|s| (*s).clone())
-        .unwrap_or_else(|| reqwest::Client::new());
+        .unwrap_or_else(reqwest::Client::new);
 
     // Try /releases/latest first (non-prerelease), fall back to /releases (includes prerelease)
     let urls = [
@@ -1272,7 +1272,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
     let client = app
         .try_state::<reqwest::Client>()
         .map(|s| (*s).clone())
-        .unwrap_or_else(|| reqwest::Client::new());
+        .unwrap_or_else(reqwest::Client::new);
 
     log::info!("Downloading update from: {}", url);
 
@@ -1295,7 +1295,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
     // Save to user's Downloads folder
     let downloads_dir = dirs::download_dir()
         .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
-        .unwrap_or_else(|| std::env::temp_dir());
+        .unwrap_or_else(std::env::temp_dir);
 
     let file_path = downloads_dir.join(&filename);
     let mut file = std::fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
@@ -1514,7 +1514,7 @@ pub async fn download_whisper_model(app: AppHandle, model_name: String) -> Resul
     let client = app
         .try_state::<reqwest::Client>()
         .map(|s| (*s).clone())
-        .unwrap_or_else(|| reqwest::Client::new());
+        .unwrap_or_else(reqwest::Client::new);
 
     // Resolve URL
     let url = if let Some((_, url, _, _, _, _, _)) =
@@ -1987,7 +1987,7 @@ pub fn export_transcription(
         "markdown" | "md" => history.export_markdown(&[entry_id]).map_err(|e| e.to_string()),
         "csv" => {
             let mut wtr = csv::Writer::from_writer(Vec::new());
-            wtr.write_record(&[
+            wtr.write_record([
                 "ID",
                 "Text",
                 "Timestamp",

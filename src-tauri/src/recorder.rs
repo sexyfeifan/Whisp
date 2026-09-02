@@ -144,7 +144,7 @@ impl AudioRecorder {
                 u64::MAX
             } else {
                 // chunks are emitted ~every 512 samples
-                (silence_timeout_sec as u64 * sample_rate as u64) / 512
+                (silence_timeout_sec * sample_rate as u64) / 512
             };
             let mut silent_chunks: u64 = 0;
             // Don't start silence detection until at least 3 seconds of audio
@@ -479,6 +479,7 @@ pub fn is_mostly_silent(audio: &RecordedAudio, threshold: f32) -> bool {
 /// Estimate the signal-to-noise ratio of the audio in decibels.
 /// Uses peak signal vs. median absolute sample energy as a simple proxy.
 /// Returns a value in dB (higher = better quality).
+#[allow(dead_code)]
 pub fn signal_to_noise_ratio(audio: &RecordedAudio) -> f32 {
     if audio.samples.is_empty() {
         return 0.0;

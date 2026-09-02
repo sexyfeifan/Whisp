@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -113,7 +113,7 @@ impl WhisperEngine {
             for entry in std::fs::read_dir(&dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                if path.extension().map_or(false, |ext| ext == "bin" || ext == "ggml") {
+                if path.extension().is_some_and(|ext| ext == "bin" || ext == "ggml") {
                     let name = path
                         .file_stem()
                         .map(|n| n.to_string_lossy().to_string())
@@ -219,8 +219,8 @@ impl WhisperEngine {
 
         for i in 0..num_segments {
             let text = state.full_get_segment_text(i)?;
-            let start = state.full_get_segment_t0(i)? as i64 * 10; // convert to ms
-            let end = state.full_get_segment_t1(i)? as i64 * 10;
+            let start = state.full_get_segment_t0(i)? * 10; // convert to ms
+            let end = state.full_get_segment_t1(i)? * 10;
 
             full_text.push_str(&text);
             segments.push(WhisperSegment {

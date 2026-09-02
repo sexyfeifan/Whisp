@@ -18,9 +18,8 @@ struct CorrectionRule {
 enum Pattern {
     /// Exact substring match.
     Literal(String),
-    /// Custom matching function for context-aware rules.
-    /// Takes (full_text, match_start) and returns whether to apply.
-    ContextFn(fn(&str) -> bool),
+    /// Context-aware rule with a check function and a rule ID for correction.
+    ContextRule(fn(&str) -> bool, RuleId),
 }
 
 /// Post-processing engine that applies a chain of correction rules to transcription text.
@@ -30,6 +29,7 @@ pub struct PostProcessor {
 
 impl PostProcessor {
     /// Create a new `PostProcessor` with all built-in correction rules.
+    #[allow(clippy::vec_init_then_push)]
     pub fn new() -> Self {
         let mut rules = Vec::new();
 
@@ -55,7 +55,7 @@ impl PostProcessor {
         // Add question mark if sentence ends with question words
         // Common ASR miss: 你好吗 → 你好吗 (missing ?)
         rules.push(CorrectionRule {
-            pattern: Pattern::ContextFn(is_chinese_question_without_mark),
+            pattern: Pattern::ContextRule(is_chinese_question_without_mark, RuleId::ChineseQuestion),
             replacement: String::new(), // handled specially
             language: Some("zh".to_string()),
         });
@@ -63,7 +63,7 @@ impl PostProcessor {
         // Normalize common Chinese number patterns (e.g. "一百二十三" → "123")
         // This is a conservative rule — only applies to simple cardinal numbers.
         rules.push(CorrectionRule {
-            pattern: Pattern::ContextFn(has_chinese_numbers),
+            pattern: Pattern::ContextRule(has_chinese_numbers, RuleId::ChineseNumbers),
             replacement: String::new(), // handled specially
             language: Some("zh".to_string()),
         });
@@ -80,21 +80,21 @@ impl PostProcessor {
         });
         // 'i' at start of string
         rules.push(CorrectionRule {
-            pattern: Pattern::ContextFn(english_lowercase_i_at_start),
+            pattern: Pattern::ContextRule(english_lowercase_i_at_start, RuleId::LowercaseI),
             replacement: String::new(), // handled specially
             language: Some("en".to_string()),
         });
 
         // Auto-capitalize first letter of sentences
         rules.push(CorrectionRule {
-            pattern: Pattern::ContextFn(english_uncapitalized_sentence),
+            pattern: Pattern::ContextRule(english_uncapitalized_sentence, RuleId::UncapitalizedSentence),
             replacement: String::new(), // handled specially
             language: Some("en".to_string()),
         });
 
         // Auto-add period at end of English sentences
         rules.push(CorrectionRule {
-            pattern: Pattern::ContextFn(english_missing_period),
+            pattern: Pattern::ContextRule(english_missing_period, RuleId::MissingPeriod),
             replacement: String::new(), // handled specially
             language: Some("en".to_string()),
         });
@@ -157,9 +157,9 @@ impl PostProcessor {
             if !matches_language(&rule.language, lang) {
                 continue;
             }
-            if let Pattern::ContextFn(check) = rule.pattern {
+            if let Pattern::ContextRule(check, rule_id) = rule.pattern {
                 if check(&result) {
-                    result = apply_context_correction(&result, check);
+                    result = apply_context_rule(&result, rule_id);
                 }
             }
         }
@@ -262,7 +262,7 @@ fn english_uncapitalized_sentence(text: &str) -> bool {
     // Check if the text itself starts with a lowercase letter
     text.chars()
         .next()
-        .map_or(false, |c| c.is_ascii_lowercase())
+        .is_some_and(|c| c.is_ascii_lowercase())
     // Also check after sentence-ending punctuation
     || text.contains(". ")
     || text.contains("? ")
@@ -279,60 +279,61 @@ fn english_missing_period(text: &str) -> bool {
     last.is_ascii_alphabetic() || last.is_ascii_digit()
 }
 
-/// Apply a correction based on a context function.
+/// Correction rule identifier — avoids function pointer comparisons.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuleId {
+    LowercaseI,
+    UncapitalizedSentence,
+    MissingPeriod,
+    ChineseQuestion,
+    ChineseNumbers,
+}
+
+/// Apply a correction based on a rule identifier.
 /// Returns the corrected text (caller already confirmed `check` returns true).
-fn apply_context_correction(text: &str, check: fn(&str) -> bool) -> String {
+fn apply_context_rule(text: &str, rule: RuleId) -> String {
     let text = text.trim().to_string();
 
-    if check == english_lowercase_i_at_start {
-        // Capitalize leading 'i'
-        if text.starts_with("i ") {
-            return format!("I{}", &text[1..]);
-        } else if text.starts_with("i,") {
-            return format!("I{}", &text[1..]);
-        } else if text.starts_with("i.") {
-            return format!("I{}", &text[1..]);
+    match rule {
+        RuleId::LowercaseI => {
+            if text.starts_with("i ") || text.starts_with("i,") || text.starts_with("i.") {
+                return format!("I{}", &text[1..]);
+            }
         }
-    }
+        RuleId::UncapitalizedSentence => {
+            let mut result = String::with_capacity(text.len());
+            let chars: Vec<char> = text.chars().collect();
+            let mut capitalize_next = true;
 
-    if check == english_uncapitalized_sentence {
-        let mut result = String::with_capacity(text.len());
-        let chars: Vec<char> = text.chars().collect();
-        let mut capitalize_next = true;
-
-        for (i, &ch) in chars.iter().enumerate() {
-            if capitalize_next && ch.is_ascii_lowercase() {
-                result.push(ch.to_ascii_uppercase());
-                capitalize_next = false;
-            } else {
-                result.push(ch);
-                // After sentence-ending punctuation followed by space, capitalize next letter
-                if (ch == '.' || ch == '?' || ch == '!') && i + 1 < chars.len() && chars[i + 1] == ' ' {
-                    // Look ahead for the next non-space character
-                    let rest: String = chars[i + 1..].iter().collect();
-                    if let Some(next_alpha) = rest.trim_start().chars().next() {
-                        if next_alpha.is_ascii_lowercase() {
-                            capitalize_next = true;
+            for (i, &ch) in chars.iter().enumerate() {
+                if capitalize_next && ch.is_ascii_lowercase() {
+                    result.push(ch.to_ascii_uppercase());
+                    capitalize_next = false;
+                } else {
+                    result.push(ch);
+                    if (ch == '.' || ch == '?' || ch == '!') && i + 1 < chars.len() && chars[i + 1] == ' ' {
+                        let rest: String = chars[i + 1..].iter().collect();
+                        if let Some(next_alpha) = rest.trim_start().chars().next() {
+                            if next_alpha.is_ascii_lowercase() {
+                                capitalize_next = true;
+                            }
                         }
                     }
                 }
             }
+            return result;
         }
-        return result;
-    }
-
-    if check == english_missing_period {
-        let trimmed = text.trim_end();
-        return format!("{}.", trimmed);
-    }
-
-    if check == is_chinese_question_without_mark {
-        let trimmed = text.trim_end();
-        return format!("{}？", trimmed);
-    }
-
-    if check == has_chinese_numbers {
-        return convert_chinese_numbers(&text);
+        RuleId::MissingPeriod => {
+            let trimmed = text.trim_end();
+            return format!("{}.", trimmed);
+        }
+        RuleId::ChineseQuestion => {
+            let trimmed = text.trim_end();
+            return format!("{}？", trimmed);
+        }
+        RuleId::ChineseNumbers => {
+            return convert_chinese_numbers(&text);
+        }
     }
 
     text

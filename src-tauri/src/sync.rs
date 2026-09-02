@@ -85,18 +85,12 @@ struct DeviceSyncState {
 
 /// Overall sync state: tracks the last sync timestamp per device.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 struct SyncState {
     #[serde(default)]
     devices: std::collections::HashMap<String, DeviceSyncState>,
 }
 
-impl Default for SyncState {
-    fn default() -> Self {
-        Self {
-            devices: std::collections::HashMap::new(),
-        }
-    }
-}
 
 /// Rich result from a sync operation, including conflict info.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,7 +147,7 @@ pub fn sync_dir() -> Option<PathBuf> {
 }
 
 /// Load sync state from `.sync-state.json` in the sync directory.
-fn load_sync_state(dir: &PathBuf) -> SyncState {
+fn load_sync_state(dir: &std::path::Path) -> SyncState {
     let state_path = dir.join(".sync-state.json");
     if state_path.exists() {
         match std::fs::read_to_string(&state_path) {
@@ -172,7 +166,7 @@ fn load_sync_state(dir: &PathBuf) -> SyncState {
 }
 
 /// Save sync state to `.sync-state.json` in the sync directory.
-fn save_sync_state(dir: &PathBuf, state: &SyncState) -> Result<(), String> {
+fn save_sync_state(dir: &std::path::Path, state: &SyncState) -> Result<(), String> {
     let state_path = dir.join(".sync-state.json");
     let json = serde_json::to_string_pretty(state).map_err(|e| format!("Serialize sync state: {e}"))?;
     std::fs::write(&state_path, json).map_err(|e| format!("Write sync state: {e}"))?;

@@ -26,6 +26,7 @@ pub fn stop_streaming_recording(app_handle: &AppHandle) -> Result<()> {
 
 /// Configuration for real-time chunked streaming transcription.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct StreamingConfig {
     /// Whether streaming transcription is enabled.
     pub enabled: bool,

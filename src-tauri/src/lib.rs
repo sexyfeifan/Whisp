@@ -1,3 +1,4 @@
+#![allow(dead_code, clippy::unnecessary_literal_unwrap)]
 mod commands;
 mod cost;
 mod diarization;
