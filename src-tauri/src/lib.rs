@@ -1228,7 +1228,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                 close_overlay(&handle);
 
                 if auto_paste_enabled {
-                    let target_bundle_id: Option<String> = {
+                    let _target_bundle_id: Option<String> = {
                         #[cfg(target_os = "macos")]
                         {
                             LAST_FRONTMOST_APP_BUNDLE_ID
@@ -1244,7 +1244,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     let paste_handle = handle.clone();
                     std::thread::spawn(move || {
                         #[cfg(target_os = "macos")]
-                        if let Some(bundle_id) = target_bundle_id.as_deref() {
+                        if let Some(bundle_id) = _target_bundle_id.as_deref() {
                             if let Err(e) = paste::activate_app_by_bundle_id(bundle_id) {
                                 log::warn!("Failed to reactivate target app: {}", e);
                             }
