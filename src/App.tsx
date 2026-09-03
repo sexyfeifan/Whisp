@@ -14,7 +14,7 @@ function App() {
   if (!settings) {
     return (
       <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
-        <div className="w-[200px] shrink-0 flex flex-col border-r p-4 space-y-3" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
+        <div className="w-[220px] shrink-0 flex flex-col border-r p-4 space-y-3" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
           <Skeleton className="h-6 w-20 mb-4" />
           <Skeleton className="h-8 w-full" />
           <Skeleton className="h-8 w-full" />
