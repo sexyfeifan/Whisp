@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { useState } from "react";
 import { Check, AlertCircle, ChevronRight, ChevronLeft } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -16,6 +16,61 @@ const stepVariants = {
   exit: (direction: number) => ({ x: direction < 0 ? 200 : -200, opacity: 0 }),
 };
 
+/** Confetti-like burst particles for celebration */
+const confettiColors = ["#7c5bf5", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+const confettiCount = 18;
+
+function CelebrationBurst({ reduced }: { reduced: boolean }) {
+  if (reduced) {
+    return (
+      <motion.div
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 400, damping: 20 }}
+        className="flex items-center justify-center"
+      >
+        <span className="text-5xl">✅</span>
+      </motion.div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-24 flex items-center justify-center overflow-visible">
+      <motion.div
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 300, damping: 15, delay: 0.1 }}
+      >
+        <Check size={48} style={{ color: "hsl(var(--success))" }} />
+      </motion.div>
+      {Array.from({ length: confettiCount }).map((_, i) => {
+        const angle = (360 / confettiCount) * i;
+        const distance = 60 + Math.random() * 40;
+        const rad = (angle * Math.PI) / 180;
+        return (
+          <motion.div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: 6 + Math.random() * 4,
+              height: 6 + Math.random() * 4,
+              background: confettiColors[i % confettiColors.length],
+            }}
+            initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+            animate={{
+              x: Math.cos(rad) * distance,
+              y: Math.sin(rad) * distance,
+              scale: [0, 1.4, 0],
+              opacity: [0, 1, 0],
+            }}
+            transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 * i }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function OnboardingPage(app: AppState) {
   const {
     settings, updateSettings, apiKeyStatus, apiKeyError, microphoneOk, accessibilityOk,
@@ -25,6 +80,8 @@ export function OnboardingPage(app: AppState) {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   if (!settings) return null;
 
@@ -48,19 +105,62 @@ export function OnboardingPage(app: AppState) {
     if (currentStep > 0) goToStep(currentStep - 1);
   };
 
+  const handleFinish = async () => {
+    const ok = await persistSettings();
+    if (ok) {
+      setCelebrating(true);
+      setTimeout(() => {
+        setCelebrating(false);
+        setView("history");
+      }, reducedMotion ? 600 : 1200);
+    }
+  };
+
+  const handleSkip = () => {
+    setView("history");
+  };
+
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
-      <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
+      {/* Sidebar — glass morphism matching main Sidebar */}
+      <motion.div
+        className="w-[180px] shrink-0 flex flex-col border-r overflow-hidden"
+        style={{
+          background: "linear-gradient(180deg, hsl(var(--sidebar-bg) / 0.7) 0%, hsl(var(--sidebar-bg) / 0.6) 100%)",
+          borderColor: "hsl(var(--sidebar-border))",
+          backdropFilter: "blur(var(--glass-blur))",
+          WebkitBackdropFilter: "blur(var(--glass-blur))",
+        }}
+      >
         <div className="flex items-center gap-2 px-4 py-4">
           <BrandMark size={24} />
           <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
         </div>
-      </div>
-      <div className="flex-1 overflow-y-auto">
+      </motion.div>
+
+      <div className="flex-1 overflow-y-auto relative">
+        {/* Skip button — top right */}
+        <div className="absolute top-4 right-4 z-20">
+          <Button variant="ghost" size="sm" onClick={handleSkip}>
+            {m.skipSetup ?? "Skip"}
+          </Button>
+        </div>
+
+        {/* Linear progress bar at top */}
+        <div className="w-full h-[3px]" style={{ background: "hsl(var(--hairline))" }}>
+          <motion.div
+            className="h-full rounded-r-full"
+            style={{ background: "hsl(var(--primary))" }}
+            initial={{ width: 0 }}
+            animate={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+            transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
+          />
+        </div>
+
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
           className="p-6"
         >
           {/* Logo + Title */}
@@ -68,7 +168,7 @@ export function OnboardingPage(app: AppState) {
             className="flex flex-col items-center mb-6"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
+            transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
           >
             <motion.div
               className="mb-3"
@@ -82,15 +182,15 @@ export function OnboardingPage(app: AppState) {
             <p className="text-xs" style={{ color: "hsl(var(--steel))" }}>{m.appSubtitle}</p>
           </motion.div>
 
-          {/* Progress bar */}
-          <div className="flex items-center gap-1 mb-8">
+          {/* Step progress indicators + step count */}
+          <div className="flex items-center gap-1 mb-2">
             {steps.map((step, index) => (
               <motion.div
                 key={step.id}
                 className="flex-1 flex items-center"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * index, duration: 0.3 }}
+                transition={{ delay: 0.1 * index, type: "spring", stiffness: 300, damping: 25 }}
               >
                 <button
                   onClick={() => goToStep(index)}
@@ -122,8 +222,27 @@ export function OnboardingPage(app: AppState) {
             ))}
           </div>
 
-          {/* Step content with animation */}
+          {/* Step count text */}
+          <p className="text-xs mb-6" style={{ color: "hsl(var(--stone))" }}>
+            {`Step ${currentStep + 1} of ${steps.length}`}
+          </p>
+
+          {/* Step content with spring animation */}
           <div className="relative min-h-[400px]">
+            {/* Celebration overlay */}
+            <AnimatePresence>
+              {celebrating && (
+                <motion.div
+                  className="absolute inset-0 z-30 flex items-center justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <CelebrationBurst reduced={!!reducedMotion} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <AnimatePresence mode="wait" custom={direction}>
               {currentStep === 0 && (
                 <motion.div
@@ -133,7 +252,7 @@ export function OnboardingPage(app: AppState) {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
                   className="space-y-4"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -174,7 +293,7 @@ export function OnboardingPage(app: AppState) {
                     </button>
                   </div>
                   {showModelGuide && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} transition={{ duration: 0.3 }}>
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 25 }}>
                       <ModelGuide currentModel={settings.model} onSelectModel={(modelName) => updateSettings({ model: modelName })} uiLanguage={uiLanguage} toggleText={m.apiBaseUrl} selectedText={m.connected} chooseText={m.save} />
                     </motion.div>
                   )}
@@ -200,7 +319,7 @@ export function OnboardingPage(app: AppState) {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
                   className="space-y-4"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -226,7 +345,7 @@ export function OnboardingPage(app: AppState) {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
                   className="space-y-4"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -252,7 +371,7 @@ export function OnboardingPage(app: AppState) {
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25, mass: 0.8 }}
                   className="space-y-4"
                 >
                   <div className="flex items-center gap-2 mb-3">
@@ -283,10 +402,10 @@ export function OnboardingPage(app: AppState) {
               <Button
                 variant="primary"
                 className="py-2.5"
-                onClick={async () => { const ok = await persistSettings(); if (ok) setView("history"); }}
-                disabled={!canProceed || savingSettings}
+                onClick={handleFinish}
+                disabled={!canProceed || savingSettings || celebrating}
               >
-                {savingSettings ? m.saving : (apiKeyStatus === "ok" || apiKeyStatus === "warn") ? m.getStarted : m.saveAndContinue}
+                {savingSettings ? m.saving : celebrating ? "✓" : (apiKeyStatus === "ok" || apiKeyStatus === "warn") ? m.getStarted : m.saveAndContinue}
               </Button>
             )}
           </div>

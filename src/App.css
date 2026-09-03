@@ -473,10 +473,11 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border-radius: var(--radius-sm);
 }
 
-/* ═══ Toast Slide ═══ */
+/* ═══ Toast Slide (spring-like snappy entrance) ═══ */
 @keyframes toast-in {
-  from { transform: translateY(100%) scale(0.95); opacity: 0; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+  0% { transform: translateY(24px) scale(0.92); opacity: 0; }
+  60% { transform: translateY(-4px) scale(1.02); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 @keyframes toast-out {
   from { transform: translateY(0) scale(1); opacity: 1; }

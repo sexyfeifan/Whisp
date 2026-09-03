@@ -19,6 +19,7 @@ import type { UploadConfirmState } from "../components/history";
 import type { AppState } from "../hooks/useApp";
 import type { HistoryEntry } from "../types";
 import { translateShortcut, formatTemplate } from "../lib/utils";
+import { staggerContainer, staggerItem } from "../lib/constants";
 
 function groupByTime(entries: HistoryEntry[], m: Record<string, string>): { label: string; entries: HistoryEntry[] }[] {
   const now = new Date();
@@ -298,9 +299,9 @@ export function HistoryPage(app: AppState) {
               </div>
             )
           ) : (
-            <motion.div key="history-list" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <motion.div key="history-list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} variants={staggerContainer}>
               {groupByTime(displayedHistory, m).map((group) => (
-                <div key={group.label} className="mb-6">
+                <motion.div key={group.label} variants={staggerItem} className="mb-6">
                   <h3 className="text-xs font-semibold uppercase tracking-wider px-1 mb-3" style={{ color: "hsl(var(--stone))" }}>
                     {group.label}
                     <span className="ml-2 text-[10px] font-normal" style={{ color: "hsl(var(--muted))" }}>
@@ -347,7 +348,7 @@ export function HistoryPage(app: AppState) {
                       />
                     ))}
                   </div>
-                </div>
+                </motion.div>
               ))}
               {hasMore && !searchQuery && statusFilter === "all" && (
                 <Button variant="secondary" className="w-full py-2 rounded-xl" onClick={() => loadHistory(false)}>
