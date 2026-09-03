@@ -1361,7 +1361,7 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                                 "文字起こし失敗:",
                                 "필사 실패:"
                             ),
-                            &error_message.chars().take(100).collect::<String>()
+                            error_message.chars().take(100).collect::<String>()
                         ),
                         model: model.clone(),
                         duration_ms,
