@@ -1088,7 +1088,7 @@ pub async fn batch_transcribe(
 
                 // Save failed entry to history
                 let entry = NewHistoryEntry {
-                    text: format!("转写失败: {}", &err_msg.chars().take(100).collect::<String>()),
+                    text: format!("转写失败: {}", err_msg.chars().take(100).collect::<String>()),
                     model: settings.model.clone(),
                     duration_ms,
                     audio_path: Some(file_path.clone()),
@@ -2262,7 +2262,7 @@ pub async fn transcribe_file(
             let error_msg = e.to_string();
 
             let entry = NewHistoryEntry {
-                text: format!("转写失败: {}", &error_msg.chars().take(100).collect::<String>()),
+                text: format!("转写失败: {}", error_msg.chars().take(100).collect::<String>()),
                 model: settings.model.clone(),
                 duration_ms,
                 audio_path: None, // uploaded file not saved to disk
