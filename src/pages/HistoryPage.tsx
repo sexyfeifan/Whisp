@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Check, Volume2, Clock, FileAudio,
-  Tag,
+  Tag, AlertCircle,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
@@ -245,18 +245,21 @@ export function HistoryPage(app: AppState) {
 
         <div className="px-8 pb-3 space-y-2">
           {errorMsg && (
-            <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
-              {errorMsg}
+            <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap flex items-start gap-2" role="alert" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
+              <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{errorMsg}</span>
             </div>
           )}
           {polishErrorMsg && (
-            <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--warning) / 0.1)", border: "1px solid hsl(var(--warning) / 0.2)", color: "hsl(var(--warning))" }}>
-              {polishErrorMsg}
+            <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap flex items-start gap-2" role="alert" style={{ background: "hsl(var(--warning) / 0.1)", border: "1px solid hsl(var(--warning) / 0.2)", color: "hsl(var(--warning))" }}>
+              <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{polishErrorMsg}</span>
             </div>
           )}
           {settingsFeedback && (
-            <div className="px-3 py-2 rounded-lg text-xs" style={{ background: settingsFeedback.tone === "success" ? "hsl(var(--success) / 0.1)" : "hsl(var(--destructive) / 0.1)", border: `1px solid ${settingsFeedback.tone === "success" ? "hsl(var(--success) / 0.2)" : "hsl(var(--destructive) / 0.2)"}`, color: settingsFeedback.tone === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
-              {settingsFeedback.message}
+            <div className="px-3 py-2 rounded-lg text-xs flex items-start gap-2" role="alert" style={{ background: settingsFeedback.tone === "success" ? "hsl(var(--success) / 0.1)" : "hsl(var(--destructive) / 0.1)", border: `1px solid ${settingsFeedback.tone === "success" ? "hsl(var(--success) / 0.2)" : "hsl(var(--destructive) / 0.2)"}`, color: settingsFeedback.tone === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))" }}>
+              {settingsFeedback.tone === "success" ? <Check size={14} className="shrink-0 mt-0.5" aria-hidden="true" /> : <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />}
+              <span>{settingsFeedback.message}</span>
             </div>
           )}
           <div className="relative">

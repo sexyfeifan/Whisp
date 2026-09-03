@@ -1,4 +1,5 @@
-import { Sparkles, X, Loader2 } from "lucide-react";
+import { useEffect, useCallback } from "react";
+import { Sparkles, X, Loader2, AlertCircle } from "lucide-react";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -24,17 +25,28 @@ interface HistorySummaryModalProps {
 }
 
 export function HistorySummaryModal({ summaryModal, setSummaryModal, m }: HistorySummaryModalProps) {
+  const handleEscape = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") setSummaryModal(null);
+  }, [setSummaryModal]);
+
+  useEffect(() => {
+    if (summaryModal) {
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
+    }
+  }, [summaryModal, handleEscape]);
+
   if (!summaryModal) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSummaryModal(null)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label={m.aiSummary ?? "AI Summary"} style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setSummaryModal(null)}>
       <div className="max-w-lg w-full mx-4 rounded-xl shadow-2xl border p-6 max-h-[80vh] overflow-y-auto" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <Sparkles size={18} style={{ color: "hsl(var(--primary))" }} />
             <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>{m.aiSummary}</h2>
           </div>
-          <button onClick={() => setSummaryModal(null)} aria-label={m.close ?? "Close"} className="p-1 rounded-lg hover:bg-[hsl(var(--surface))] transition-colors" style={{ color: "hsl(var(--steel))" }}>
+          <button onClick={() => setSummaryModal(null)} aria-label={m.close ?? "Close"} className="p-1 rounded-lg hover:bg-[hsl(var(--surface))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]" style={{ color: "hsl(var(--steel))" }}>
             <X size={18} />
           </button>
         </div>
@@ -45,8 +57,9 @@ export function HistorySummaryModal({ summaryModal, setSummaryModal, m }: Histor
           </div>
         )}
         {summaryModal.error && (
-          <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
-            {summaryModal.error}
+          <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap flex items-start gap-2" role="alert" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
+            <AlertCircle size={14} className="shrink-0 mt-0.5" aria-hidden="true" />
+            <span>{summaryModal.error}</span>
           </div>
         )}
         {summaryModal.result && (

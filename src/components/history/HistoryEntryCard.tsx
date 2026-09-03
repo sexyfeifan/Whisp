@@ -103,7 +103,7 @@ export function HistoryEntryCard({
           {failed ? (
             <div className="rounded-md border border-[hsl(var(--destructive)/0.3)] bg-[hsl(var(--destructive)/0.06)] p-2 relative">
               <button
-                className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded hover:bg-[hsl(var(--destructive)/0.15)] transition-colors"
+                className="absolute top-1 right-1 w-5 h-5 flex items-center justify-center rounded hover:bg-[hsl(var(--destructive)/0.15)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
                 title={m.deleteRecord}
                 aria-label={m.deleteRecord}
                 onClick={(e) => { e.stopPropagation(); deleteEntry(entry.id); }}
@@ -272,8 +272,9 @@ export function HistoryEntryCard({
               {tag}
               <button
                 onClick={(e) => { e.stopPropagation(); handleRemoveTag(entry.id, tag); }}
-                className="hover:opacity-70 transition-opacity"
+                className="hover:opacity-70 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
                 style={{ color: "hsl(var(--primary))" }}
+                aria-label={`Remove tag ${tag}`}
               >
                 <X size={8} />
               </button>
@@ -303,8 +304,9 @@ export function HistoryEntryCard({
           ) : (
             <button
               onClick={(e) => { e.stopPropagation(); setAddingTagToEntry(entry.id); setTagInputValue(""); }}
-              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full hover:bg-[hsl(var(--surface))] transition-colors"
+              className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full hover:bg-[hsl(var(--surface))] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               style={{ color: "hsl(var(--steel))" }}
+              aria-label="Add tag"
             >
               <Plus size={8} />
               tag

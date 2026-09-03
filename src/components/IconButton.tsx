@@ -10,6 +10,7 @@ export function IconButton({
       size="icon"
       onClick={onClick}
       title={title}
+      aria-label={title}
       className="h-7 w-7"
     >
       {children}

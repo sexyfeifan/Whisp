@@ -228,7 +228,8 @@ export function AudioPlayer({ audioPath, durationMs, onTimeUpdate }: AudioPlayer
           <button
             onClick={togglePlay}
             disabled={isLoading}
-            className="p-2 rounded-full transition-all"
+            className="p-2 rounded-full transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+            aria-label={isPlaying ? "Pause" : "Play"}
             style={{
               background: "hsl(var(--primary))",
               color: "white",

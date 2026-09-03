@@ -54,6 +54,21 @@ export function Sidebar({
   const navRef = useRef<HTMLDivElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState({ top: 0, height: 0 });
 
+  // Auto-collapse on narrow viewports (< 640px)
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      if (e.matches) {
+        setInternalCollapsed(true);
+        onCollapsedChange?.(true);
+        try { localStorage.setItem("whisp-sidebar-collapsed", "true"); } catch { /* noop */ }
+      }
+    };
+    handleChange(mq);
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, [onCollapsedChange]);
+
   // Sync indicator position to active item
   const updateIndicator = useCallback(() => {
     if (!navRef.current) return;
@@ -125,7 +140,7 @@ export function Sidebar({
         </div>
         <button
           onClick={toggleCollapse}
-          className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
+          className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
           style={{ color: "hsl(var(--stone))" }}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
@@ -171,7 +186,7 @@ export function Sidebar({
                 flushAutoSave();
                 setView(item.id);
               }}
-              className="relative z-10 flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors duration-150"
+              className="relative z-10 flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
               style={{
                 color: isActive
                   ? "hsl(var(--sidebar-text-active))"
@@ -210,7 +225,7 @@ export function Sidebar({
         >
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))]"
+            className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
             style={{ color: "hsl(var(--sidebar-text))" }}
             title={darkMode ? (m.lightMode ?? "Light Mode") : (m.darkMode ?? "Dark Mode")}
             aria-label={darkMode ? (m.lightMode ?? "Light Mode") : (m.darkMode ?? "Dark Mode")}
@@ -231,7 +246,7 @@ export function Sidebar({
                 {updateStatus === "available" && (
                   <button
                     onClick={checkForUpdates}
-                    className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))] animate-pulse"
+                    className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))] animate-pulse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
                     style={{ color: "hsl(var(--success))" }}
                     title={m.updateAvailable ?? "Update available"}
                     aria-label={m.updateAvailable ?? "Update available"}
