@@ -61,6 +61,35 @@
   --chart-6: 198 66% 46%;
   --chart-7: 244 42% 69%;
   --chart-8: 218 46% 72%;
+
+  /* ── Spacing Scale ── */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Radius Scale ── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* ── Shadow Scale ── */
+  --shadow-xs: 0 1px 2px hsl(var(--ink-deep) / 0.04);
+  --shadow-sm: 0 1px 3px hsl(var(--ink-deep) / 0.06), 0 1px 2px hsl(var(--ink-deep) / 0.04);
+  --shadow-md: 0 4px 6px -1px hsl(var(--ink-deep) / 0.06), 0 2px 4px -2px hsl(var(--ink-deep) / 0.04);
+  --shadow-lg: 0 10px 15px -3px hsl(var(--ink-deep) / 0.06), 0 4px 6px -4px hsl(var(--ink-deep) / 0.04);
+  --shadow-xl: 0 20px 25px -5px hsl(var(--ink-deep) / 0.08), 0 8px 10px -6px hsl(var(--ink-deep) / 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -119,6 +148,35 @@
     --chart-6: 193 68% 58%;
     --chart-7: 246 48% 57%;
     --chart-8: 222 46% 55%;
+
+    /* ── Spacing Scale ── */
+    --space-0: 0px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+
+    /* ── Radius Scale ── */
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-full: 9999px;
+
+    /* ── Shadow Scale (dark) ── */
+    --shadow-xs: 0 1px 2px hsl(0 0% 0% / 0.15);
+    --shadow-sm: 0 1px 3px hsl(0 0% 0% / 0.2), 0 1px 2px hsl(0 0% 0% / 0.15);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.2), 0 2px 4px -2px hsl(0 0% 0% / 0.15);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.25), 0 4px 6px -4px hsl(0 0% 0% / 0.15);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.3), 0 8px 10px -6px hsl(0 0% 0% / 0.15);
   }
 }
 
@@ -313,6 +371,13 @@ select {
   padding-right: 28px !important;
 }
 
+/* ═══ Focus Visible ═══ */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 /* ═══ Animations ═══ */
 
 @keyframes spin {
@@ -322,4 +387,43 @@ select {
 @keyframes brand-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
+}
+
+/* ═══ Skeleton Shimmer ═══ */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, hsl(var(--hairline-soft)) 25%, hsl(var(--surface-soft)) 50%, hsl(var(--hairline-soft)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* ═══ Toast Slide ═══ */
+@keyframes toast-in {
+  from { transform: translateY(100%) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes toast-out {
+  from { transform: translateY(0) scale(1); opacity: 1; }
+  to { transform: translateY(100%) scale(0.95); opacity: 0; }
+}
+
+/* ═══ Focus Visible ═══ */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ═══ Reduced Motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

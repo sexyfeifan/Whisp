@@ -10,7 +10,7 @@ export function SettingsPageHeader({
   onDone: () => void;
 }) {
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-center justify-between mb-6" role="banner">
       <div>
         <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{title}</h1>
         <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>

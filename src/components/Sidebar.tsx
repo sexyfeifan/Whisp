@@ -34,13 +34,13 @@ export function Sidebar({
   m: Record<string, string>;
 }) {
   return (
-    <div className="w-[180px] shrink-0 flex flex-col border-r" style={{ background: "hsl(var(--sidebar-bg))", borderColor: "hsl(var(--sidebar-border))" }}>
+    <div className="w-[180px] shrink-0 flex flex-col border-r backdrop-blur-xl" style={{ background: "hsl(var(--sidebar-bg) / 0.85)", borderColor: "hsl(var(--sidebar-border))" }}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <BrandMark size={22} />
         <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
       </div>
 
-      <div className="flex-1 px-3 space-y-0.5">
+      <div className="flex-1 px-3 space-y-0.5" role="navigation" aria-label="Main navigation">
         {navItems.map((item, idx) => {
           const prevGroup = idx > 0 ? navItems[idx - 1].group : null;
           const showGroupLabel = item.group !== prevGroup && (item.group === "config" || item.group === "tools");
@@ -56,6 +56,7 @@ export function Sidebar({
                 </div>
               )}
               <button
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => { flushAutoSave(); setView(item.id); }}
                 className={`flex items-center gap-3 w-full rounded-lg px-3 py-2 text-sm transition-all duration-200 ${
                   isActive
@@ -91,7 +92,7 @@ export function Sidebar({
           className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-xs transition-colors"
           style={{ color: "hsl(var(--sidebar-text))" }}
         >
-          <Download size={16} />
+          <Download size={16} className={updateStatus === "available" ? "animate-bounce" : ""} />
           {updateStatus === "checking" ? m.checkingUpdates : updateStatus === "available" ? m.updateAvailable : m.checkForUpdates}
         </button>
         <div className="px-3 flex items-center gap-2">
