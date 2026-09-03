@@ -6,6 +6,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { check as checkUpdaterUpdate } from "@tauri-apps/plugin-updater";
 import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
+import { useToast } from "../components/ui/toast";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
 import { History, Settings, Mic, Shield, Activity, BarChart3, Terminal, Box, Info } from "lucide-react";
@@ -115,6 +116,7 @@ export function useApp(): AppState {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsFeedback, setSettingsFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+  const { toast } = useToast();
   const clearTimerRef = useRef<number | null>(null);
   const [appVersion, setAppVersion] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -357,10 +359,12 @@ export function useApp(): AppState {
     try {
       await invoke("save_settings", { settings });
       setSettingsFeedback({ tone: "success", message: m.settingsSaved });
+      toast({ message: m.settingsSaved, variant: "success" });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
       return true;
     } catch (error) {
       setSettingsFeedback({ tone: "error", message: String(error) });
+      toast({ message: String(error), variant: "error" });
       return false;
     } finally { setSavingSettings(false); }
   }, [settings, m]);
@@ -381,6 +385,7 @@ export function useApp(): AppState {
 
   const copyText = useCallback(async (text: string, id: number) => {
     await writeText(text); setCopied(id);
+    toast({ message: m.copied ?? "Copied", variant: "success" });
     window.setTimeout(() => setCopied(null), 1500);
   }, []);
 
@@ -568,6 +573,7 @@ export function useApp(): AppState {
   const clearHistory = useCallback(async () => {
     if (history.length === 0) {
       setSettingsFeedback({ tone: "error", message: m.clearEmpty });
+      toast({ message: m.clearEmpty, variant: "error" });
       window.setTimeout(() => setSettingsFeedback(null), 2200); return;
     }
     if (clearTimerRef.current) { window.clearTimeout(clearTimerRef.current); clearTimerRef.current = null; }
@@ -575,6 +581,7 @@ export function useApp(): AppState {
       await invoke("clear_history"); setHistory([]);
       setPlayingAudioId(null); setAudioUrls({});
       setSettingsFeedback({ tone: "success", message: m.clearSuccess });
+      toast({ message: m.clearSuccess, variant: "success" });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
     } catch (error) { setErrorMsg(`${m.clearFailed} ${String(error)}`); }
   }, [history, m]);

@@ -18,6 +18,7 @@ import { FilterChip } from "../components/FilterChip";
 import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 import { AudioPlayer } from "../components/AudioPlayer";
 import type { AppState } from "../hooks/useApp";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage, cn } from "../lib/utils";
@@ -762,32 +763,22 @@ const handleBatchExport = async (fmt: string) => {
       )}
 
       {/* Clear Confirmation Dialog */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }} onClick={() => setShowClearConfirm(false)}>
-          <div className="max-w-sm w-full mx-4 rounded-xl shadow-2xl border p-6" style={{ background: "hsl(var(--card))", borderColor: "hsl(var(--hairline))" }} onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold mb-2" style={{ color: "hsl(var(--ink))" }}>{m.clearConfirmTitle ?? "Clear All History?"}</h2>
-            <p className="text-sm mb-6" style={{ color: "hsl(var(--steel))" }}>
-              {m.clearConfirmDesc ?? "This will permanently delete all transcription records. This action cannot be undone."}
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button variant="secondary" size="sm" onClick={() => setShowClearConfirm(false)}>
-                {m.cancel ?? "Cancel"}
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={async () => {
-                  setShowClearConfirm(false);
-                  await clearHistory();
-                }}
-              >
-                {m.clearConfirm ?? "Confirm Clear"}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-      )}
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.clearConfirmTitle ?? "Clear All History?"}</DialogTitle>
+            <DialogDescription>{m.clearConfirmDesc ?? "This will permanently delete all transcription records. This action cannot be undone."}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setShowClearConfirm(false)}>
+              {m.cancel ?? "Cancel"}
+            </Button>
+            <Button variant="danger" size="sm" onClick={async () => { await clearHistory(); setShowClearConfirm(false); }}>
+              {m.clearConfirm ?? "Confirm Clear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Upload Audio Confirm Dialog */}
       {uploadConfirm && (

@@ -1,5 +1,6 @@
 import type React from "react";
 import { Download, Moon, Sun } from "lucide-react";
+import { Tooltip } from "./ui/tooltip";
 import type { View } from "../lib/constants";
 import { BrandMark } from "./BrandMark";
 
@@ -34,7 +35,7 @@ export function Sidebar({
   m: Record<string, string>;
 }) {
   return (
-    <div className="w-[180px] shrink-0 flex flex-col border-r backdrop-blur-xl" style={{ background: "hsl(var(--sidebar-bg) / 0.85)", borderColor: "hsl(var(--sidebar-border))" }}>
+    <div className="w-[180px] shrink-0 flex flex-col border-r backdrop-blur-xl" style={{ background: "linear-gradient(180deg, hsl(var(--sidebar-bg) / 0.7) 0%, hsl(var(--sidebar-bg) / 0.6) 100%)", borderColor: "hsl(var(--sidebar-border))" }}>
       <div className="flex items-center gap-2 px-4 pt-4 pb-3">
         <BrandMark size={22} />
         <span className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>Whisp</span>
@@ -84,7 +85,9 @@ export function Sidebar({
           style={{ color: "hsl(var(--sidebar-text))" }}
           title={darkMode ? m.lightMode ?? "Light Mode" : m.darkMode ?? "Dark Mode"}
         >
-          {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+          <Tooltip content={darkMode ? (m.lightMode ?? "Light Mode") : (m.darkMode ?? "Dark Mode")} side="right">
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />}
+          </Tooltip>
           {darkMode ? (m.lightMode ?? "Light Mode") : (m.darkMode ?? "Dark Mode")}
         </button>
         <button
@@ -92,7 +95,9 @@ export function Sidebar({
           className="flex items-center gap-3 w-full rounded-lg px-3 py-2 text-xs transition-colors"
           style={{ color: "hsl(var(--sidebar-text))" }}
         >
-          <Download size={16} className={updateStatus === "available" ? "animate-bounce" : ""} />
+          <Tooltip content={updateStatus === "available" ? (m.updateAvailable ?? "Update") : (m.checkForUpdates ?? "Check for Updates")} side="right">
+            <Download size={16} className={updateStatus === "available" ? "animate-bounce" : ""} />
+          </Tooltip>
           {updateStatus === "checking" ? m.checkingUpdates : updateStatus === "available" ? m.updateAvailable : m.checkForUpdates}
         </button>
         <div className="px-3 flex items-center gap-2">
