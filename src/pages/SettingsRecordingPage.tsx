@@ -135,7 +135,7 @@ export function SettingsRecordingPage(app: AppState) {
 
   if (embedded) {
     return (
-      <motion.div key="settingsRecording" variants={viewVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2, ease: "easeOut" }} className="p-6">
+      <motion.div key="settingsRecording" variants={viewVariants} initial="initial" animate="animate" exit="exit" transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }} className="p-6">
         <SettingsRecordingContent {...app} />
       </motion.div>
     );
@@ -145,7 +145,7 @@ export function SettingsRecordingPage(app: AppState) {
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
       <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
       <div className="flex-1 overflow-y-auto">
-        <motion.div key="settingsRecording" variants={viewVariants} initial="initial" animate="animate" exit="exit" transition={{ duration: 0.2, ease: "easeOut" }} className="p-6">
+        <motion.div key="settingsRecording" variants={viewVariants} initial="initial" animate="animate" exit="exit" transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }} className="p-6">
           <SettingsRecordingContent {...app} />
         </motion.div>
       </div>

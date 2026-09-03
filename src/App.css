@@ -62,6 +62,12 @@
   --chart-7: 244 42% 69%;
   --chart-8: 218 46% 72%;
 
+  /* ── Warm Accent Colors ── */
+  --accent-amber: 35 80% 60%;
+  --accent-amber-light: 35 80% 95%;
+  --accent-teal: 170 50% 45%;
+  --accent-teal-light: 170 50% 95%;
+
   /* ── Spacing Scale ── */
   --space-0: 0px;
   --space-1: 4px;
@@ -148,6 +154,12 @@
     --chart-6: 193 68% 58%;
     --chart-7: 246 48% 57%;
     --chart-8: 222 46% 55%;
+
+    /* ── Warm Accent Colors (dark) ── */
+    --accent-amber: 35 75% 65%;
+    --accent-amber-light: 35 40% 18%;
+    --accent-teal: 170 45% 55%;
+    --accent-teal-light: 170 30% 15%;
 
     /* ── Spacing Scale ── */
     --space-0: 0px;
@@ -410,6 +422,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @keyframes toast-out {
   from { transform: translateY(0) scale(1); opacity: 1; }
   to { transform: translateY(100%) scale(0.95); opacity: 0; }
+}
+
+/* ═══ Card Hierarchy ═══ */
+.card-primary {
+  background: hsl(var(--canvas));
+  border: 1px solid hsl(var(--hairline));
+  box-shadow: 0 1px 2px hsl(var(--ink-deep) / 0.04), 0 8px 24px hsl(var(--primary) / 0.025);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+.card-primary:hover {
+  box-shadow: 0 4px 12px hsl(var(--ink-deep) / 0.06), 0 12px 32px hsl(var(--primary) / 0.04);
+  transform: translateY(-2px);
+}
+
+.card-emphasized {
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.05), hsl(var(--brand-glow) / 0.03));
+  border: 1px solid hsl(var(--primary) / 0.15);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.card-secondary {
+  background: hsl(var(--surface));
+  border: 1px solid hsl(var(--hairline-soft));
+  border-radius: var(--radius-lg);
 }
 
 /* ═══ Focus Visible ═══ */

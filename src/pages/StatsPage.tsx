@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   BarChart3, DollarSign, Hash, Clock, FileAudio,
-  TrendingUp, Calendar,
+  TrendingUp, Calendar, Globe, Zap, CheckCircle2,
 } from "lucide-react";
 import { Card } from "../components/ui/card";
 import { Sidebar } from "../components/Sidebar";
@@ -65,6 +65,23 @@ function computeTopModels(history: AppState["history"]): ModelBucket[] {
   }
   return Array.from(map.entries())
     .map(([model, count]) => ({ model, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+}
+
+interface LangBucket {
+  language: string;
+  count: number;
+}
+
+function computeLanguageDistribution(history: AppState["history"]): LangBucket[] {
+  const map = new Map<string, number>();
+  for (const entry of history) {
+    const lang = entry.language || "auto";
+    map.set(lang, (map.get(lang) || 0) + 1);
+  }
+  return Array.from(map.entries())
+    .map(([language, count]) => ({ language, count }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 8);
 }
@@ -175,76 +192,19 @@ function BarChart({ data }: { data: DayBucket[] }) {
   );
 }
 
-function PieChart({ data, m }: { data: ModelBucket[]; m: Record<string, string> }) {
-  const total = data.reduce((s, d) => s + d.count, 0);
-  if (total === 0) return null;
-  const r = 60;
-  const cx = 75;
-  const cy = 70;
-  const w = 460;
-  const h = 160;
-
-  let cumulativeAngle = 0;
-  const slices = data.map((d) => {
-    const fraction = d.count / total;
-    const angle = fraction * 2 * Math.PI;
-    const startAngle = cumulativeAngle;
-    cumulativeAngle += angle;
-    const endAngle = cumulativeAngle;
-    // SVG arc path
-    const x1 = cx + r * Math.sin(startAngle);
-    const y1 = cy - r * Math.cos(startAngle);
-    const x2 = cx + r * Math.sin(endAngle);
-    const y2 = cy - r * Math.cos(endAngle);
-    const largeArc = angle > Math.PI ? 1 : 0;
-    const dPath = `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-    return { ...d, fraction, dPath, startAngle, endAngle };
-  });
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} role="img" aria-label="Top models pie chart">
-      {slices.map((s, i) => (
-        <path key={i} d={s.dPath} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke="hsl(var(--background))" strokeWidth="1.5" />
-      ))}
-      {/* Center text */}
-      <text x={cx} y={cy - 6} textAnchor="middle" fontSize="20" fontWeight="700" fill="hsl(var(--ink))">
-        {total}
-      </text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fontSize="9" fill="hsl(var(--steel))">
-        {m.pieChartTotal ?? "total"}
-      </text>
-
-      {/* Legend */}
-      {slices.map((s, i) => {
-        const ly = 10 + i * 18;
-        const maxNameLen = 24;
-        const displayName = s.model.length > maxNameLen ? s.model.slice(0, maxNameLen - 1) + "…" : s.model;
-        return (
-          <g key={i}>
-            <rect x={165} y={ly - 4} width={8} height={8} rx="2" fill={CHART_COLORS[i % CHART_COLORS.length]} />
-            <text x={179} y={ly + 3} fontSize="10" fill="hsl(var(--ink))" style={{ fontFamily: "monospace" }}>
-              <title>{s.model}</title>
-              {displayName}
-            </text>
-            <text x={450} y={ly + 3} textAnchor="end" fontSize="10" fontWeight="600" fill="hsl(var(--ink))">
-              {Math.round(s.fraction * 100)}%
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function SummaryCard({ icon, label, value, sub, tone = "var(--chart-1)" }: {
+function SummaryCard({ icon, label, value, sub, tone = "var(--chart-1)", large }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
   tone?: string;
+  large?: boolean;
 }) {
   return (
-    <Card className="p-4 bg-[hsl(var(--canvas))]">
+    <Card
+      className="p-4 bg-[hsl(var(--canvas))]"
+      style={{ borderLeft: `3px solid hsl(${tone})` }}
+    >
       <div className="flex items-start gap-3">
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
@@ -254,7 +214,7 @@ function SummaryCard({ icon, label, value, sub, tone = "var(--chart-1)" }: {
         </div>
         <div className="min-w-0">
           <p className="text-[11px]" style={{ color: "hsl(var(--steel))" }}>{label}</p>
-          <p className="text-xl font-bold truncate" style={{ color: "hsl(var(--ink))" }}>{value}</p>
+          <p className={`font-bold truncate ${large ? "text-3xl" : "text-xl"}`} style={{ color: "hsl(var(--ink))" }}>{value}</p>
           {sub && (
             <p className="text-[10px] mt-0.5" style={{ color: "hsl(var(--steel))" }}>{sub}</p>
           )}
@@ -276,6 +236,7 @@ export function StatsPage(app: AppState) {
   const topModels = useMemo(() => computeTopModels(history), [history]);
   const todayStats = useMemo(() => computeTodayStats(history), [history]);
   const monthlyStats = useMemo(() => computeMonthlyStats(history), [history]);
+  const langDistribution = useMemo(() => computeLanguageDistribution(history), [history]);
 
   if (!settings) return null;
 
@@ -285,6 +246,15 @@ export function StatsPage(app: AppState) {
 
   const mStats = (m as Record<string, string>);
   const title = mStats.stats ?? "Usage Statistics";
+
+  const todaySuccessRate = todayStats.total > 0
+    ? Math.round((todayStats.success / todayStats.total) * 100)
+    : 0;
+  const totalSuccessRate = stats.total > 0
+    ? Math.round(((stats.total - (stats.failed ?? 0)) / stats.total) * 100)
+    : 0;
+  const maxModelCount = topModels.length > 0 ? topModels[0].count : 1;
+  const totalLangCount = langDistribution.reduce((s, d) => s + d.count, 0);
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
@@ -302,20 +272,90 @@ export function StatsPage(app: AppState) {
           animate="animate"
           exit="exit"
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="p-6"
+          className="px-8 py-6"
         >
           {/* Header */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{title}</h1>
           </div>
 
-          {/* Summary cards row */}
-          <div className="grid grid-cols-4 gap-3 mb-6">
+          {/* Today Overview — highlighted hero section */}
+          <Card
+            className="mb-6 p-5"
+            style={{
+              background: "linear-gradient(135deg, hsl(var(--primary) / 0.06) 0%, transparent 70%)",
+              borderColor: "hsl(var(--primary) / 0.15)",
+            }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <Zap size={16} className="text-[hsl(var(--primary))]" />
+              <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                {mStats.statsTodayOverview ?? "Today Overview"}
+              </h2>
+            </div>
+            {todayStats.total === 0 ? (
+              <p className="text-xs" style={{ color: "hsl(var(--steel))" }}>
+                {mStats.statsNoData ?? "No transcriptions yet today"}
+              </p>
+            ) : (
+              <div className="flex items-center gap-12">
+                <div>
+                  <p className="text-3xl font-bold" style={{ color: "hsl(var(--ink))" }}>
+                    {todayStats.total}
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
+                    {mStats.statsTotalTranscriptions ?? "Transcriptions"}
+                  </p>
+                </div>
+                <div className="w-px h-12" style={{ background: "hsl(var(--hairline))" }} />
+                <div>
+                  <p className="text-3xl font-bold" style={{ color: "hsl(var(--success))" }}>
+                    {todaySuccessRate}%
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
+                    {mStats.statsSuccess ?? "Success Rate"}
+                  </p>
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Summary cards — Row 1: Primary stats */}
+          <h2 className="text-lg font-semibold mb-4" style={{ color: "hsl(var(--ink))" }}>
+            {mStats.statsOverview ?? "Overview"}
+          </h2>
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <SummaryCard
+              large
               icon={<FileAudio size={18} />}
               label={mStats.statsTotalTranscriptions ?? "Total Transcriptions"}
               value={String(stats.total)}
+              sub={totalSuccessRate > 0 ? `${totalSuccessRate}% success` : undefined}
               tone="var(--chart-1)"
+            />
+            <SummaryCard
+              large
+              icon={<Zap size={18} />}
+              label={mStats.statsTodayCount ?? "Today"}
+              value={String(todayStats.total)}
+              tone="var(--chart-4)"
+            />
+            <SummaryCard
+              large
+              icon={<CheckCircle2 size={18} />}
+              label={mStats.statsSuccess ?? "Success Rate"}
+              value={totalSuccessRate > 0 ? `${totalSuccessRate}%` : "—"}
+              tone="var(--success)"
+            />
+          </div>
+
+          {/* Summary cards — Row 2: Secondary stats */}
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <SummaryCard
+              icon={<Clock size={18} />}
+              label={mStats.statsAvgDuration ?? "Avg Duration"}
+              value={avgDurationAll > 0 ? formatDuration(avgDurationAll) : "—"}
+              tone="var(--chart-6)"
             />
             <SummaryCard
               icon={<DollarSign size={18} />}
@@ -329,39 +369,33 @@ export function StatsPage(app: AppState) {
               value={stats.totalTokens > 0 ? stats.totalTokens.toLocaleString() : "—"}
               tone="var(--chart-3)"
             />
-            <SummaryCard
-              icon={<Clock size={18} />}
-              label={mStats.statsAvgDuration ?? "Avg Duration"}
-              value={avgDurationAll > 0 ? formatDuration(avgDurationAll) : "—"}
-              tone="var(--chart-6)"
-            />
           </div>
 
-          {/* Two-column layout: daily chart + pie chart */}
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            {/* Daily usage chart */}
-            <Card className="p-5 bg-[hsl(var(--canvas))]">
-              <div className="flex items-center gap-2 mb-3">
-                <TrendingUp size={16} className="text-[hsl(var(--primary))]" />
-                <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
-                  {mStats.statsDailyUsage ?? "Daily Usage"} <span className="font-normal text-[11px]" style={{ color: "hsl(var(--steel))" }}>(7d)</span>
-                </h2>
+          {/* Daily usage chart */}
+          <Card className="p-5 bg-[hsl(var(--canvas))] mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={16} className="text-[hsl(var(--primary))]" />
+              <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                {mStats.statsDailyUsage ?? "Daily Usage"} <span className="font-normal text-[11px]" style={{ color: "hsl(var(--steel))" }}>(7d)</span>
+              </h2>
+            </div>
+            {history.length === 0 ? (
+              <div className="flex items-center justify-center h-40 text-xs" style={{ color: "hsl(var(--steel))" }}>
+                {mStats.statsNoData ?? "No data yet"}
               </div>
-              {history.length === 0 ? (
-                <div className="flex items-center justify-center h-40 text-xs" style={{ color: "hsl(var(--steel))" }}>
-                  {mStats.statsNoData ?? "No data yet"}
-                </div>
-              ) : (
-                <BarChart data={dailyData} />
-              )}
-            </Card>
+            ) : (
+              <BarChart data={dailyData} />
+            )}
+          </Card>
 
-            {/* Top models pie chart */}
+          {/* Model Usage & Language Distribution — side by side */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Model Usage with percentage bars */}
             <Card className="p-5 bg-[hsl(var(--canvas))]">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-4">
                 <BarChart3 size={16} className="text-[hsl(var(--primary))]" />
-                <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
-                  {mStats.statsTopModels ?? "Top Models"}
+                <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                  {mStats.statsTopModels ?? "Model Usage"}
                 </h2>
               </div>
               {topModels.length === 0 ? (
@@ -369,7 +403,77 @@ export function StatsPage(app: AppState) {
                   {mStats.statsNoData ?? "No data yet"}
                 </div>
               ) : (
-                <PieChart data={topModels} m={m} />
+                <div className="space-y-3">
+                  {topModels.map((m, i) => {
+                    const pct = Math.round((m.count / stats.total) * 100);
+                    const maxNameLen = 28;
+                    const displayName = m.model.length > maxNameLen ? m.model.slice(0, maxNameLen - 1) + "…" : m.model;
+                    return (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-mono truncate mr-2" style={{ color: "hsl(var(--ink))" }} title={m.model}>
+                            {displayName}
+                          </span>
+                          <span className="text-xs font-semibold shrink-0" style={{ color: "hsl(var(--steel))" }}>
+                            {m.count} <span className="opacity-60">({pct}%)</span>
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: "hsl(var(--hairline))" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(m.count / maxModelCount) * 100}%`,
+                              background: "hsl(var(--accent-teal))",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Language Distribution with percentage bars */}
+            <Card className="p-5 bg-[hsl(var(--canvas))]">
+              <div className="flex items-center gap-2 mb-4">
+                <Globe size={16} className="text-[hsl(var(--primary))]" />
+                <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                  {mStats.statsLanguageDistribution ?? "Language Distribution"}
+                </h2>
+              </div>
+              {langDistribution.length === 0 ? (
+                <div className="flex items-center justify-center h-40 text-xs" style={{ color: "hsl(var(--steel))" }}>
+                  {mStats.statsNoData ?? "No data yet"}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {langDistribution.map((l, i) => {
+                    const pct = totalLangCount > 0 ? Math.round((l.count / totalLangCount) * 100) : 0;
+                    const maxLangCount = langDistribution[0]?.count ?? 1;
+                    return (
+                      <div key={i}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-xs font-medium" style={{ color: "hsl(var(--ink))" }}>
+                            {l.language.toUpperCase()}
+                          </span>
+                          <span className="text-xs font-semibold" style={{ color: "hsl(var(--steel))" }}>
+                            {l.count} <span className="opacity-60">({pct}%)</span>
+                          </span>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: "hsl(var(--hairline))" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${(l.count / maxLangCount) * 100}%`,
+                              background: "hsl(var(--accent-amber))",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </Card>
           </div>
@@ -380,7 +484,7 @@ export function StatsPage(app: AppState) {
             <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={16} className="text-[hsl(var(--primary))]" />
-                <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
                   {mStats.statsTodaySummary ?? "Today's Summary"}
                 </h2>
               </div>
@@ -420,7 +524,7 @@ export function StatsPage(app: AppState) {
             <Card className="p-5 bg-[hsl(var(--canvas))]">
               <div className="flex items-center gap-2 mb-4">
                 <Calendar size={16} className="text-[hsl(var(--primary))]" />
-                <h2 className="text-sm font-semibold" style={{ color: "hsl(var(--ink))" }}>
+                <h2 className="text-lg font-semibold" style={{ color: "hsl(var(--ink))" }}>
                   {mStats.statsMonthlySummary ?? "Monthly Summary"}
                 </h2>
               </div>

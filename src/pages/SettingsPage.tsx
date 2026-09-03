@@ -85,7 +85,7 @@ export function SettingsPage(app: AppState) {
           initial="initial"
           animate="animate"
           exit="exit"
-          transition={{ duration: 0.2, ease: "easeOut" }}
+          transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
           className="flex-1 overflow-y-auto"
         >
           {renderContent()}

@@ -18,10 +18,41 @@ import { FilterChip } from "../components/FilterChip";
 import { StatCard } from "../components/StatCard";
 import { IconButton } from "../components/IconButton";
 import { Sidebar } from "../components/Sidebar";
+import { FloatingRecordButton } from "../components/FloatingRecordButton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 import { AudioPlayer } from "../components/AudioPlayer";
 import type { AppState } from "../hooks/useApp";
+import type { HistoryEntry } from "../types";
 import { translateShortcut, formatTemplate, formatTime, formatDuration, displaySpeechLanguage, cn } from "../lib/utils";
+
+function groupByTime(entries: HistoryEntry[], m: Record<string, string>): { label: string; entries: HistoryEntry[] }[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+  const weekAgo = new Date(today); weekAgo.setDate(weekAgo.getDate() - 7);
+
+  const groups: Record<string, HistoryEntry[]> = { today: [], yesterday: [], week: [], earlier: [] };
+
+  for (const entry of entries) {
+    const date = new Date(entry.timestamp * 1000);
+    if (date >= today) groups.today.push(entry);
+    else if (date >= yesterday) groups.yesterday.push(entry);
+    else if (date >= weekAgo) groups.week.push(entry);
+    else groups.earlier.push(entry);
+  }
+
+  const todayLabel = m.today ?? "Today";
+  const yesterdayLabel = m.yesterday ?? "Yesterday";
+  const weekLabel = m.thisWeek ?? "This Week";
+  const earlierLabel = m.earlier ?? "Earlier";
+
+  return [
+    { label: todayLabel, entries: groups.today },
+    { label: yesterdayLabel, entries: groups.yesterday },
+    { label: weekLabel, entries: groups.week },
+    { label: earlierLabel, entries: groups.earlier },
+  ].filter(g => g.entries.length > 0);
+}
 
 interface SummaryResult {
   title: string;
@@ -190,7 +221,7 @@ const handleBatchExport = async (fmt: string) => {
       <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4">
+        <div className="flex items-center justify-between px-8 pt-7 pb-5">
           <div>
             <h1 className="text-2xl font-bold" style={{ color: "hsl(var(--ink))" }}>{m.history}</h1>
             <p className="text-xs mt-1" style={{ color: "hsl(var(--steel))" }}>
@@ -275,7 +306,7 @@ const handleBatchExport = async (fmt: string) => {
 
         {/* Upload status feedback */}
         {uploadStatus && (
-          <div className="mx-6 mb-2 px-4 py-2 rounded-lg text-sm font-medium" style={{
+          <div className="mx-8 mb-2 px-4 py-2 rounded-lg text-sm font-medium" style={{
             background: uploadStatus.type === "success" ? "hsl(var(--success) / 0.12)" : "hsl(var(--destructive) / 0.12)",
             color: uploadStatus.type === "success" ? "hsl(var(--success))" : "hsl(var(--destructive))",
             border: `1px solid ${uploadStatus.type === "success" ? "hsl(var(--success) / 0.28)" : "hsl(var(--destructive) / 0.28)"}`,
@@ -285,7 +316,7 @@ const handleBatchExport = async (fmt: string) => {
         )}
 
         {/* Stat cards */}
-        <div className="px-6 pb-3 grid grid-cols-4 gap-3">
+        <div className="px-8 pb-3 grid grid-cols-4 gap-4">
           <StatCard
             icon={<FileAudio size={18} />}
             label={m.statsTotal}
@@ -297,12 +328,14 @@ const handleBatchExport = async (fmt: string) => {
             label={m.statsToday}
             value={String(todayCount)}
             tone="var(--chart-3)"
+            accent="amber"
           />
           <StatCard
             icon={<Check size={18} />}
             label={m.statsSuccess}
             value={stats.total > 0 ? `${Math.round((stats.success / stats.total) * 100)}%` : "\u2014"}
             tone="var(--success)"
+            accent="teal"
           />
           <StatCard
             icon={<Volume2 size={18} />}
@@ -312,14 +345,14 @@ const handleBatchExport = async (fmt: string) => {
           />
         </div>
         {(stats.totalCost > 0 || stats.totalTokens > 0) && (
-          <div className="px-6 pb-3 flex gap-4 text-xs" style={{ color: "hsl(var(--steel))" }}>
+          <div className="px-8 pb-3 flex gap-4 text-xs" style={{ color: "hsl(var(--steel))" }}>
             {stats.totalCost > 0 && <span>{m.totalCost}: <strong style={{ color: "hsl(var(--ink))" }}>{"\u00a5"}{stats.totalCost.toFixed(4)}</strong></span>}
             {stats.totalTokens > 0 && <span>{m.totalTokens}: <strong style={{ color: "hsl(var(--ink))" }}>{stats.totalTokens.toLocaleString()}</strong></span>}
           </div>
         )}
 
         {/* Search and filters */}
-        <div className="px-6 pb-3 space-y-2">
+        <div className="px-8 pb-3 space-y-2">
           {errorMsg && (
             <div className="px-3 py-2 rounded-lg text-xs whitespace-pre-wrap" style={{ background: "hsl(var(--destructive) / 0.1)", border: "1px solid hsl(var(--destructive) / 0.2)", color: "hsl(var(--destructive))" }}>
               {errorMsg}
@@ -365,7 +398,7 @@ const handleBatchExport = async (fmt: string) => {
         </div>
 
         {/* History list */}
-        <div className="flex-1 overflow-y-auto px-6 pb-4">
+        <div className="flex-1 overflow-y-auto px-8 pb-4">
           {displayedHistory.length === 0 ? (
             history.length === 0 ? (
               <motion.div
@@ -391,9 +424,17 @@ const handleBatchExport = async (fmt: string) => {
               key="history-list"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="space-y-2"
             >
-              {displayedHistory.map((entry) => {
+              {groupByTime(displayedHistory, m).map((group) => (
+                <div key={group.label} className="mb-6">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider px-1 mb-3" style={{ color: "hsl(var(--stone))" }}>
+                    {group.label}
+                    <span className="ml-2 text-[10px] font-normal" style={{ color: "hsl(var(--muted))" }}>
+                      {group.entries.length}
+                    </span>
+                  </h3>
+                  <div className="space-y-2">
+                    {group.entries.map((entry) => {
                 const failed = entry.status === "failed";
                 const canRetry = Boolean(entry.audio_path);
                 return (
@@ -661,6 +702,9 @@ const handleBatchExport = async (fmt: string) => {
                   </Card>
                 );
               })}
+                  </div>
+                </div>
+              ))}
               {hasMore && !searchQuery && statusFilter === "all" && (
                 <Button
                   variant="secondary"
@@ -779,6 +823,9 @@ const handleBatchExport = async (fmt: string) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Record Button */}
+      <FloatingRecordButton isRecording={false} onPress={() => {}} />
 
       {/* Upload Audio Confirm Dialog */}
       {uploadConfirm && (

@@ -65,7 +65,7 @@ export function AboutPage(app: AppState) {
           initial="initial"
           animate="animate"
           exit="exit"
-          transition={{ duration: 0.2, ease: "easeOut" }}
+          transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
           className="flex flex-col items-center justify-center h-full p-6"
         >
           <div className="flex flex-col items-center space-y-6 max-w-md w-full">
