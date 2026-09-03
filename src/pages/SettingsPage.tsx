@@ -1,0 +1,96 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Shield, Mic, Activity, Sparkles, Box, Info, Terminal } from "lucide-react";
+import { Sidebar } from "../components/Sidebar";
+import type { AppState } from "../hooks/useApp";
+import type { SettingsTab } from "../lib/constants";
+import { viewVariants } from "../lib/constants";
+
+import { SettingsApiPage } from "./SettingsApiPage";
+import { SettingsRecordingPage } from "./SettingsRecordingPage";
+import { SettingsBehaviorPage } from "./SettingsBehaviorPage";
+import { SettingsPolishPage } from "./SettingsPolishPage";
+import { SettingsModelsPage } from "./SettingsModelsPage";
+
+export function SettingsPage(app: AppState) {
+  const { view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates, flushAutoSave, setView, m } = app;
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("api");
+
+  const tabItems = [
+    { id: "api" as SettingsTab, icon: <Shield size={14} />, label: m.apiConfiguration },
+    { id: "recording" as SettingsTab, icon: <Mic size={14} />, label: m.recordingSettings },
+    { id: "behavior" as SettingsTab, icon: <Activity size={14} />, label: m.behaviorSettings },
+    { id: "polish" as SettingsTab, icon: <Sparkles size={14} />, label: (m as Record<string, string>).aiPolishSettings ?? "AI Polish" },
+    { id: "models" as SettingsTab, icon: <Box size={14} />, label: (m as Record<string, string>).modelsManagement ?? "Models" },
+  ];
+
+  const embeddedApp = { ...app, embedded: true };
+
+  const renderContent = () => {
+    switch (settingsTab) {
+      case "api": return <SettingsApiPage {...embeddedApp} />;
+      case "recording": return <SettingsRecordingPage {...embeddedApp} />;
+      case "behavior": return <SettingsBehaviorPage {...embeddedApp} />;
+      case "polish": return <SettingsPolishPage {...embeddedApp} />;
+      case "models": return <SettingsModelsPage {...embeddedApp} />;
+    }
+  };
+
+  return (
+    <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
+      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Tab bar */}
+        <div className="border-b px-6 pt-4" style={{ borderColor: "hsl(var(--hairline))" }}>
+          <div className="flex items-center gap-1">
+            {tabItems.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSettingsTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium rounded-t-lg transition-all duration-200 border-b-2 ${
+                  settingsTab === tab.id
+                    ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]"
+                    : "border-transparent text-[hsl(var(--steel))] hover:text-[hsl(var(--ink))] hover:bg-[hsl(var(--surface))]"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+            {/* Diagnostics and About as small links */}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setView("diagnostics")}
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] rounded transition-colors hover:bg-[hsl(var(--surface))]"
+                style={{ color: "hsl(var(--stone))" }}
+              >
+                <Terminal size={12} />
+                {m.diagnostics}
+              </button>
+              <button
+                onClick={() => setView("about")}
+                className="flex items-center gap-1 px-2 py-1.5 text-[11px] rounded transition-colors hover:bg-[hsl(var(--surface))]"
+                style={{ color: "hsl(var(--stone))" }}
+              >
+                <Info size={12} />
+                {(m as Record<string, string>).about ?? "About"}
+              </button>
+            </div>
+          </div>
+        </div>
+        {/* Content */}
+        <motion.div
+          key={`settings-${settingsTab}`}
+          variants={viewVariants}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="flex-1 overflow-y-auto"
+        >
+          {renderContent()}
+        </motion.div>
+      </div>
+    </div>
+  );
+}

@@ -9,7 +9,7 @@ import { messages } from "../i18n";
 import { useToast } from "../components/ui/toast";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
-import { History, Settings, Mic, Shield, Activity, BarChart3, Terminal, Box, Info } from "lucide-react";
+import { History, Settings, BarChart3 } from "lucide-react";
 
 export interface UpdateInfo {
   latestVersion: string; releaseUrl: string; releaseNotes: string;
@@ -73,7 +73,8 @@ export interface AppState {
   todayCount: number;
   hasApiConfig: boolean;
   canProceed: boolean;
-  navItems: Array<{ id: View; icon: React.ReactNode; label: string; group?: string }>;
+  navItems: Array<{ id: View; icon: React.ReactNode; label: string }>;
+  embedded?: boolean;
   updateSettings: (patch: Partial<AppSettings>) => void;
   persistSettings: () => Promise<boolean>;
   testApiKey: (apiKey: string, apiBaseUrl: string, model: string) => Promise<void>;
@@ -650,16 +651,10 @@ export function useApp(): AppState {
   const hasApiConfig = settings ? Boolean(settings.api_key.trim() && settings.api_base_url.trim()) : false;
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
 
-  const navItems: Array<{ id: View; icon: React.ReactNode; label: string; group?: string }> = useMemo(() => [
-    { id: "history", icon: <History size={16} />, label: m.history, group: "main" },
-    { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats", group: "main" },
-    { id: "settingsApi", icon: <Shield size={16} />, label: m.apiConfiguration, group: "config" },
-    { id: "settingsRecording", icon: <Mic size={16} />, label: m.recordingSettings, group: "config" },
-    { id: "settingsBehavior", icon: <Activity size={16} />, label: m.behaviorSettings, group: "config" },
-    { id: "settingsApp", icon: <Settings size={16} />, label: m.appSettings, group: "config" },
-    { id: "settingsModels", icon: <Box size={16} />, label: (m as Record<string, string>).modelsManagement ?? "Models", group: "tools" },
-    { id: "diagnostics", icon: <Terminal size={16} />, label: m.diagnostics, group: "tools" },
-    { id: "about", icon: <Info size={16} />, label: (m as Record<string, string>).about ?? "About", group: "tools" },
+  const navItems: Array<{ id: View; icon: React.ReactNode; label: string }> = useMemo(() => [
+    { id: "history", icon: <History size={16} />, label: m.history },
+    { id: "stats", icon: <BarChart3 size={16} />, label: (m as Record<string, string>).stats ?? "Stats" },
+    { id: "settings", icon: <Settings size={16} />, label: m.settings },
   ], [m]);
 
   return {
