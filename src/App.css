@@ -114,6 +114,10 @@
   --glass-bg: hsl(var(--sidebar-bg) / 0.7);
   --glass-border: hsl(var(--sidebar-border) / 0.5);
   --glass-blur: 20px;
+
+  /* ── Toast ── */
+  --toast-bg: 237 16% 24%;
+  --toast-border: 244 24% 89%;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -225,6 +229,10 @@
     --glass-bg: hsl(var(--sidebar-bg) / 0.6);
     --glass-border: hsl(var(--sidebar-border) / 0.4);
     --glass-blur: 24px;
+
+    /* ── Toast (dark) ── */
+    --toast-bg: 240 20% 18%;
+    --toast-border: 240 16% 28%;
   }
 }
 
@@ -284,6 +292,10 @@
   --chart-6: 198 66% 46%;
   --chart-7: 244 42% 69%;
   --chart-8: 218 46% 72%;
+
+  /* ── Toast ── */
+  --toast-bg: 237 16% 24%;
+  --toast-border: 244 24% 89%;
 }
 
 /* Manual dark mode toggle (data-theme attribute) */
@@ -342,9 +354,13 @@
   --chart-6: 193 68% 58%;
   --chart-7: 246 48% 57%;
   --chart-8: 222 46% 55%;
-}
 
-/* ═══ Typography ═══ */
+  /* ── Toast (dark) ── */
+  --toast-bg: 240 20% 18%;
+  --toast-border: 240 16% 28%;
+  }
+
+  /* ═══ Typography ═══ */
 
 body {
   margin: 0;
@@ -449,6 +465,26 @@ input[type="range"]:focus::-webkit-slider-thumb {
   box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2), var(--shadow-sm);
 }
 
+/* Dark mode range slider — brighter thumb border for contrast */
+@media (prefers-color-scheme: dark) {
+  input[type="range"]::-webkit-slider-thumb {
+    border-color: hsl(var(--surface));
+    box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.3), var(--shadow-sm);
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    background: hsl(var(--hairline-strong));
+  }
+}
+
+[data-theme="dark"] input[type="range"]::-webkit-slider-thumb {
+  border-color: hsl(var(--surface));
+  box-shadow: 0 0 0 1px hsl(0 0% 0% / 0.3), var(--shadow-sm);
+}
+
+[data-theme="dark"] input[type="range"]::-webkit-slider-runnable-track {
+  background: hsl(var(--hairline-strong));
+}
+
 /* ═══ Animations ═══ */
 
 @keyframes spin {
@@ -473,6 +509,17 @@ input[type="range"]:focus::-webkit-slider-thumb {
   border-radius: var(--radius-sm);
 }
 
+/* Dark mode skeleton: use darker stops so shimmer is visible */
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(90deg, hsl(var(--hairline-soft)) 25%, hsl(var(--hairline)) 50%, hsl(var(--hairline-soft)) 75%);
+  }
+}
+
+[data-theme="dark"] .skeleton {
+  background: linear-gradient(90deg, hsl(var(--hairline-soft)) 25%, hsl(var(--hairline)) 50%, hsl(var(--hairline-soft)) 75%);
+}
+
 /* ═══ Toast Slide (spring-like snappy entrance) ═══ */
 @keyframes toast-in {
   0% { transform: translateY(24px) scale(0.92); opacity: 0; }
@@ -482,6 +529,14 @@ input[type="range"]:focus::-webkit-slider-thumb {
 @keyframes toast-out {
   from { transform: translateY(0) scale(1); opacity: 1; }
   to { transform: translateY(100%) scale(0.95); opacity: 0; }
+}
+
+/* ═══ Toast (theme-aware) ═══ */
+[data-theme="dark"] .toast-container > div,
+@media (prefers-color-scheme: dark) {
+  .toast-container > div {
+    border: 1px solid hsl(var(--toast-border) / 0.3);
+  }
 }
 
 /* ═══ Card Hierarchy ═══ */

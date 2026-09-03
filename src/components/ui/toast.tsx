@@ -35,7 +35,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     success: "hsl(var(--success))",
     error: "hsl(var(--destructive))",
     info: "hsl(var(--primary))",
-    default: "hsl(var(--charcoal))",
+    default: "hsl(var(--toast-bg))",
   };
 
   return (

@@ -65,7 +65,7 @@ export function HistoryEntryCard({
 
   return (
     <motion.div
-      whileHover={{ y: -2, boxShadow: "0 4px 12px hsl(0 0% 0% / 0.08)" }}
+      whileHover={{ y: -2, boxShadow: "0 4px 12px hsl(0 0% 0% / 0.12)" }}
       transition={{ type: "spring", stiffness: 400, damping: 25 }}
     >
       <Card

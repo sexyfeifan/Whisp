@@ -66,7 +66,7 @@ export function AboutPage(app: AppState) {
           animate="animate"
           exit="exit"
           transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
-          className="flex flex-col items-center justify-center h-full p-6"
+          className="relative flex flex-col items-center justify-center h-full p-6 overflow-hidden" 
         >
           <div className="flex flex-col items-center space-y-6 max-w-md w-full">
             {/* App Icon */}

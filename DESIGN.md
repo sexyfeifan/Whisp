@@ -414,4 +414,91 @@ Eight-step palette for data visualization:
 
 ---
 
-*Last updated: 2026-09-03*
+## 🌑 暗色模式设计决策 / Dark Mode Design Decisions
+
+### Design Philosophy
+
+Dark mode is **not** an inversion of light mode — it is a carefully tuned environment where:
+- **Shadows are replaced by depth layers**: darker surfaces recede, slightly lighter surfaces float.
+- **Colour is brighter, not just flipped**: primary hue shifts from `250 64% 57%` → `248 82% 72%` (higher lightness, higher saturation) for legibility.
+- **Charts gain saturation**: all `--chart-*` tokens use higher saturation (+10-16%) and higher lightness (+8-12%) in dark mode.
+
+### Shadow Strategy
+
+| Elevation | Light Mode                      | Dark Mode                          | Rationale                              |
+| --------- | ------------------------------- | ---------------------------------- | -------------------------------------- |
+| `--shadow-xs` | `hsl(ink-deep / 0.04)`       | `hsl(0 0% 0% / 0.15)`             | 4× opacity to show lift on dark canvas |
+| `--shadow-sm` | `hsl(ink-deep / 0.06+0.04)`  | `hsl(0 0% 0% / 0.20+0.15)`        | Layered depth for cards at rest        |
+| `--shadow-md` | `hsl(ink-deep / 0.06+0.04)`  | `hsl(0 0% 0% / 0.20+0.15)`        | Floating panels                        |
+| `--shadow-lg` | `hsl(ink-deep / 0.06+0.04)`  | `hsl(0 0% 0% / 0.25+0.15)`        | Modals and dialogs                     |
+| `--shadow-xl` | `hsl(ink-deep / 0.08+0.04)`  | `hsl(0 0% 0% / 0.30+0.15)`        | Command palette, overlays              |
+
+**Rule**: Dark shadows always use `hsl(0 0% 0%)` (pure black) — never `--ink-deep` which is near-white in dark mode.
+
+### Glass Morphism
+
+| Token            | Light               | Dark                | Notes                              |
+| ---------------- | ------------------- | ------------------- | ---------------------------------- |
+| `--glass-bg`     | `sidebar-bg / 0.7`  | `sidebar-bg / 0.6`  | Slightly more transparent in dark  |
+| `--glass-border` | `sidebar-border / 0.5` | `sidebar-border / 0.4` | Softer edge in dark            |
+| `--glass-blur`   | `20px`              | `24px`              | Higher blur compensates for lower opacity |
+
+### Skeleton Shimmer
+
+Light mode shimmer oscillates between `--hairline-soft` and `--surface-soft`.
+Dark mode shimmer oscillates between `--hairline-soft` and `--hairline` (brighter stop) so the animation is visible against the dark canvas.
+
+### Toast
+
+| Token           | Light              | Dark               |
+| --------------- | ------------------ | ------------------ |
+| `--toast-bg`    | `237 16% 24%`      | `240 20% 18%`      |
+| `--toast-border`| `244 24% 89%`      | `240 16% 28%`      |
+
+Default toast uses `--toast-bg` (theme-aware) instead of hardcoded `--charcoal`.
+
+### Range Slider
+
+Dark mode adds:
+- Brighter track: `--hairline-strong` instead of `--hairline`
+- Visible thumb border: `hsl(var(--surface))` with subtle black ring
+
+### Sparkline
+
+The brand sparkline `#0080FF` (`hsl(210 100% 50%)`) is visible on dark backgrounds because the background is `hsl(239 24% 11%)` — sufficient contrast at ~4.2:1. No change needed.
+
+### History Card Hover
+
+The hover shadow uses `hsl(0 0% 0% / 0.12)` — a pure-black shadow at 12% opacity, visible on dark surfaces. The `whileHover` lift (`y: -2`) adds additional depth perception.
+
+---
+
+## 🎬 品牌微动画 / Brand Micro-Animation Spec
+
+### BrandMark Component
+
+The `BrandMark` component (`src/components/BrandMark.tsx`) renders the app icon with a Framer Motion idle pulse animation.
+
+| State      | Scale        | Opacity       | Duration | Repeat    | Easing     |
+| ---------- | ------------ | ------------- | -------- | --------- | ---------- |
+| Idle       | `1 → 1.03 → 1` | `1 → 0.92 → 1` | 2.4s     | Infinity  | easeInOut  |
+| Recording  | `1 → 1.06 → 1` | `1 → 0.85 → 1` | 0.8s     | Infinity  | easeInOut  |
+
+### Accessibility
+
+- `prefers-reduced-motion: reduce` → animation variants are empty object; Framer Motion skips animation entirely.
+- The component uses `aria-hidden="true"` (decorative icon).
+- Global reduced-motion media query in `App.css` collapses all `animation-duration` to `0.01ms` as a safety net.
+
+### About Page Gradient
+
+The About page header uses a `radial-gradient` backdrop wash:
+```
+radial-gradient(ellipse 60% 50% at 50% 30%, brand/0.06, brand-glow/0.03, transparent 70%)
+```
+This creates a subtle identity glow behind the BrandMark that anchors the page visually without competing with content.
+
+---
+
+*Last updated: 2026-09-04*
+
