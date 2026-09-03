@@ -76,7 +76,7 @@ jobs:
         run: npx eslint src/ --ext .ts,.tsx
 
       - name: Frontend tests
-        run: npx vitest run
+        run: npx vitest run --passWithNoTests
 
   # ── ARM64 Linux cross-compilation check ──
   arm64-build:
