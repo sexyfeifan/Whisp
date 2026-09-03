@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Shield, Plus, X, Sparkles } from "lucide-react";
+import { Shield, Plus, X, Sparkles, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -21,6 +21,8 @@ function SettingsApiContent(app: AppState) {
   const [showAddEndpoint, setShowAddEndpoint] = useState(false);
   const [newEndpointLabel, setNewEndpointLabel] = useState("");
   const [newEndpointUrl, setNewEndpointUrl] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showSummaryApiKey, setShowSummaryApiKey] = useState(false);
 
   if (!settings) return null;
 
@@ -96,7 +98,18 @@ function SettingsApiContent(app: AppState) {
           </div>
           <div>
             <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.apiKey}</label>
-            <Input type="password" value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-..." />
+            <div className="relative">
+              <Input type={showApiKey ? "text" : "password"} value={settings.api_key} onChange={(event) => updateSettings({ api_key: event.target.value })} placeholder="sk-..." className="pr-10" />
+              <button
+                type="button"
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[hsl(var(--surface))] transition-colors"
+                style={{ color: "hsl(var(--steel))" }}
+                aria-label={showApiKey ? "Hide API key" : "Show API key"}
+              >
+                {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
             <Button
               variant="secondary"
               className="w-full mt-2"
@@ -169,7 +182,18 @@ function SettingsApiContent(app: AppState) {
           </div>
           <div>
             <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryApiKey}</label>
-            <Input type="password" value={settings.summary_api_key} onChange={(event) => updateSettings({ summary_api_key: event.target.value })} placeholder={m.summaryApiKey} />
+            <div className="relative">
+              <Input type={showSummaryApiKey ? "text" : "password"} value={settings.summary_api_key} onChange={(event) => updateSettings({ summary_api_key: event.target.value })} placeholder={m.summaryApiKey} className="pr-10" />
+              <button
+                type="button"
+                onClick={() => setShowSummaryApiKey(!showSummaryApiKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-[hsl(var(--surface))] transition-colors"
+                style={{ color: "hsl(var(--steel))" }}
+                aria-label={showSummaryApiKey ? "Hide summary API key" : "Show summary API key"}
+              >
+                {showSummaryApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.summaryModel}</label>

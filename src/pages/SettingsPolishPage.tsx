@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { Zap } from "lucide-react";
+import { Zap, RotateCcw } from "lucide-react";
+import { useRef, useCallback } from "react";
 import { Input } from "../components/ui/input";
 import { FilterChip } from "../components/FilterChip";
 import { ToggleRow } from "../components/ToggleRow";
@@ -14,6 +15,23 @@ function SettingsPolishContent(app: AppState) {
     settings, updateSettings, defaultPolishPrompt, persistSettings, savingSettings,
     settingsFeedback, setView, m,
   } = app;
+
+  const promptRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertVariable = useCallback((variable: string) => {
+    const textarea = promptRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const current = settings?.ai_polish_prompt || "";
+    const updated = current.slice(0, start) + variable + current.slice(end);
+    updateSettings({ ai_polish_prompt: updated });
+    // Restore cursor position after the inserted variable
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + variable.length, start + variable.length);
+    });
+  }, [settings?.ai_polish_prompt, updateSettings]);
 
   if (!settings) return null;
 
@@ -50,8 +68,33 @@ function SettingsPolishContent(app: AppState) {
                 </datalist>
               </div>
               <div>
-                <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishPrompt}</label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[13px] font-normal" style={{ color: "hsl(var(--steel))" }}>{m.aiPolishPrompt}</label>
+                  <button
+                    type="button"
+                    onClick={() => updateSettings({ ai_polish_prompt: defaultPolishPrompt || "" })}
+                    className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded hover:bg-[hsl(var(--surface))] transition-colors"
+                    style={{ color: "hsl(var(--steel))" }}
+                  >
+                    <RotateCcw size={11} />
+                    {m.restoreDefault || "Restore default"}
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {["{text}", "{language}", "{model}"].map((variable) => (
+                    <button
+                      key={variable}
+                      type="button"
+                      onClick={() => insertVariable(variable)}
+                      className="px-2 py-0.5 rounded text-[11px] font-mono transition-colors hover:opacity-80"
+                      style={{ background: "hsl(var(--primary) / 0.1)", color: "hsl(var(--primary))" }}
+                    >
+                      {variable}
+                    </button>
+                  ))}
+                </div>
                 <textarea
+                  ref={promptRef}
                   value={settings.ai_polish_prompt}
                   onChange={(event) => updateSettings({ ai_polish_prompt: event.target.value })}
                   placeholder={defaultPolishPrompt || m.aiPolishPromptPlaceholder}

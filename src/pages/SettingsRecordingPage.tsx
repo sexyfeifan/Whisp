@@ -35,8 +35,7 @@ function SettingsRecordingContent(app: AppState) {
                 step={1}
                 value={settings.silence_timeout_sec ?? 3}
                 onChange={(e) => updateSettings({ silence_timeout_sec: Number(e.target.value) })}
-                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer"
-                style={{ accentColor: "hsl(var(--accent))" }}
+                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer settings-range"
               />
               <span className="text-sm font-mono w-10 text-right" style={{ color: "hsl(var(--ink))" }}>
                 {settings.silence_timeout_sec ?? 3}s

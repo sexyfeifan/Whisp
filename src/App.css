@@ -420,10 +420,33 @@ select {
 }
 
 /* ═══ Focus Visible ═══ */
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   outline: 2px solid hsl(var(--primary));
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* ═══ Range Input Styling ═══ */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: hsl(var(--primary));
+  cursor: pointer;
+  border: 2px solid hsl(var(--canvas));
+  box-shadow: var(--shadow-sm);
+  margin-top: -6px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: hsl(var(--hairline));
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.2), var(--shadow-sm);
 }
 
 /* ═══ Animations ═══ */
@@ -484,13 +507,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   background: hsl(var(--surface));
   border: 1px solid hsl(var(--hairline-soft));
   border-radius: var(--radius-lg);
-}
-
-/* ═══ Focus Visible ═══ */
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
 }
 
 /* ═══ Reduced Motion ═══ */

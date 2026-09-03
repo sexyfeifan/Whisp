@@ -42,19 +42,29 @@ export function SettingsPage(app: AppState) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Tab bar */}
         <div className="border-b px-6 pt-4" style={{ borderColor: "hsl(var(--hairline))" }}>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 relative">
             {tabItems.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setSettingsTab(tab.id)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium rounded-t-lg transition-all duration-200 border-b-2 ${
+                className={`relative flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium rounded-t-lg transition-colors duration-200 z-10 ${
                   settingsTab === tab.id
-                    ? "border-[hsl(var(--primary))] text-[hsl(var(--primary))]"
-                    : "border-transparent text-[hsl(var(--steel))] hover:text-[hsl(var(--ink))] hover:bg-[hsl(var(--surface))]"
+                    ? "text-[hsl(var(--primary))]"
+                    : "text-[hsl(var(--steel))] hover:text-[hsl(var(--ink))]"
                 }`}
               >
-                {tab.icon}
-                {tab.label}
+                {settingsTab === tab.id && (
+                  <motion.div
+                    layoutId="settings-tab-indicator"
+                    className="absolute inset-0 rounded-lg"
+                    style={{ background: "hsl(var(--primary) / 0.1)" }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {tab.icon}
+                  {tab.label}
+                </span>
               </button>
             ))}
             {/* Diagnostics and About as small links */}
