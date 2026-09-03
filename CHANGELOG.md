@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.12.39 (2026-09-03)
+
+- (add changes here)
+
+
 All notable changes to Whisp are documented in this file.
 
 ---

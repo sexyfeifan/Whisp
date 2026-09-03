@@ -9,6 +9,7 @@ import { SettingsPolishPage } from "./pages/SettingsPolishPage";
 import { DiagnosticsPage } from "./pages/DiagnosticsPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { StatsPage } from "./pages/StatsPage";
+import { AboutPage } from "./pages/AboutPage";
 
 function App() {
   const app = useApp();
@@ -41,6 +42,8 @@ function App() {
       return <SettingsModelsPage {...app} />;
     case "diagnostics":
       return <DiagnosticsPage {...app} />;
+    case "about":
+      return <AboutPage {...app} />;
     default:
       return <HistoryPage {...app} />;
   }
