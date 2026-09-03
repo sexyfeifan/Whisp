@@ -107,6 +107,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             gcc-aarch64-linux-gnu \
+            cmake \
             pkg-config \
             libwebkit2gtk-4.1-dev:arm64 \
             libayatana-appindicator3-dev:arm64 \
@@ -126,7 +127,7 @@ jobs:
           cd src-tauri
           export PKG_CONFIG_ALLOW_CROSS=1
           export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
-          cargo build --release --target aarch64-unknown-linux-gnu 2>&1 | tail -60
+          cargo build --release --target aarch64-unknown-linux-gnu --no-default-features 2>&1 | tail -60
         shell: bash
 
   # ── Version sync check ──

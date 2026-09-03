@@ -8,8 +8,8 @@ pub mod log_buffer;
 pub mod paste;
 mod permissions;
 mod plugin;
-mod postprocess;
 mod polish;
+mod postprocess;
 mod recorder;
 mod settings;
 mod shortcut;
@@ -783,19 +783,14 @@ fn start_recording(app_handle: &tauri::AppHandle) {
 
 /// Attempt transcription using local Whisper engine as fallback.
 /// Returns Ok(text) if successful, Err if local Whisper is unavailable or fails.
-fn try_local_whisper_fallback(
-    wav_data: &[u8],
-    language: &str,
-    whisper_config_json: &str,
-) -> anyhow::Result<String> {
+fn try_local_whisper_fallback(wav_data: &[u8], language: &str, whisper_config_json: &str) -> anyhow::Result<String> {
     use crate::whisper::WhisperEngine;
 
     // Parse stored whisper config to get model path
     let config: crate::whisper::WhisperConfig = if whisper_config_json.trim().is_empty() {
         WhisperEngine::new().get_config()
     } else {
-        serde_json::from_str(whisper_config_json)
-            .unwrap_or_else(|_| WhisperEngine::new().get_config())
+        serde_json::from_str(whisper_config_json).unwrap_or_else(|_| WhisperEngine::new().get_config())
     };
 
     if config.model_path.is_empty() {
@@ -803,15 +798,12 @@ fn try_local_whisper_fallback(
     }
 
     if !std::path::Path::new(&config.model_path).exists() {
-        anyhow::bail!(
-            "Local Whisper model not found: {}",
-            config.model_path
-        );
+        anyhow::bail!("Local Whisper model not found: {}", config.model_path);
     }
 
     // Decode WAV bytes to f32 samples using hound
-    let reader = hound::WavReader::new(std::io::Cursor::new(wav_data))
-        .context("Failed to parse WAV data for local Whisper")?;
+    let reader =
+        hound::WavReader::new(std::io::Cursor::new(wav_data)).context("Failed to parse WAV data for local Whisper")?;
     let spec = reader.spec();
     let sample_rate = spec.sample_rate;
     let channels = spec.channels as u32;
@@ -1294,10 +1286,13 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     match try_local_whisper_fallback(&wav_data, &language, &whisper_config_json) {
                         Ok(text) => {
                             log::info!("Local Whisper fallback succeeded, text_length={}", text.len());
-                            let _ = handle.emit("transcription-fallback", serde_json::json!({
-                                "reason": cloud_err.to_string(),
-                                "provider": "local_whisper",
-                            }));
+                            let _ = handle.emit(
+                                "transcription-fallback",
+                                serde_json::json!({
+                                    "reason": cloud_err.to_string(),
+                                    "provider": "local_whisper",
+                                }),
+                            );
                             Some(text)
                         }
                         Err(fallback_err) => {
@@ -1359,7 +1354,13 @@ fn stop_and_transcribe(app_handle: &tauri::AppHandle) {
                     let entry = NewHistoryEntry {
                         text: format!(
                             "{} {}",
-                            tr(&ui_language, "转写失败:", "Transcription failed:", "文字起こし失敗:", "필사 실패:"),
+                            tr(
+                                &ui_language,
+                                "转写失败:",
+                                "Transcription failed:",
+                                "文字起こし失敗:",
+                                "필사 실패:"
+                            ),
                             &error_message.chars().take(100).collect::<String>()
                         ),
                         model: model.clone(),
@@ -1642,11 +1643,17 @@ pub fn confirm_pending_transcription_impl(app_handle: &tauri::AppHandle) -> Resu
                     log::info!("Cloud API failed, falling back to local Whisper (preview confirm)...");
                     match try_local_whisper_fallback(&wav_data, &language, &whisper_config_json) {
                         Ok(text) => {
-                            log::info!("Local Whisper fallback succeeded (preview confirm), text_length={}", text.len());
-                            let _ = handle.emit("transcription-fallback", serde_json::json!({
-                                "reason": cloud_err.to_string(),
-                                "provider": "local_whisper",
-                            }));
+                            log::info!(
+                                "Local Whisper fallback succeeded (preview confirm), text_length={}",
+                                text.len()
+                            );
+                            let _ = handle.emit(
+                                "transcription-fallback",
+                                serde_json::json!({
+                                    "reason": cloud_err.to_string(),
+                                    "provider": "local_whisper",
+                                }),
+                            );
                             Some(text)
                         }
                         Err(fallback_err) => {

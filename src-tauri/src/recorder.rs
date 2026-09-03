@@ -486,11 +486,7 @@ pub fn signal_to_noise_ratio(audio: &RecordedAudio) -> f32 {
     }
 
     // Peak signal
-    let peak = audio
-        .samples
-        .iter()
-        .map(|s| s.abs())
-        .fold(0.0_f32, f32::max);
+    let peak = audio.samples.iter().map(|s| s.abs()).fold(0.0_f32, f32::max);
     if peak == 0.0 {
         return 0.0;
     }
@@ -576,8 +572,7 @@ impl VadDetector {
                 sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
                 let p75_idx = (sorted.len() as f32 * 0.75) as usize;
                 self.noise_floor = sorted[p75_idx.min(sorted.len() - 1)];
-                self.energy_threshold =
-                    (self.noise_floor * Self::THRESHOLD_MULTIPLIER).max(Self::MIN_THRESHOLD);
+                self.energy_threshold = (self.noise_floor * Self::THRESHOLD_MULTIPLIER).max(Self::MIN_THRESHOLD);
                 log::info!(
                     "VAD calibration complete: noise_floor={:.4}, threshold={:.4}",
                     self.noise_floor,

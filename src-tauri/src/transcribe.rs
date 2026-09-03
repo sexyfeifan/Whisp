@@ -455,7 +455,9 @@ pub async fn transcribe_audio(
     let timeout = Duration::from_secs(timeout_secs.max(dynamic_timeout));
     log::info!(
         "Transcribe: audio={:.1}s, dynamic_timeout={}s, user_timeout={}s",
-        audio_duration_secs, dynamic_timeout, timeout_secs
+        audio_duration_secs,
+        dynamic_timeout,
+        timeout_secs
     );
 
     let attempts = retry_count.saturating_add(1);

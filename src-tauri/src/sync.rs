@@ -84,13 +84,11 @@ struct DeviceSyncState {
 }
 
 /// Overall sync state: tracks the last sync timestamp per device.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct SyncState {
     #[serde(default)]
     devices: std::collections::HashMap<String, DeviceSyncState>,
 }
-
 
 /// Rich result from a sync operation, including conflict info.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,8 +228,10 @@ fn import_from_sync_with_lww(
 
     let existing = history.get_entries().map_err(|e| e.to_string())?;
     // Build a map of (timestamp, provider) -> entry for conflict detection
-    let existing_map: std::collections::HashMap<(i64, String), &crate::history::HistoryEntry> =
-        existing.iter().map(|e| ((e.timestamp, e.provider.clone()), e)).collect();
+    let existing_map: std::collections::HashMap<(i64, String), &crate::history::HistoryEntry> = existing
+        .iter()
+        .map(|e| ((e.timestamp, e.provider.clone()), e))
+        .collect();
 
     // Track which entries we've seen from remote devices (for conflict detection)
     // Key: (timestamp, provider) -> (record, file_path)
@@ -269,7 +269,11 @@ fn import_from_sync_with_lww(
         }
 
         // Incremental: skip records not modified since last sync
-        let effective_updated_at = if record.updated_at > 0 { record.updated_at } else { record.timestamp };
+        let effective_updated_at = if record.updated_at > 0 {
+            record.updated_at
+        } else {
+            record.timestamp
+        };
         if effective_updated_at <= since_timestamp {
             continue;
         }
@@ -284,7 +288,11 @@ fn import_from_sync_with_lww(
 
     // Second pass: import or resolve conflicts
     for (key, (record, path)) in &remote_records {
-        let effective_remote_updated_at = if record.updated_at > 0 { record.updated_at } else { record.timestamp };
+        let effective_remote_updated_at = if record.updated_at > 0 {
+            record.updated_at
+        } else {
+            record.timestamp
+        };
 
         if let Some(local_entry) = existing_map.get(key) {
             // CONFLICT: both local and remote have this entry
@@ -297,7 +305,10 @@ fn import_from_sync_with_lww(
                 // Remote is newer: update local entry (LWW)
                 log::info!(
                     "Conflict resolved (LWW): entry {} remote({}) > local({}), updating from device '{}'",
-                    record.id, effective_remote_updated_at, local_updated_at, record.source_device
+                    record.id,
+                    effective_remote_updated_at,
+                    local_updated_at,
+                    record.source_device
                 );
                 conflict_details.push(ConflictDetail {
                     entry_id: record.id,
@@ -315,7 +326,7 @@ fn import_from_sync_with_lww(
                     &record.status,
                     None, // error_message
                     &record.provider,
-                    "",   // api_base_url
+                    "", // api_base_url
                     &record.language,
                     record.polished_text.as_deref(),
                 ) {
@@ -327,7 +338,9 @@ fn import_from_sync_with_lww(
                 // Local is newer or same: keep local, log the conflict
                 log::info!(
                     "Conflict resolved (LWW): entry {} local({}) >= remote({}), keeping local version",
-                    record.id, local_updated_at, effective_remote_updated_at
+                    record.id,
+                    local_updated_at,
+                    effective_remote_updated_at
                 );
                 conflict_details.push(ConflictDetail {
                     entry_id: record.id,
@@ -412,7 +425,9 @@ pub fn full_sync(history: &crate::history::HistoryManager, device_name: &str) ->
 
     log::info!(
         "Starting sync for device '{}': last_sync={}, now={}",
-        device_name, last_sync, sync_timestamp
+        device_name,
+        last_sync,
+        sync_timestamp
     );
 
     // Export: only export entries modified since last sync
@@ -431,8 +446,7 @@ pub fn full_sync(history: &crate::history::HistoryManager, device_name: &str) ->
     }
 
     // Import with LWW conflict resolution, only entries newer than last sync
-    let (imported, conflicts_resolved, conflict_details) =
-        import_from_sync_with_lww(history, device_name, last_sync)?;
+    let (imported, conflicts_resolved, conflict_details) = import_from_sync_with_lww(history, device_name, last_sync)?;
 
     // Update sync state
     sync_state.devices.insert(
@@ -458,7 +472,10 @@ pub fn full_sync(history: &crate::history::HistoryManager, device_name: &str) ->
 
     log::info!(
         "Sync completed: exported={}, imported={}, conflicts={}, skipped={}",
-        exported, imported, conflicts_resolved, skipped
+        exported,
+        imported,
+        conflicts_resolved,
+        skipped
     );
 
     Ok(result)

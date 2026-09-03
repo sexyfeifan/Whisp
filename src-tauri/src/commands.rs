@@ -472,38 +472,47 @@ pub fn trigger_sync(app: AppHandle, history: State<'_, Arc<HistoryManager>>) -> 
     let device = settings.device_name.clone();
 
     // Emit 'syncing' status
-    let _ = app.emit("sync-status", serde_json::json!({
-        "status": "syncing",
-        "details": { "device_name": &device }
-    }));
+    let _ = app.emit(
+        "sync-status",
+        serde_json::json!({
+            "status": "syncing",
+            "details": { "device_name": &device }
+        }),
+    );
 
     let result = crate::sync::full_sync(history.inner().as_ref(), &device)?;
 
     // Emit conflict events for each resolved conflict
     for conflict in &result.conflict_details {
-        let _ = app.emit("sync-status", serde_json::json!({
-            "status": "conflict",
-            "details": {
-                "entry_id": conflict.entry_id,
-                "winner": conflict.winner,
-                "local_updated_at": conflict.local_updated_at,
-                "remote_updated_at": conflict.remote_updated_at,
-                "remote_device": conflict.remote_device,
-            }
-        }));
+        let _ = app.emit(
+            "sync-status",
+            serde_json::json!({
+                "status": "conflict",
+                "details": {
+                    "entry_id": conflict.entry_id,
+                    "winner": conflict.winner,
+                    "local_updated_at": conflict.local_updated_at,
+                    "remote_updated_at": conflict.remote_updated_at,
+                    "remote_device": conflict.remote_device,
+                }
+            }),
+        );
     }
 
     // Emit 'completed' status
-    let _ = app.emit("sync-status", serde_json::json!({
-        "status": "completed",
-        "details": {
-            "exported": result.exported,
-            "imported": result.imported,
-            "conflicts_resolved": result.conflicts_resolved,
-            "skipped": result.skipped,
-            "sync_timestamp": result.sync_timestamp,
-        }
-    }));
+    let _ = app.emit(
+        "sync-status",
+        serde_json::json!({
+            "status": "completed",
+            "details": {
+                "exported": result.exported,
+                "imported": result.imported,
+                "conflicts_resolved": result.conflicts_resolved,
+                "skipped": result.skipped,
+                "sync_timestamp": result.sync_timestamp,
+            }
+        }),
+    );
 
     Ok(serde_json::json!({
         "exported": result.exported,
@@ -1358,10 +1367,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
                 "ダウンロード完了: {}。インストーラーが起動します。",
                 file_path.display()
             ),
-            &format!(
-                "다운로드 완료: {}. 설치 프로그램이 곧 시작됩니다.",
-                file_path.display()
-            ),
+            &format!("다운로드 완료: {}. 설치 프로그램이 곧 시작됩니다.", file_path.display()),
         ));
     }
 
@@ -2059,13 +2065,20 @@ pub fn get_entries_by_tag(history: State<'_, Arc<HistoryManager>>, tag: String) 
 }
 
 #[tauri::command]
-pub fn export_entries_batch(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>, format: String) -> Result<String, String> {
+pub fn export_entries_batch(
+    history: State<'_, Arc<HistoryManager>>,
+    ids: Vec<i64>,
+    format: String,
+) -> Result<String, String> {
     history.export_entries(&format, &ids).map_err(|e| e.to_string())
 }
 
 /// Get tags for multiple entries at once (for list views).
 #[tauri::command]
-pub fn get_tags_batch(history: State<'_, Arc<HistoryManager>>, ids: Vec<i64>) -> Result<std::collections::HashMap<i64, Vec<String>>, String> {
+pub fn get_tags_batch(
+    history: State<'_, Arc<HistoryManager>>,
+    ids: Vec<i64>,
+) -> Result<std::collections::HashMap<i64, Vec<String>>, String> {
     history.get_tags_batch(&ids).map_err(|e| e.to_string())
 }
 

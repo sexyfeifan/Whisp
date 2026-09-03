@@ -465,10 +465,7 @@ pub fn recommended_model() -> ModelRecommendation {
         ModelRecommendation {
             recommended: "ggml-medium".to_string(),
             total_memory_bytes: mem,
-            reason: format!(
-                "{:.1} GB RAM detected — medium model provides strong accuracy.",
-                mem_gb
-            ),
+            reason: format!("{:.1} GB RAM detected — medium model provides strong accuracy.", mem_gb),
         }
     }
 }
@@ -614,7 +611,12 @@ mod tests {
         let audio: Vec<f32> = (0..48000).map(|i| (i as f32 / 48000.0)).collect();
         let resampled = resample_to_16k(&audio, 48000);
         // After trimming to expected length, should be exactly 16000
-        assert_eq!(resampled.len(), 16000, "Expected exactly 16000, got {}", resampled.len());
+        assert_eq!(
+            resampled.len(),
+            16000,
+            "Expected exactly 16000, got {}",
+            resampled.len()
+        );
     }
 
     #[test]
@@ -638,14 +640,17 @@ mod tests {
         let resampled = resample_to_16k(&audio, sr);
 
         // The resampled signal should be exactly 1 second at 16kHz
-        assert_eq!(resampled.len(), 16000, "Expected exactly 16000, got {}", resampled.len());
+        assert_eq!(
+            resampled.len(),
+            16000,
+            "Expected exactly 16000, got {}",
+            resampled.len()
+        );
 
         // Count zero crossings to estimate dominant frequency
         let mut zero_crossings = 0usize;
         for i in 1..resampled.len() {
-            if (resampled[i - 1] >= 0.0 && resampled[i] < 0.0)
-                || (resampled[i - 1] < 0.0 && resampled[i] >= 0.0)
-            {
+            if (resampled[i - 1] >= 0.0 && resampled[i] < 0.0) || (resampled[i - 1] < 0.0 && resampled[i] >= 0.0) {
                 zero_crossings += 1;
             }
         }

@@ -832,9 +832,7 @@ impl HistoryManager {
     /// Get all tags for a given history entry.
     pub fn get_tags(&self, entry_id: i64) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let mut stmt = conn.prepare(
-            "SELECT tag FROM tags WHERE entry_id = ?1 ORDER BY tag ASC",
-        )?;
+        let mut stmt = conn.prepare("SELECT tag FROM tags WHERE entry_id = ?1 ORDER BY tag ASC")?;
         let tags = stmt
             .query_map([entry_id], |row| row.get::<_, String>(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -874,9 +872,7 @@ impl HistoryManager {
     /// Get all distinct tags in the database.
     pub fn get_all_tags(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
-        let mut stmt = conn.prepare(
-            "SELECT DISTINCT tag FROM tags ORDER BY tag ASC",
-        )?;
+        let mut stmt = conn.prepare("SELECT DISTINCT tag FROM tags ORDER BY tag ASC")?;
         let tags = stmt
             .query_map([], |row| row.get::<_, String>(0))?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -943,9 +939,18 @@ impl HistoryManager {
         let entries = self.get_entries_by_ids(ids)?;
         let mut wtr = csv::Writer::from_writer(vec![]);
         wtr.write_record([
-            "id", "timestamp", "text", "model", "provider", "language",
-            "status", "duration_ms", "polished_text", "estimated_cost",
-        ]).map_err(|e| anyhow::anyhow!(e))?;
+            "id",
+            "timestamp",
+            "text",
+            "model",
+            "provider",
+            "language",
+            "status",
+            "duration_ms",
+            "polished_text",
+            "estimated_cost",
+        ])
+        .map_err(|e| anyhow::anyhow!(e))?;
         for entry in &entries {
             wtr.write_record(&[
                 entry.id.to_string(),
@@ -958,7 +963,8 @@ impl HistoryManager {
                 entry.duration_ms.map(|d| d.to_string()).unwrap_or_default(),
                 entry.polished_text.clone().unwrap_or_default(),
                 entry.estimated_cost.map(|c| c.to_string()).unwrap_or_default(),
-            ]).map_err(|e| anyhow::anyhow!(e))?;
+            ])
+            .map_err(|e| anyhow::anyhow!(e))?;
         }
         let data = wtr.into_inner().map_err(|e| anyhow::anyhow!(e))?;
         String::from_utf8(data).map_err(|e| anyhow::anyhow!(e))
