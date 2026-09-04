@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Mic, Search, Check, Volume2, Clock, FileAudio,
@@ -115,7 +115,7 @@ export function HistoryPage(app: AppState) {
     setTimeout(() => setUploadStatus(null), 5000);
   };
 
-  const loadTags = async () => {
+  const loadTags = useCallback(async () => {
     try {
       const ids = history.map((e: { id: number }) => e.id);
       if (ids.length === 0) { setEntryTags({}); setAllTags([]); return; }
@@ -126,9 +126,9 @@ export function HistoryPage(app: AppState) {
       setEntryTags(tagsMap ?? {});
       setAllTags(tags ?? []);
     } catch (e) { console.error("Failed to load tags:", e); }
-  };
+  }, [history]);
 
-  useEffect(() => { loadTags(); }, [history.length]);
+  useEffect(() => { loadTags(); }, [loadTags]);
 
   const handleAddTag = async (entryId: number, tag: string) => {
     if (!tag.trim()) return;

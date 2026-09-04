@@ -161,11 +161,11 @@ function Overlay() {
 
   // Resize overlay for streaming text — only on state transitions and
   // boolean changes to avoid re-triggering setSize on every partial text update
+  const hasStreamingText = !!streamingText;
   useEffect(() => {
     if (state !== "recording") return;
-    const hasText = !!streamingText;
-    getCurrentWindow().setSize(new LogicalSize(hasText ? 600 : 360, 80));
-  }, [state, !!streamingText]);
+    getCurrentWindow().setSize(new LogicalSize(hasStreamingText ? 600 : 360, 80));
+  }, [state, hasStreamingText]);
 
   // Typewriter effect: gradually reveal streaming text characters
   useEffect(() => {
@@ -198,6 +198,7 @@ function Overlay() {
     tick();
 
     return () => window.clearTimeout(typewriterRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamingText]);
 
   // Waveform animation (recording state)

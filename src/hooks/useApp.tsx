@@ -194,7 +194,8 @@ export function useApp(): AppState {
   }, []);
 
   const uiLanguage: UiLanguage = (settings?.ui_language as UiLanguage) ?? "zh-CN";
-  const m: Record<string, string> = (messages[uiLanguage] ?? messages["zh-CN"]) || {};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const m: Record<string, string> = useMemo(() => (messages[uiLanguage] ?? messages["zh-CN"]) || {}, [uiLanguage]);
 
   const downloadAndInstall = useCallback(async (url?: string, filename?: string) => {
     setDownloading(true);
@@ -368,7 +369,7 @@ export function useApp(): AppState {
       toast({ message: String(error), variant: "error" });
       return false;
     } finally { setSavingSettings(false); }
-  }, [settings, m]);
+ }, [settings, m, toast]);
 
   const testApiKey = useCallback(async (apiKey: string, apiBaseUrl: string, model: string) => {
     if (!apiKey || !apiBaseUrl) return;
@@ -382,13 +383,13 @@ export function useApp(): AppState {
       setApiKeyStatus(isUpstreamOverload ? "warn" : "error");
       setApiKeyError(`${detail}\n${m.optionalValidationHint}`);
     }
-  }, [m, m.optionalValidationHint]);
+  }, [m]);
 
   const copyText = useCallback(async (text: string, id: number) => {
     await writeText(text); setCopied(id);
     toast({ message: m.copied ?? "Copied", variant: "success" });
     window.setTimeout(() => setCopied(null), 1500);
-  }, []);
+  }, [toast, m.copied]);
 
   const stopAudio = useCallback(() => {
     if (audioElRef.current) {
@@ -585,7 +586,7 @@ export function useApp(): AppState {
       toast({ message: m.clearSuccess, variant: "success" });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
     } catch (error) { setErrorMsg(`${m.clearFailed} ${String(error)}`); }
-  }, [history, m]);
+  }, [history, m, toast]);
 
   const retryEntry = useCallback(async (id: number) => {
     setRetrying(id);
