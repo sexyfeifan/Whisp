@@ -66,26 +66,50 @@ function SettingsAppContent(app: AppState) {
                 <span className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.microphone}</span>
                 <StatusIcon ok={microphoneOk} label={m.disabled} />
               </div>
-              <Button
-                variant={microphoneOk ? "secondary" : "primary"}
-                size="sm"
-                onClick={handleEnableMicrophone}
-              >
-                {microphoneOk ? m.granted : m.allowMicrophone}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant={microphoneOk ? "secondary" : "primary"}
+                  size="sm"
+                  onClick={handleEnableMicrophone}
+                >
+                  {microphoneOk ? m.granted : m.allowMicrophone}
+                </Button>
+                {!microphoneOk && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openPath("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")}
+                  >
+                    <SettingsIcon size={12} className="mr-1" />
+                    {m.openSettings}
+                  </Button>
+                )}
+              </div>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.accessibility}</span>
                 <StatusIcon ok={accessibilityOk} label={m.disabled} />
               </div>
-              <Button
-                variant={accessibilityOk ? "secondary" : "primary"}
-                size="sm"
-                onClick={handleEnableAccessibility}
-              >
-                {accessibilityOk ? m.granted : m.allowAccessibility}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant={accessibilityOk ? "secondary" : "primary"}
+                  size="sm"
+                  onClick={handleEnableAccessibility}
+                >
+                  {accessibilityOk ? m.granted : m.allowAccessibility}
+                </Button>
+                {!accessibilityOk && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openPath("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")}
+                  >
+                    <SettingsIcon size={12} className="mr-1" />
+                    {m.openSettings}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </SettingsSection>
