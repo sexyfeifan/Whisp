@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Mic, Activity, Sparkles, Box, Info, Terminal } from "lucide-react";
+import { Shield, Mic, Activity, Sparkles, Box, Settings, Info, Terminal } from "lucide-react";
 import { Sidebar } from "../components/Sidebar";
 import type { AppState } from "../hooks/useApp";
 import type { SettingsTab } from "../lib/constants";
@@ -11,6 +11,7 @@ import { SettingsRecordingPage } from "./SettingsRecordingPage";
 import { SettingsBehaviorPage } from "./SettingsBehaviorPage";
 import { SettingsPolishPage } from "./SettingsPolishPage";
 import { SettingsModelsPage } from "./SettingsModelsPage";
+import { SettingsAppPage } from "./SettingsAppPage";
 
 export function SettingsPage(app: AppState) {
   const { view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates, flushAutoSave, setView, m } = app;
@@ -22,6 +23,7 @@ export function SettingsPage(app: AppState) {
     { id: "behavior" as SettingsTab, icon: <Activity size={14} />, label: m.behaviorSettings },
     { id: "polish" as SettingsTab, icon: <Sparkles size={14} />, label: (m as Record<string, string>).aiPolishSettings ?? "AI Polish" },
     { id: "models" as SettingsTab, icon: <Box size={14} />, label: (m as Record<string, string>).modelsManagement ?? "Models" },
+    { id: "app" as SettingsTab, icon: <Settings size={14} />, label: m.appSettings },
   ];
 
   const embeddedApp = { ...app, embedded: true };
@@ -33,6 +35,7 @@ export function SettingsPage(app: AppState) {
       case "behavior": return <SettingsBehaviorPage {...embeddedApp} />;
       case "polish": return <SettingsPolishPage {...embeddedApp} />;
       case "models": return <SettingsModelsPage {...embeddedApp} />;
+      case "app": return <SettingsAppPage {...embeddedApp} />;
     }
   };
 
