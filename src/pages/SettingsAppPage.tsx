@@ -60,22 +60,32 @@ function SettingsAppContent(app: AppState) {
               <p className="text-xs mt-1" style={{ color: "hsl(var(--destructive))" }}>{m.shortcutConflict}: {shortcutConflictMsg}</p>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.microphone}</label>
-              {microphoneOk ? (
-                <StatusIcon ok={true} label={m.enabled} />
-              ) : (
-                <Button variant="primary" className="w-full" onClick={handleEnableMicrophone}>{m.allowMicrophone}</Button>
-              )}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.microphone}</span>
+                <StatusIcon ok={microphoneOk} label={m.disabled} />
+              </div>
+              <Button
+                variant={microphoneOk ? "secondary" : "primary"}
+                size="sm"
+                onClick={handleEnableMicrophone}
+              >
+                {microphoneOk ? m.granted : m.allowMicrophone}
+              </Button>
             </div>
-            <div>
-              <label className="block text-[13px] font-normal mb-1.5" style={{ color: "hsl(var(--steel))" }}>{m.accessibility}</label>
-              {accessibilityOk ? (
-                <StatusIcon ok={true} label={m.enabled} />
-              ) : (
-                <Button variant="primary" className="w-full" onClick={handleEnableAccessibility}>{m.allowAccessibility}</Button>
-              )}
+            <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: "1px solid hsl(var(--hairline))" }}>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium" style={{ color: "hsl(var(--ink))" }}>{m.accessibility}</span>
+                <StatusIcon ok={accessibilityOk} label={m.disabled} />
+              </div>
+              <Button
+                variant={accessibilityOk ? "secondary" : "primary"}
+                size="sm"
+                onClick={handleEnableAccessibility}
+              >
+                {accessibilityOk ? m.granted : m.allowAccessibility}
+              </Button>
             </div>
           </div>
         </SettingsSection>
