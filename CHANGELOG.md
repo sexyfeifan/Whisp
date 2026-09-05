@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.24.3 (2026-09-05)
+
+- Simplified Settings into two clear levels: Common and Advanced
+- Made App settings the default view so shortcuts, permissions, language, and startup controls are immediately available
+- Grouped recording and API controls under Common; behavior, AI polish, and offline models remain available under Advanced
+- Added localized navigation labels for Chinese, English, Japanese, and Korean
+- Preserved every existing setting and the animated tab transitions
+
+
 ## v2.24.2 (2026-09-05)
 
 - Reworked the interface into the Midnight Signal palette: deep navy neutrals, cobalt focus, and cyan AI accents
