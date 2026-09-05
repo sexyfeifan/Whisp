@@ -3,17 +3,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { check as checkUpdaterUpdate } from "@tauri-apps/plugin-updater";
+import { check as checkUpdaterUpdate, type DownloadEvent, type Update } from "@tauri-apps/plugin-updater";
 import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
 import { useToast } from "../components/ui/toast-context";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
+import { selectUpdateAsset, type ReleaseAsset } from "../lib/update";
 import { History, Settings, BarChart3 } from "lucide-react";
 
 export interface UpdateInfo {
   latestVersion: string; releaseUrl: string; releaseNotes: string;
-  publishedAt: string; assets: { name: string; url: string; size: number }[];
+  publishedAt: string; assets: ReleaseAsset[];
 }
 
 export interface AppState {
@@ -133,6 +134,7 @@ export function useApp(): AppState {
   const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const pendingUpdateRef = useRef<Update | null>(null);
   const [polishErrorMsg, setPolishErrorMsg] = useState<string | null>(null);
   const [playingAudioId, setPlayingAudioId] = useState<number | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
@@ -161,9 +163,15 @@ export function useApp(): AppState {
 
   const checkForUpdates = useCallback(async () => {
     setUpdateStatus("checking");
+    setDownloadMsg(null);
     try {
+      if (pendingUpdateRef.current) {
+        await pendingUpdateRef.current.close().catch(() => undefined);
+        pendingUpdateRef.current = null;
+      }
       const update = await checkUpdaterUpdate();
       if (update) {
+        pendingUpdateRef.current = update;
         setUpdateStatus("available");
         setUpdateInfo({
           latestVersion: update.version,
@@ -173,6 +181,7 @@ export function useApp(): AppState {
           assets: [],
         });
       } else {
+        setUpdateInfo(null);
         setUpdateStatus("latest");
         setTimeout(() => setUpdateStatus("idle"), 3000);
       }
@@ -186,12 +195,13 @@ export function useApp(): AppState {
         }>("check_for_updates");
         if (result.error) { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); return; }
         if (result.has_update) {
+          pendingUpdateRef.current = null;
           setUpdateStatus("available");
           setUpdateInfo({
             latestVersion: result.latest_version, releaseUrl: result.release_url,
             releaseNotes: result.release_notes, publishedAt: result.published_at, assets: result.assets,
           });
-        } else { setUpdateStatus("latest"); setTimeout(() => setUpdateStatus("idle"), 3000); }
+        } else { setUpdateInfo(null); setUpdateStatus("latest"); setTimeout(() => setUpdateStatus("idle"), 3000); }
       } catch { setUpdateStatus("error"); setTimeout(() => setUpdateStatus("idle"), 3000); }
     }
   }, []);
@@ -204,19 +214,34 @@ export function useApp(): AppState {
     setDownloading(true);
     setDownloadMsg(null);
     try {
-      if (!url || !filename) {
-        const platform = navigator.userAgent;
-        const isMacPlatform = /Mac/i.test(platform);
-        const isWin = /Win/i.test(platform);
-        const isArm = /arm64|aarch64/i.test(platform) || ("userAgentData" in navigator && (navigator as Navigator & { userAgentData?: { architecture?: string } }).userAgentData?.architecture === "arm");
+      const pendingUpdate = pendingUpdateRef.current;
+      if (!url && !filename && pendingUpdate) {
+        let downloadedBytes = 0;
+        let totalBytes = 0;
+        setDownloadMsg(m.downloadingFile);
+        await pendingUpdate.downloadAndInstall((event: DownloadEvent) => {
+          if (event.event === "Started") {
+            totalBytes = event.data.contentLength ?? 0;
+          } else if (event.event === "Progress") {
+            downloadedBytes += event.data.chunkLength;
+            if (totalBytes > 0) {
+              const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
+              setDownloadMsg(`${m.downloadingFile} ${percent}%`);
+            }
+          } else {
+            setDownloadMsg(m.installingUpdate);
+          }
+        });
+        pendingUpdateRef.current = null;
+        setDownloadMsg(m.updateInstalledRestart);
+        return;
+      }
 
+      if (!url || !filename) {
+        const platform = navigator.platform || navigator.userAgent;
+        const architecture = await invoke<string>("get_target_arch").catch(() => navigator.userAgent);
         const assets = updateInfo?.assets || [];
-        const asset = assets.find((a) => {
-          if (isMacPlatform && isArm) return a.name.includes("aarch64") && a.name.endsWith(".dmg");
-          if (isMacPlatform) return a.name.includes("x64") && a.name.endsWith(".dmg");
-          if (isWin) return a.name.endsWith("-setup.exe") || a.name.endsWith(".msi");
-          return a.name.endsWith(".AppImage") || a.name.endsWith(".deb");
-        }) || assets[0];
+        const asset = selectUpdateAsset(assets, platform, architecture);
 
         if (asset) {
           url = asset.url;
@@ -239,6 +264,11 @@ export function useApp(): AppState {
       setDownloading(false);
     }
   }, [updateInfo, m]);
+
+  useEffect(() => () => {
+    void pendingUpdateRef.current?.close();
+    pendingUpdateRef.current = null;
+  }, []);
 
   useEffect(() => { getVersion().then(setAppVersion); }, []);
 

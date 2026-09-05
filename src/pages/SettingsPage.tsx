@@ -30,9 +30,6 @@ export function SettingsPage(app: AppState) {
     navItems,
     darkMode,
     setDarkMode,
-    updateStatus,
-    appVersion,
-    checkForUpdates,
     flushAutoSave,
     setView,
     m,
@@ -97,9 +94,6 @@ export function SettingsPage(app: AppState) {
         navItems={navItems}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
-        updateStatus={updateStatus}
-        appVersion={appVersion}
-        checkForUpdates={checkForUpdates}
         flushAutoSave={flushAutoSave}
         setView={setView}
         m={m}

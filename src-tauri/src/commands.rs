@@ -745,6 +745,11 @@ fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 #[tauri::command]
+pub fn get_target_arch() -> String {
+    std::env::consts::ARCH.to_string()
+}
+
+#[tauri::command]
 pub async fn check_for_updates(app: AppHandle) -> UpdateInfo {
     log::info!("Update check requested");
     let current_version = env!("CARGO_PKG_VERSION").to_string();
@@ -1283,6 +1288,13 @@ pub fn import_settings_json(app: AppHandle, json: String) -> Result<String, Stri
 pub async fn download_and_install_update(app: AppHandle, url: String, filename: String) -> Result<String, String> {
     use std::io::Write;
 
+    let safe_filename = std::path::Path::new(&filename)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| "Invalid update filename".to_string())?
+        .to_string();
+
     let client = app
         .try_state::<reqwest::Client>()
         .map(|s| (*s).clone())
@@ -1311,7 +1323,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
         .or_else(|| dirs::home_dir().map(|h| h.join("Downloads")))
         .unwrap_or_else(std::env::temp_dir);
 
-    let file_path = downloads_dir.join(&filename);
+    let file_path = downloads_dir.join(&safe_filename);
     let mut file = std::fs::File::create(&file_path).map_err(|e| format!("Failed to create file: {}", e))?;
     file.write_all(&bytes)
         .map_err(|e| format!("Failed to write file: {}", e))?;
@@ -1324,7 +1336,7 @@ pub async fn download_and_install_update(app: AppHandle, url: String, filename: 
 
     #[cfg(target_os = "macos")]
     {
-        if filename.ends_with(".dmg") {
+        if safe_filename.ends_with(".dmg") {
             let _ = std::process::Command::new("open").arg(&file_path).spawn();
             return Ok(tr(
                 lang,

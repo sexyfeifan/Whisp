@@ -58,7 +58,7 @@ export function HistoryPage(app: AppState) {
     retrying, hasMore, deleteEntry, deleteSelected, clearHistory,
     retryEntry, copyText, loadHistory, m, uiLanguage,
     uploadingFile, transcribeFile,
-    view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
+    view, navItems, darkMode, setDarkMode,
     flushAutoSave, setView, history, startRecording,
   } = app;
 
@@ -196,7 +196,7 @@ export function HistoryPage(app: AppState) {
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
-      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
+      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} flushAutoSave={flushAutoSave} setView={setView} m={m} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <HistoryToolbar
           selectedIds={selectedIds}
@@ -353,7 +353,7 @@ export function HistoryPage(app: AppState) {
                   </div>
                 </motion.div>
               ))}
-              {hasMore && !searchQuery && statusFilter === "all" && (
+              {hasMore && !searchQuery && (
                 <Button variant="secondary" className="w-full py-2 rounded-xl" onClick={() => loadHistory(false)}>
                   {m.loadMore}
                 </Button>

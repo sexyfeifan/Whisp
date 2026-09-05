@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import {
   Copy, Trash2, RefreshCw, Loader2, Download, FileText,
   Sparkles, X, Tag, Plus,
@@ -64,10 +63,6 @@ export function HistoryEntryCard({
   const canRetry = Boolean(entry.audio_path);
 
   return (
-    <motion.div
-      whileHover={{ y: -2, boxShadow: "0 4px 12px hsl(0 0% 0% / 0.12)" }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-    >
       <Card
         className="p-4 border-[hsl(var(--hairline))]"
         style={{
@@ -329,6 +324,5 @@ export function HistoryEntryCard({
           </div>
         )}
       </Card>
-    </motion.div>
   );
 }

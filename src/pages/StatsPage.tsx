@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { invoke } from "@tauri-apps/api/core";
 import {
   TrendingUp, FileAudio, Zap, CheckCircle2,
   Clock, DollarSign, Hash,
@@ -79,25 +80,34 @@ function computePeriodStats(history: AppState["history"], startSec: number) {
 export function StatsPage(app: AppState) {
   const {
     history, stats, m, view, navItems,
-    darkMode, setDarkMode, updateStatus, appVersion,
-    checkForUpdates, flushAutoSave, setView,
+    darkMode, setDarkMode, flushAutoSave, setView,
     settings,
   } = app;
 
-  const dailyData = useMemo(() => computeDailyUsage(history, m), [history, m]);
-  const topModels = useMemo(() => computeTopModels(history), [history]);
-  const langDistribution = useMemo(() => computeLanguageDistribution(history), [history]);
+  const [completeHistory, setCompleteHistory] = useState<AppState["history"]>(history);
+
+  useEffect(() => {
+    let active = true;
+    invoke<AppState["history"]>("get_history")
+      .then((entries) => { if (active) setCompleteHistory(entries); })
+      .catch(() => { if (active) setCompleteHistory(history); });
+    return () => { active = false; };
+  }, [history, stats.total]);
+
+  const dailyData = useMemo(() => computeDailyUsage(completeHistory, m), [completeHistory, m]);
+  const topModels = useMemo(() => computeTopModels(completeHistory), [completeHistory]);
+  const langDistribution = useMemo(() => computeLanguageDistribution(completeHistory), [completeHistory]);
 
   const todayStats = useMemo(() => {
     const now = new Date(); now.setHours(0, 0, 0, 0);
-    return computePeriodStats(history, now.getTime() / 1000);
-  }, [history]);
+    return computePeriodStats(completeHistory, now.getTime() / 1000);
+  }, [completeHistory]);
 
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    return computePeriodStats(history, startOfMonth.getTime() / 1000);
-  }, [history]);
+    return computePeriodStats(completeHistory, startOfMonth.getTime() / 1000);
+  }, [completeHistory]);
 
   // Weekly trend: this week vs last week
   const weeklyTrend = useMemo(() => {
@@ -108,8 +118,8 @@ export function StatsPage(app: AppState) {
     const thisWeekStart = new Date(todayStart.getTime() - 6 * msPerDay);
     const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * msPerDay);
 
-    const thisWeekCount = history.filter(e => (e.timestamp * 1000) >= thisWeekStart.getTime()).length;
-    const lastWeekCount = history.filter(e => {
+    const thisWeekCount = completeHistory.filter(e => (e.timestamp * 1000) >= thisWeekStart.getTime()).length;
+    const lastWeekCount = completeHistory.filter(e => {
       const ts = e.timestamp * 1000;
       return ts >= lastWeekStart.getTime() && ts < thisWeekStart.getTime();
     }).length;
@@ -119,7 +129,7 @@ export function StatsPage(app: AppState) {
     for (let i = 6; i >= 0; i--) {
       const dayStart = new Date(todayStart.getTime() - i * msPerDay);
       const dayEnd = new Date(dayStart.getTime() + msPerDay - 1);
-      const count = history.filter(e => {
+      const count = completeHistory.filter(e => {
         const ts = e.timestamp * 1000;
         return ts >= dayStart.getTime() && ts <= dayEnd.getTime();
       }).length;
@@ -127,12 +137,12 @@ export function StatsPage(app: AppState) {
     }
 
     return { thisWeekCount, lastWeekCount, dailyCounts };
-  }, [history]);
+  }, [completeHistory]);
 
   if (!settings) return null;
 
   const avgDurationAll = stats.total > 0
-    ? history.reduce((s, e) => s + (e.duration_ms || 0), 0) / stats.total
+    ? completeHistory.reduce((s, e) => s + (e.duration_ms || 0), 0) / stats.total
     : 0;
 
   const mStats = m as Record<string, string>;
@@ -147,8 +157,7 @@ export function StatsPage(app: AppState) {
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
       <Sidebar
         view={view} navItems={navItems} darkMode={darkMode}
-        setDarkMode={setDarkMode} updateStatus={updateStatus}
-        appVersion={appVersion} checkForUpdates={checkForUpdates}
+        setDarkMode={setDarkMode}
         flushAutoSave={flushAutoSave} setView={setView} m={m}
       />
       <div className="flex-1 overflow-y-auto">
@@ -235,7 +244,7 @@ export function StatsPage(app: AppState) {
                 <span className="font-normal text-[11px]" style={{ color: "hsl(var(--steel))" }}>(7d)</span>
               </h2>
             </div>
-            {history.length === 0 ? (
+            {completeHistory.length === 0 ? (
               <div className="flex items-center justify-center h-40 text-xs" style={{ color: "hsl(var(--steel))" }}>
                 {mStats.statsNoData ?? "No data yet"}
               </div>

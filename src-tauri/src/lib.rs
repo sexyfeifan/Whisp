@@ -227,6 +227,7 @@ pub fn run() {
             commands::start_streaming_recording,
             commands::stop_streaming_recording,
             commands::toggle_autostart,
+            commands::get_target_arch,
             commands::check_for_updates,
             commands::polish_text,
             commands::translate_text,

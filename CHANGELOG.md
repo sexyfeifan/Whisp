@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.24.4 (2026-09-06)
+
+- Fixed square hover shadows around rounded history cards by removing the duplicate outer hover layer
+- Synced the About page with the real runtime version and removed the redundant sidebar version label
+- Completed the update flow with architecture-aware installer selection, native updater progress, visible errors, and persistent completion feedback
+- Corrected external link handling in About and App settings
+- Fixed statistics charts to use the complete history instead of only the first 50 records
+- Kept pagination available while filtering history by success or failure
+
 ## v2.24.3 (2026-09-05)
 
 - Simplified Settings into two clear levels: Common and Advanced

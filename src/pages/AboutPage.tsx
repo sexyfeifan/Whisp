@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
-import { ExternalLink, Download, Check, RefreshCw } from "lucide-react";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { ExternalLink, Download, Check, RefreshCw, AlertCircle } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { BrandMark } from "../components/BrandMark";
 import { Sidebar } from "../components/Sidebar";
 import type { AppState } from "../hooks/useApp";
@@ -20,25 +20,12 @@ export function AboutPage(app: AppState) {
   };
 
   const handleDownload = async () => {
-    if (updateInfo?.assets && updateInfo.assets.length > 0) {
-      // Find the appropriate installer for the current platform
-      const isMac = navigator.userAgent.includes("Mac");
-      const isWindows = navigator.userAgent.includes("Windows");
-      
-      let asset = updateInfo.assets[0]; // default to first asset
-      if (isMac) {
-        asset = updateInfo.assets.find(a => a.name.endsWith(".dmg")) || asset;
-      } else if (isWindows) {
-        asset = updateInfo.assets.find(a => a.name.endsWith(".exe") || a.name.endsWith(".msi")) || asset;
-      }
-      
-      await downloadAndInstall(asset.url, asset.name);
-    }
+    await downloadAndInstall();
   };
 
   const openLink = async (url: string) => {
     try {
-      await openPath(url);
+      await openUrl(url);
     } catch {
       window.open(url, "_blank");
     }
@@ -51,9 +38,6 @@ export function AboutPage(app: AppState) {
         navItems={navItems}
         darkMode={darkMode}
         setDarkMode={setDarkMode}
-        updateStatus={updateStatus}
-        appVersion={appVersion}
-        checkForUpdates={checkForUpdates}
         flushAutoSave={flushAutoSave}
         setView={setView}
         m={m}
@@ -124,7 +108,7 @@ export function AboutPage(app: AppState) {
                 ) : (
                   <>
                     <span className="text-sm font-medium">
-                      {m.versionLabel.replace("{version}", appVersion)}
+                      {m.versionLabel.replace("{version}", appVersion || "—")}
                     </span>
                     <RefreshCw size={14} />
                   </>
@@ -156,7 +140,7 @@ export function AboutPage(app: AppState) {
                     {downloading ? (
                       <>
                         <RefreshCw size={14} className="animate-spin" />
-                        <span>{downloadMsg || m.downloading}</span>
+                        <span>{downloadMsg || m.downloadingFile}</span>
                       </>
                     ) : (
                       <>
@@ -176,8 +160,35 @@ export function AboutPage(app: AppState) {
                   animate={{ opacity: 1 }}
                 >
                   <Check size={14} />
-                  <span className="text-sm">{m.latestVersion}</span>
+                  <span className="text-sm">{m.upToDate}</span>
                 </motion.div>
+              )}
+
+              {updateStatus === "error" && (
+                <motion.div
+                  className="flex items-center gap-2"
+                  style={{ color: "hsl(var(--destructive))" }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <AlertCircle size={14} />
+                  <span className="text-sm">{m.updateError}</span>
+                </motion.div>
+              )}
+
+              {downloadMsg && !downloading && (
+                <motion.p
+                  className="max-w-sm text-center text-xs leading-relaxed"
+                  style={{
+                    color: downloadMsg.startsWith(m.downloadFailed) || downloadMsg === m.noDownloadableAsset
+                      ? "hsl(var(--destructive))"
+                      : "hsl(var(--success))",
+                  }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  {downloadMsg}
+                </motion.p>
               )}
             </motion.div>
 

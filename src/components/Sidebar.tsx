@@ -2,7 +2,7 @@ import type React from "react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Download, Moon, Sun,
+  Moon, Sun,
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import type { View } from "../lib/constants";
@@ -19,9 +19,6 @@ export function Sidebar({
   navItems,
   darkMode,
   setDarkMode,
-  updateStatus,
-  appVersion,
-  checkForUpdates,
   flushAutoSave,
   setView,
   m,
@@ -32,9 +29,6 @@ export function Sidebar({
   navItems: NavItem[];
   darkMode: boolean;
   setDarkMode: (value: boolean | ((prev: boolean) => boolean)) => void;
-  updateStatus: string;
-  appVersion: string;
-  checkForUpdates: () => void;
   flushAutoSave: () => void;
   setView: (view: View) => void;
   m: Record<string, string>;
@@ -221,7 +215,7 @@ export function Sidebar({
         {/* Dark mode toggle */}
         <div
           className="flex items-center px-3"
-          style={{ justifyContent: collapsed ? "center" : "space-between" }}
+          style={{ justifyContent: collapsed ? "center" : "flex-start" }}
         >
           <button
             onClick={() => setDarkMode(!darkMode)}
@@ -233,33 +227,6 @@ export function Sidebar({
             {darkMode ? <Sun size={15} /> : <Moon size={15} />}
           </button>
 
-          {/* Version + update (hidden when collapsed) */}
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex items-center gap-2"
-              >
-                {updateStatus === "available" && (
-                  <button
-                    onClick={checkForUpdates}
-                    className="p-1.5 rounded-lg transition-colors hover:bg-[hsl(var(--sidebar-item-hover-bg))] animate-pulse focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
-                    style={{ color: "hsl(var(--success))" }}
-                    title={m.updateAvailable ?? "Update available"}
-                    aria-label={m.updateAvailable ?? "Update available"}
-                  >
-                    <Download size={15} />
-                  </button>
-                )}
-                <span className="text-[11px]" style={{ color: "hsl(var(--stone))" }}>
-                  {appVersion ? `v${appVersion}` : ""}
-                </span>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
     </motion.div>

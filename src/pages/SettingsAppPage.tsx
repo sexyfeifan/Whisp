@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { Keyboard, Settings as SettingsIcon, Download, Check, ExternalLink, X, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
@@ -78,7 +78,7 @@ function SettingsAppContent(app: AppState) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => openPath("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")}
+                    onClick={() => openUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")}
                   >
                     <SettingsIcon size={12} className="mr-1" />
                     {m.openSettings}
@@ -103,7 +103,7 @@ function SettingsAppContent(app: AppState) {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => openPath("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")}
+                    onClick={() => openUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")}
                   >
                     <SettingsIcon size={12} className="mr-1" />
                     {m.openSettings}
@@ -166,12 +166,12 @@ function SettingsAppContent(app: AppState) {
                   {downloading ? (downloadMsg || m.checkingUpdates) : `${m.downloadUpdate} v${updateInfo.latestVersion}`}
                 </Button>
                 {downloadMsg && !downloading && (
-                  <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith("Update failed") || downloadMsg.startsWith("Download failed") ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
+                  <div className="w-full text-xs mt-1 p-2 rounded-lg" style={{ background: downloadMsg.startsWith(m.downloadFailed) || downloadMsg === m.noDownloadableAsset ? "hsl(var(--destructive) / 0.1)" : "hsl(var(--success) / 0.1)", color: downloadMsg.startsWith(m.downloadFailed) || downloadMsg === m.noDownloadableAsset ? "hsl(var(--destructive))" : "hsl(var(--success))" }}>
                     {downloadMsg}
                   </div>
                 )}
                 {updateInfo.releaseUrl && (
-                  <Button variant="secondary" size="sm" onClick={() => openPath(updateInfo.releaseUrl)}>
+                  <Button variant="secondary" size="sm" onClick={() => openUrl(updateInfo.releaseUrl)}>
                     <ExternalLink size={12} className="mr-1" />
                     {m.viewOnGitHub}
                   </Button>
@@ -282,7 +282,7 @@ function SettingsAppContent(app: AppState) {
 }
 
 export function SettingsAppPage(app: AppState) {
-  const { view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates, flushAutoSave, setView, m, embedded } = app;
+  const { view, navItems, darkMode, setDarkMode, flushAutoSave, setView, m, embedded } = app;
 
   if (embedded) {
     return (
@@ -294,7 +294,7 @@ export function SettingsAppPage(app: AppState) {
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
-      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
+      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} flushAutoSave={flushAutoSave} setView={setView} m={m} />
       <div className="flex-1 overflow-y-auto">
         <motion.div key="settingsApp" variants={viewVariants} initial="initial" animate="animate" exit="exit" transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }} className="p-6">
           <SettingsAppContent {...app} />

@@ -12,7 +12,7 @@ export function DiagnosticsPage(app: AppState) {
   const {
     settings, history, microphoneOk, accessibilityOk, appVersion, logs, logsAutoScroll,
     setLogsAutoScroll, logContainerRef, clearLogs, copyAllLogs, m, view, navItems,
-    darkMode, setDarkMode, updateStatus, checkForUpdates, flushAutoSave, setView,
+    darkMode, setDarkMode, flushAutoSave, setView,
   } = app;
 
   if (!settings) return null;
@@ -26,7 +26,7 @@ export function DiagnosticsPage(app: AppState) {
 
   return (
     <div className="flex h-screen" style={{ background: "hsl(var(--background))" }}>
-      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} updateStatus={updateStatus} appVersion={appVersion} checkForUpdates={checkForUpdates} flushAutoSave={flushAutoSave} setView={setView} m={m} />
+      <Sidebar view={view} navItems={navItems} darkMode={darkMode} setDarkMode={setDarkMode} flushAutoSave={flushAutoSave} setView={setView} m={m} />
       <div className="flex-1 overflow-y-auto">
         <motion.div
           key="diagnostics"
@@ -129,7 +129,7 @@ export function DiagnosticsPage(app: AppState) {
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
-                  <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.versionLabel.split(" ")[0]}</span>
+                  <span className="text-sm" style={{ color: "hsl(var(--ink))" }}>{m.versionName}</span>
                   <span className="text-xs font-mono" style={{ color: "hsl(var(--steel))" }}>{appVersion ? `v${appVersion}` : "\u2014"}</span>
                 </div>
                 <div className="flex items-center justify-between p-2 rounded-lg" style={{ background: "hsl(var(--surface))" }}>
