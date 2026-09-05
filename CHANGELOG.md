@@ -1,34 +1,14 @@
 # Changelog
 
-## v2.20.0 (2026-09-03)
+## v2.24.2 (2026-09-05)
 
-- (add changes here)
-
-
-## v2.14.3 (2026-09-03)
-
-- (add changes here)
-
-
-## v2.14.0 (2026-09-03)
-
-- (add changes here)
-
-
-## v2.13.1 (2026-09-03)
-
-- (add changes here)
-
-
-## v2.13.0 (2026-09-03)
-
-- (add changes here)
-
-
-## v2.12.39 (2026-09-03)
-
-- (add changes here)
-
+- Reworked the interface into the Midnight Signal palette: deep navy neutrals, cobalt focus, and cyan AI accents
+- Preserved the existing Thinking Orb, waveform, transitions, and floating recording-state animation
+- Fixed the history-page record button so it starts recording instead of doing nothing
+- Fixed dashboard totals, success rate, saved audio, cost, tokens, and today's count to cover the full database
+- Moved live audio-quality feedback into the recording state and surfaced offline fallback while it is actually running
+- Added pinned frontend tests and made CI fail when frontend coverage disappears
+- Removed the React fast-refresh lint warning and modernized the Vite path configuration
 
 All notable changes to Whisp are documented in this file.
 

@@ -1,6 +1,6 @@
 # Whisp 设计系统 / Design System
 
-> Luminous ink and iris — a restrained, accessible palette for a desktop voice-to-text app.
+> Midnight Signal — deep navy neutrals, electric cobalt, and cyan signal states for a focused AI voice workspace.
 > All CSS custom properties live in `src/App.css` and follow the space-separated HSL convention:
 > `--token: H S% L%;` used as `hsl(var(--token))` or `hsl(var(--token) / alpha)`.
 
@@ -12,43 +12,43 @@
 
 | Token              | Light                 | Dark                  | Usage                  |
 | ------------------ | --------------------- | --------------------- | ---------------------- |
-| `--primary`        | `250 64% 57%`         | `248 82% 72%`         | CTA, active states     |
-| `--primary-pressed`| `250 58% 50%`         | `248 72% 65%`         | Pressed / active        |
-| `--primary-deep`   | `248 48% 40%`         | `250 64% 58%`         | Emphasis, headers      |
-| `--on-primary`     | `0 0% 100%` (white)   | `240 25% 10%` (near-black) | Text on primary   |
+| `--primary`        | `226 82% 55%`         | `190 92% 58%`         | CTA, active states     |
+| `--primary-pressed`| `228 78% 48%`         | `192 82% 50%`         | Pressed / active        |
+| `--primary-deep`   | `229 58% 36%`         | `226 84% 66%`         | Emphasis, headers      |
+| `--on-primary`     | `0 0% 100%` (white)   | `224 45% 7%` (near-black) | Text on primary   |
 
 ### 语义色 / Semantic
 
 | Token                     | Light               | Dark                | Usage                |
 | ------------------------- | ------------------- | ------------------- | -------------------- |
-| `--success`               | `154 48% 37%`       | `154 46% 52%`       | Confirmations        |
-| `--warning`               | `35 75% 48%`        | `35 72% 59%`        | Caution states       |
-| `--destructive`           | `355 64% 52%`       | `355 62% 63%`       | Errors, delete       |
+| `--success`               | `160 56% 34%`       | `160 64% 52%`       | Confirmations        |
+| `--warning`               | `35 88% 48%`        | `38 88% 60%`        | Caution states       |
+| `--destructive`           | `354 72% 52%`       | `354 78% 66%`       | Errors, delete       |
 | `--*-foreground`          | white / dark        | inverted            | Text on semantic bg  |
 
 ### 中性色阶 / Neutral Scale
 
 | Token          | Light HSL         | Dark HSL          | Role                        |
 | -------------- | ----------------- | ----------------- | --------------------------- |
-| `--ink-deep`   | `238 28% 10%`     | `246 30% 97%`     | Headings, strong emphasis   |
-| `--ink`        | `238 23% 15%`     | `244 22% 91%`     | Body text                   |
-| `--charcoal`   | `237 16% 24%`     | `242 15% 83%`     | Secondary text              |
-| `--slate`      | `238 12% 38%`     | `241 11% 68%`     | Tertiary / captions         |
-| `--steel`      | `239 10% 48%`     | `240 9% 57%`      | Placeholders                |
-| `--stone`      | `240 8% 61%`      | `240 7% 44%`      | Disabled text               |
-| `--muted`      | `242 10% 74%`     | `240 9% 33%`      | Muted / subtle              |
+| `--ink-deep`   | `226 42% 9%`      | `210 40% 98%`     | Headings, strong emphasis   |
+| `--ink`        | `224 34% 14%`     | `213 32% 92%`     | Body text                   |
+| `--charcoal`   | `222 22% 24%`     | `215 22% 82%`     | Secondary text              |
+| `--slate`      | `220 15% 38%`     | `217 15% 68%`     | Tertiary / captions         |
+| `--steel`      | `219 12% 49%`     | `218 12% 56%`     | Placeholders                |
+| `--stone`      | `218 10% 62%`     | `220 10% 43%`     | Disabled text               |
+| `--muted`      | `216 15% 75%`     | `221 13% 31%`     | Muted / subtle              |
 
 ### 表面色 / Surfaces
 
 | Token              | Light               | Dark                |
 | ------------------ | ------------------- | ------------------- |
-| `--canvas`         | `0 0% 100%`         | `239 24% 11%`       |
-| `--surface`        | `246 32% 97%`       | `239 22% 14%`       |
-| `--surface-soft`   | `248 45% 98.5%`     | `241 24% 12%`       |
-| `--card`           | `0 0% 100%`         | `239 24% 11%`       |
-| `--hairline`       | `244 24% 89%`       | `240 18% 22%`       |
-| `--hairline-soft`  | `246 32% 93%`       | `241 20% 17%`       |
-| `--border`         | `244 24% 89%`       | `240 18% 22%`       |
+| `--canvas`         | `210 40% 99%`       | `224 42% 9%`        |
+| `--surface`        | `216 40% 96.5%`     | `222 37% 12.5%`     |
+| `--surface-soft`   | `210 50% 98%`       | `224 40% 10.5%`     |
+| `--card`           | `210 40% 99%`       | `223 40% 9%`        |
+| `--hairline`       | `218 28% 87%`       | `220 28% 20%`       |
+| `--hairline-soft`  | `216 34% 92%`       | `222 30% 15.5%`     |
+| `--border`         | `218 28% 87%`       | `220 28% 20%`       |
 
 ---
 
@@ -501,4 +501,3 @@ This creates a subtle identity glow behind the BrandMark that anchors the page v
 ---
 
 *Last updated: 2026-09-04*
-

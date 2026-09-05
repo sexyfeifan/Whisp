@@ -146,6 +146,14 @@ html, body {
   transform-origin: center center;
 }
 
+.quality-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  transition: background-color 180ms ease, box-shadow 180ms ease;
+}
+
 .recording-text-row {
   display: flex;
   align-items: center;

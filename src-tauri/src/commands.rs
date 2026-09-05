@@ -1,4 +1,4 @@
-use crate::history::{HistoryEntry, HistoryManager, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
+use crate::history::{HistoryEntry, HistoryManager, HistoryStats, NewHistoryEntry, STATUS_FAILED, STATUS_SUCCESS};
 use crate::paste::EnigoState;
 use crate::settings::{self, AppSettings};
 use crate::shortcut::{
@@ -53,6 +53,11 @@ pub fn get_history_page(
     offset: i64,
 ) -> Result<Vec<HistoryEntry>, String> {
     history.get_entries_page(limit, offset).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_history_stats(history: State<'_, Arc<HistoryManager>>, start_of_day: i64) -> Result<HistoryStats, String> {
+    history.get_stats(start_of_day).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

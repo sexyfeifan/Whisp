@@ -608,7 +608,7 @@ mod tests {
 
     #[test]
     fn test_resample_downsample() {
-        let audio: Vec<f32> = (0..48000).map(|i| (i as f32 / 48000.0)).collect();
+        let audio: Vec<f32> = (0..48000).map(|i| i as f32 / 48000.0).collect();
         let resampled = resample_to_16k(&audio, 48000);
         // After trimming to expected length, should be exactly 16000
         assert_eq!(

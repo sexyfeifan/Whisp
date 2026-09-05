@@ -6,7 +6,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { check as checkUpdaterUpdate } from "@tauri-apps/plugin-updater";
 import type { AppSettings, HistoryEntry, LogEntry } from "../types";
 import { messages } from "../i18n";
-import { useToast } from "../components/ui/toast";
+import { useToast } from "../components/ui/toast-context";
 import type { View, StatusFilter, UiLanguage } from "../lib/constants";
 import { isMac } from "../lib/constants";
 import { History, Settings, BarChart3 } from "lucide-react";
@@ -91,6 +91,7 @@ export interface AppState {
   loadHistory: (reset?: boolean) => Promise<void>;
   loadSettings: () => Promise<void>;
   searchHistory: (query: string) => Promise<void>;
+  startRecording: () => Promise<void>;
   handleEnableMicrophone: () => Promise<void>;
   handleEnableAccessibility: () => Promise<void>;
   checkForUpdates: () => Promise<void>;
@@ -122,6 +123,8 @@ export function useApp(): AppState {
   const [appVersion, setAppVersion] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [hasMore, setHasMore] = useState(false);
+  const [stats, setStats] = useState({ total: 0, success: 0, failed: 0, audioSaved: 0, totalCost: 0, totalTokens: 0 });
+  const [todayCount, setTodayCount] = useState(0);
   const [shortcutConflictMsg, setShortcutConflictMsg] = useState<string | null>(null);
   const autoSaveTimerRef = useRef<number>(0);
   const historyOffsetRef = useRef(0);
@@ -246,9 +249,22 @@ export function useApp(): AppState {
 
   const loadHistory = useCallback(async (reset = true) => {
     const offset = reset ? 0 : historyOffsetRef.current;
-    const entries = await invoke<HistoryEntry[]>("get_history_page", { limit: HISTORY_PAGE_SIZE, offset });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const statsRequest = reset
+      ? invoke<AppState["stats"] & { todayCount: number }>("get_history_stats", { startOfDay: Math.floor(today.getTime() / 1000) })
+      : Promise.resolve(null);
+    const [entries, aggregate] = await Promise.all([
+      invoke<HistoryEntry[]>("get_history_page", { limit: HISTORY_PAGE_SIZE, offset }),
+      statsRequest,
+    ]);
     if (reset) { setHistory(entries); historyOffsetRef.current = entries.length; setSelectedIds(new Set()); }
     else { setHistory((prev) => [...prev, ...entries]); historyOffsetRef.current += entries.length; }
+    if (aggregate) {
+      const { todayCount: nextTodayCount, ...nextStats } = aggregate;
+      setStats(nextStats);
+      setTodayCount(nextTodayCount);
+    }
     setHasMore(entries.length === HISTORY_PAGE_SIZE);
   }, []);
 
@@ -336,6 +352,17 @@ export function useApp(): AppState {
     await invoke("request_accessibility");
     await waitForPermission("check_accessibility", setAccessibilityOk);
   }, [waitForPermission]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      await invoke("start_streaming_recording");
+    } catch (error) {
+      const message = String(error);
+      setErrorMsg(message);
+      toast({ message, variant: "error" });
+      window.setTimeout(() => setErrorMsg(null), 5000);
+    }
+  }, [toast]);
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((current) => {
@@ -555,7 +582,8 @@ export function useApp(): AppState {
       return next;
     });
     setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
-  }, [playingAudioId, stopAudio]);
+    await loadHistory(true);
+  }, [playingAudioId, stopAudio, loadHistory]);
 
   const deleteSelected = useCallback(async () => {
     if (selectedIds.size === 0) return;
@@ -570,7 +598,8 @@ export function useApp(): AppState {
       return next;
     });
     setSelectedIds(new Set());
-  }, [selectedIds, playingAudioId, stopAudio]);
+    await loadHistory(true);
+  }, [selectedIds, playingAudioId, stopAudio, loadHistory]);
 
   const clearHistory = useCallback(async () => {
     if (history.length === 0) {
@@ -582,6 +611,9 @@ export function useApp(): AppState {
     try {
       await invoke("clear_history"); setHistory([]);
       setPlayingAudioId(null); setAudioUrls({});
+      setStats({ total: 0, success: 0, failed: 0, audioSaved: 0, totalCost: 0, totalTokens: 0 });
+      setTodayCount(0);
+      setHasMore(false);
       setSettingsFeedback({ tone: "success", message: m.clearSuccess });
       toast({ message: m.clearSuccess, variant: "success" });
       window.setTimeout(() => setSettingsFeedback(null), 2200);
@@ -633,22 +665,6 @@ export function useApp(): AppState {
     });
   }, [history, searchQuery, statusFilter, ftsResults]);
 
-  const stats = useMemo(() => {
-    const total = history.length;
-    const failed = history.filter((entry) => entry.status === "failed").length;
-    const success = total - failed;
-    const audioSaved = history.filter((entry) => Boolean(entry.audio_path)).length;
-    const totalCost = history.reduce((sum, entry) => sum + (entry.estimated_cost || 0), 0);
-    const totalTokens = history.reduce((sum, entry) => sum + (entry.polish_tokens || 0), 0);
-    return { total, success, failed, audioSaved, totalCost, totalTokens };
-  }, [history]);
-
-  const todayCount = useMemo(() => {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const startOfDay = today.getTime() / 1000;
-    return history.filter((entry) => entry.timestamp >= startOfDay).length;
-  }, [history]);
-
   const hasApiConfig = settings ? Boolean(settings.api_key.trim() && settings.api_base_url.trim()) : false;
   const canProceed = hasApiConfig && microphoneOk && (isMac ? accessibilityOk : true);
 
@@ -673,7 +689,7 @@ export function useApp(): AppState {
     navItems, updateSettings, persistSettings, testApiKey,
     copyText, playAudio, loadLogs, clearLogs, copyAllLogs, flushAutoSave,
     deleteEntry, deleteSelected, clearHistory, retryEntry, loadHistory, loadSettings,
-    searchHistory,
+    searchHistory, startRecording,
     handleEnableMicrophone, handleEnableAccessibility, checkForUpdates, downloadAndInstall,
   };
 }

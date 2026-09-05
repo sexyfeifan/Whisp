@@ -59,7 +59,7 @@ export function HistoryPage(app: AppState) {
     retryEntry, copyText, loadHistory, m, uiLanguage,
     uploadingFile, transcribeFile,
     view, navItems, darkMode, setDarkMode, updateStatus, appVersion, checkForUpdates,
-    flushAutoSave, setView, history,
+    flushAutoSave, setView, history, startRecording,
   } = app;
 
   const [exportDropdown, setExportDropdown] = useState<number | null>(null);
@@ -382,7 +382,10 @@ export function HistoryPage(app: AppState) {
         </DialogContent>
       </Dialog>
 
-      <FloatingRecordButton isRecording={false} onPress={() => {}} />
+      <FloatingRecordButton
+        onPress={() => void startRecording()}
+        shortcut={translateShortcut(settings.shortcut || "")}
+      />
 
       <HistoryUploadDialog
         uploadConfirm={uploadConfirm}

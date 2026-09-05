@@ -93,6 +93,18 @@ pub struct HistoryEntry {
     pub polished_text: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistoryStats {
+    pub total: i64,
+    pub success: i64,
+    pub failed: i64,
+    pub audio_saved: i64,
+    pub total_cost: f64,
+    pub total_tokens: i64,
+    pub today_count: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct NewHistoryEntry {
     pub text: String,
@@ -368,6 +380,34 @@ impl HistoryManager {
             .query_map(rusqlite::params![limit, offset], row_to_history_entry)?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(entries)
+    }
+
+    pub fn get_stats(&self, start_of_day: i64) -> Result<HistoryStats> {
+        let conn = self.conn.lock().unwrap_or_else(|e| e.into_inner());
+        let stats = conn.query_row(
+            "SELECT
+                COUNT(*),
+                COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN audio_path IS NOT NULL AND audio_path != '' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(estimated_cost), 0),
+                COALESCE(SUM(polish_tokens), 0),
+                COALESCE(SUM(CASE WHEN timestamp >= ?1 THEN 1 ELSE 0 END), 0)
+             FROM transcriptions",
+            [start_of_day],
+            |row| {
+                Ok(HistoryStats {
+                    total: row.get(0)?,
+                    success: row.get(1)?,
+                    failed: row.get(2)?,
+                    audio_saved: row.get(3)?,
+                    total_cost: row.get(4)?,
+                    total_tokens: row.get(5)?,
+                    today_count: row.get(6)?,
+                })
+            },
+        )?;
+        Ok(stats)
     }
 
     pub fn delete_entry(&self, id: i64) -> Result<()> {
@@ -1194,6 +1234,56 @@ mod tests {
 
         let page3 = hm.get_entries_page(2, 4).unwrap();
         assert_eq!(page3.len(), 1);
+    }
+
+    #[test]
+    fn test_get_stats_aggregates_all_entries() {
+        let (hm, _tmp) = create_test_history();
+        hm.add_entry(&NewHistoryEntry {
+            text: "Success".into(),
+            model: "whisper-1".into(),
+            duration_ms: Some(1000),
+            audio_path: Some("/tmp/whisp-test.wav".into()),
+            status: STATUS_SUCCESS.into(),
+            error_message: None,
+            provider: "OpenAI".into(),
+            api_base_url: "https://api.openai.com/v1".into(),
+            language: "en".into(),
+            retry_of: None,
+            asr_duration_sec: Some(1.0),
+            polish_tokens: Some(120),
+            estimated_cost: Some(0.012),
+            polished_text: None,
+            recorded_at: 100,
+        })
+        .unwrap();
+        hm.add_entry(&NewHistoryEntry {
+            text: "".into(),
+            model: "whisper-1".into(),
+            duration_ms: None,
+            audio_path: None,
+            status: STATUS_FAILED.into(),
+            error_message: Some("network".into()),
+            provider: "OpenAI".into(),
+            api_base_url: "https://api.openai.com/v1".into(),
+            language: "en".into(),
+            retry_of: None,
+            asr_duration_sec: None,
+            polish_tokens: Some(30),
+            estimated_cost: Some(0.003),
+            polished_text: None,
+            recorded_at: 200,
+        })
+        .unwrap();
+
+        let stats = hm.get_stats(150).unwrap();
+        assert_eq!(stats.total, 2);
+        assert_eq!(stats.success, 1);
+        assert_eq!(stats.failed, 1);
+        assert_eq!(stats.audio_saved, 1);
+        assert_eq!(stats.total_tokens, 150);
+        assert!((stats.total_cost - 0.015).abs() < f64::EPSILON);
+        assert_eq!(stats.today_count, 1);
     }
 
     #[test]

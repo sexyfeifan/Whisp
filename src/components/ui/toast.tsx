@@ -1,18 +1,13 @@
-import { useCallback, useState, createContext, useContext } from "react";
+import { useCallback, useState } from "react";
 import { X, Check, AlertCircle, Info } from "lucide-react";
+import { ToastContext, type ToastOptions, type ToastVariant } from "./toast-context";
 
-type ToastVariant = "default" | "success" | "error" | "info";
 interface Toast { id: string; message: string; variant: ToastVariant; }
-interface ToastContextValue { toast: (opts: { message: string; variant?: ToastVariant }) => void; }
-
-const ToastContext = createContext<ToastContextValue>({ toast: () => {} });
-
-export function useToast() { return useContext(ToastContext); }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = useCallback(({ message, variant = "default" }: { message: string; variant?: ToastVariant }) => {
+  const toast = useCallback(({ message, variant = "default" }: ToastOptions) => {
     const id = Math.random().toString(36).slice(2);
     setToasts((prev) => [...prev, { id, message, variant }]);
     setTimeout(() => {
@@ -41,7 +36,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col-reverse gap-2 items-center" role="status" aria-live="polite" aria-label="Notifications">
+      <div className="toast-container fixed bottom-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col-reverse gap-2 items-center" role="status" aria-live="polite" aria-label="Notifications">
         {toasts.map((t) => (
           <div
             key={t.id}

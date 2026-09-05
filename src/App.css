@@ -1,66 +1,66 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════
-   Whisp Design System — luminous ink and iris
-   Restrained colour creates hierarchy, identity, and focus.
+   Whisp Design System — Midnight Signal
+   Deep navy, electric cobalt, and cyan signal states.
    ═══════════════════════════════════════════════════════════════════ */
 
 :root {
-  --primary: 250 64% 57%;
-  --primary-pressed: 250 58% 50%;
-  --primary-deep: 248 48% 40%;
+  --primary: 226 82% 55%;
+  --primary-pressed: 228 78% 48%;
+  --primary-deep: 229 58% 36%;
   --on-primary: 0 0% 100%;
-  --canvas: 0 0% 100%;
-  --surface: 246 32% 97%;
-  --surface-soft: 248 45% 98.5%;
-  --hairline: 244 24% 89%;
-  --hairline-soft: 246 32% 93%;
-  --hairline-strong: 242 18% 78%;
-  --ink-deep: 238 28% 10%;
-  --ink: 238 23% 15%;
-  --charcoal: 237 16% 24%;
-  --slate: 238 12% 38%;
-  --steel: 239 10% 48%;
-  --stone: 240 8% 61%;
-  --muted: 242 10% 74%;
-  --success: 154 48% 37%;
+  --canvas: 210 40% 99%;
+  --surface: 216 40% 96.5%;
+  --surface-soft: 210 50% 98%;
+  --hairline: 218 28% 87%;
+  --hairline-soft: 216 34% 92%;
+  --hairline-strong: 219 22% 76%;
+  --ink-deep: 226 42% 9%;
+  --ink: 224 34% 14%;
+  --charcoal: 222 22% 24%;
+  --slate: 220 15% 38%;
+  --steel: 219 12% 49%;
+  --stone: 218 10% 62%;
+  --muted: 216 15% 75%;
+  --success: 160 56% 34%;
   --success-foreground: 0 0% 100%;
-  --warning: 35 75% 48%;
+  --warning: 35 88% 48%;
   --warning-foreground: 0 0% 100%;
-  --destructive: 355 64% 52%;
+  --destructive: 354 72% 52%;
   --destructive-foreground: 0 0% 100%;
-  --background: 248 45% 98.5%;
-  --foreground: 237 16% 24%;
-  --card: 0 0% 100%;
-  --card-foreground: 237 16% 24%;
+  --background: 214 45% 97.5%;
+  --foreground: 222 22% 24%;
+  --card: 210 40% 99%;
+  --card-foreground: 222 22% 24%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 246 28% 95%;
-  --secondary-foreground: 238 18% 22%;
-  --muted-fg: 239 10% 48%;
-  --accent: 250 68% 95%;
-  --accent-foreground: 250 55% 45%;
-  --border: 244 24% 89%;
-  --input: 242 18% 78%;
-  --ring: 250 64% 57%;
+  --secondary: 216 35% 94%;
+  --secondary-foreground: 224 30% 20%;
+  --muted-fg: 219 12% 49%;
+  --accent: 191 78% 93%;
+  --accent-foreground: 223 68% 38%;
+  --border: 218 28% 87%;
+  --input: 219 22% 76%;
+  --ring: 226 82% 55%;
   --radius: 0.5rem;
-  --sidebar-bg: 246 35% 97.5%;
-  --sidebar-border: 244 24% 90%;
-  --sidebar-item-active-bg: 250 70% 94.5%;
-  --sidebar-item-hover-bg: 247 34% 95%;
-  --sidebar-text: 239 10% 45%;
-  --sidebar-text-active: 250 55% 43%;
-  --brand: 250 64% 57%;
+  --sidebar-bg: 220 38% 96.5%;
+  --sidebar-border: 218 28% 88%;
+  --sidebar-item-active-bg: 218 80% 93%;
+  --sidebar-item-hover-bg: 216 38% 94.5%;
+  --sidebar-text: 220 14% 42%;
+  --sidebar-text-active: 226 70% 43%;
+  --brand: 226 82% 55%;
   --brand-foreground: 0 0% 100%;
-  --brand-subtle: 250 70% 95%;
-  --brand-glow: 276 72% 63%;
-  --chart-1: 250 64% 57%;
-  --chart-2: 267 60% 60%;
-  --chart-3: 232 70% 58%;
-  --chart-4: 216 72% 55%;
-  --chart-5: 282 54% 61%;
-  --chart-6: 198 66% 46%;
-  --chart-7: 244 42% 69%;
-  --chart-8: 218 46% 72%;
+  --brand-subtle: 214 90% 94%;
+  --brand-glow: 190 88% 48%;
+  --chart-1: 226 82% 55%;
+  --chart-2: 190 82% 43%;
+  --chart-3: 258 70% 61%;
+  --chart-4: 160 55% 40%;
+  --chart-5: 35 85% 52%;
+  --chart-6: 322 66% 55%;
+  --chart-7: 205 78% 50%;
+  --chart-8: 277 60% 58%;
 
   /* ── Warm Accent Colors ── */
   --accent-amber: 35 80% 60%;
@@ -116,66 +116,66 @@
   --glass-blur: 20px;
 
   /* ── Toast ── */
-  --toast-bg: 237 16% 24%;
-  --toast-border: 244 24% 89%;
+  --toast-bg: 224 34% 14%;
+  --toast-border: 218 28% 87%;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --primary: 248 82% 72%;
-    --primary-pressed: 248 72% 65%;
-    --primary-deep: 250 64% 58%;
-    --on-primary: 240 25% 10%;
-    --canvas: 239 24% 11%;
-    --surface: 239 22% 14%;
-    --surface-soft: 241 24% 12%;
-    --hairline: 240 18% 22%;
-    --hairline-soft: 241 20% 17%;
-    --hairline-strong: 240 14% 29%;
-    --ink-deep: 246 30% 97%;
-    --ink: 244 22% 91%;
-    --charcoal: 242 15% 83%;
-    --slate: 241 11% 68%;
-    --steel: 240 9% 57%;
-    --stone: 240 7% 44%;
-    --muted: 240 9% 33%;
-    --success: 154 46% 52%;
-    --success-foreground: 240 25% 9%;
-    --warning: 35 72% 59%;
-    --warning-foreground: 240 25% 9%;
-    --destructive: 355 62% 63%;
-    --destructive-foreground: 246 30% 97%;
-    --background: 240 28% 8.5%;
-    --foreground: 242 15% 83%;
-    --card: 239 24% 11%;
-    --card-foreground: 242 15% 83%;
-    --primary-foreground: 240 25% 10%;
-    --secondary: 241 18% 17%;
-    --secondary-foreground: 242 15% 83%;
-    --muted-fg: 240 9% 57%;
-    --accent: 250 30% 19%;
-    --accent-foreground: 248 80% 82%;
-    --border: 240 18% 22%;
-    --input: 240 14% 29%;
-    --ring: 248 82% 72%;
-    --sidebar-bg: 240 30% 7.5%;
-    --sidebar-border: 241 20% 17%;
-    --sidebar-item-active-bg: 250 36% 22%;
-    --sidebar-item-hover-bg: 241 22% 13%;
-    --sidebar-text: 240 9% 58%;
-    --sidebar-text-active: 248 85% 82%;
-    --brand: 248 82% 72%;
-    --brand-foreground: 240 25% 10%;
-    --brand-subtle: 250 34% 19%;
-    --brand-glow: 276 76% 69%;
-    --chart-1: 248 82% 72%;
-    --chart-2: 270 76% 72%;
-    --chart-3: 228 82% 70%;
-    --chart-4: 211 78% 65%;
-    --chart-5: 288 64% 72%;
-    --chart-6: 193 68% 58%;
-    --chart-7: 246 48% 57%;
-    --chart-8: 222 46% 55%;
+    --primary: 190 92% 58%;
+    --primary-pressed: 192 82% 50%;
+    --primary-deep: 226 84% 66%;
+    --on-primary: 224 45% 7%;
+    --canvas: 224 42% 9%;
+    --surface: 222 37% 12.5%;
+    --surface-soft: 224 40% 10.5%;
+    --hairline: 220 28% 20%;
+    --hairline-soft: 222 30% 15.5%;
+    --hairline-strong: 219 24% 28%;
+    --ink-deep: 210 40% 98%;
+    --ink: 213 32% 92%;
+    --charcoal: 215 22% 82%;
+    --slate: 217 15% 68%;
+    --steel: 218 12% 56%;
+    --stone: 220 10% 43%;
+    --muted: 221 13% 31%;
+    --success: 160 64% 52%;
+    --success-foreground: 224 45% 7%;
+    --warning: 38 88% 60%;
+    --warning-foreground: 224 45% 7%;
+    --destructive: 354 78% 66%;
+    --destructive-foreground: 210 40% 98%;
+    --background: 225 48% 6.5%;
+    --foreground: 215 22% 82%;
+    --card: 223 40% 9%;
+    --card-foreground: 215 22% 82%;
+    --primary-foreground: 224 45% 7%;
+    --secondary: 221 30% 15.5%;
+    --secondary-foreground: 215 22% 82%;
+    --muted-fg: 218 12% 56%;
+    --accent: 216 48% 17%;
+    --accent-foreground: 190 86% 72%;
+    --border: 220 28% 20%;
+    --input: 219 24% 28%;
+    --ring: 190 92% 58%;
+    --sidebar-bg: 226 52% 5.5%;
+    --sidebar-border: 220 30% 16%;
+    --sidebar-item-active-bg: 218 48% 17.5%;
+    --sidebar-item-hover-bg: 222 35% 12%;
+    --sidebar-text: 217 13% 59%;
+    --sidebar-text-active: 190 92% 72%;
+    --brand: 190 92% 58%;
+    --brand-foreground: 224 45% 7%;
+    --brand-subtle: 218 48% 17%;
+    --brand-glow: 258 90% 70%;
+    --chart-1: 190 92% 58%;
+    --chart-2: 226 84% 66%;
+    --chart-3: 258 82% 72%;
+    --chart-4: 160 64% 54%;
+    --chart-5: 38 88% 62%;
+    --chart-6: 326 76% 68%;
+    --chart-7: 204 90% 64%;
+    --chart-8: 280 72% 72%;
 
     /* ── Warm Accent Colors (dark) ── */
     --accent-amber: 35 75% 65%;
@@ -231,133 +231,133 @@
     --glass-blur: 24px;
 
     /* ── Toast (dark) ── */
-    --toast-bg: 240 20% 18%;
-    --toast-border: 240 16% 28%;
+    --toast-bg: 220 30% 14%;
+    --toast-border: 219 24% 28%;
   }
 }
 
 /* Manual light mode toggle (data-theme attribute) — overrides prefers-color-scheme: dark */
 [data-theme="light"] {
-  --primary: 250 64% 57%;
-  --primary-pressed: 250 58% 50%;
-  --primary-deep: 248 48% 40%;
+  --primary: 226 82% 55%;
+  --primary-pressed: 228 78% 48%;
+  --primary-deep: 229 58% 36%;
   --on-primary: 0 0% 100%;
-  --canvas: 0 0% 100%;
-  --surface: 246 32% 97%;
-  --surface-soft: 248 45% 98.5%;
-  --hairline: 244 24% 89%;
-  --hairline-soft: 246 32% 93%;
-  --hairline-strong: 242 18% 78%;
-  --ink-deep: 238 28% 10%;
-  --ink: 238 23% 15%;
-  --charcoal: 237 16% 24%;
-  --slate: 238 12% 38%;
-  --steel: 239 10% 48%;
-  --stone: 240 8% 61%;
-  --muted: 242 10% 74%;
-  --success: 154 48% 37%;
+  --canvas: 210 40% 99%;
+  --surface: 216 40% 96.5%;
+  --surface-soft: 210 50% 98%;
+  --hairline: 218 28% 87%;
+  --hairline-soft: 216 34% 92%;
+  --hairline-strong: 219 22% 76%;
+  --ink-deep: 226 42% 9%;
+  --ink: 224 34% 14%;
+  --charcoal: 222 22% 24%;
+  --slate: 220 15% 38%;
+  --steel: 219 12% 49%;
+  --stone: 218 10% 62%;
+  --muted: 216 15% 75%;
+  --success: 160 56% 34%;
   --success-foreground: 0 0% 100%;
-  --warning: 35 75% 48%;
+  --warning: 35 88% 48%;
   --warning-foreground: 0 0% 100%;
-  --destructive: 355 64% 52%;
+  --destructive: 354 72% 52%;
   --destructive-foreground: 0 0% 100%;
-  --background: 248 45% 98.5%;
-  --foreground: 237 16% 24%;
-  --card: 0 0% 100%;
-  --card-foreground: 237 16% 24%;
+  --background: 214 45% 97.5%;
+  --foreground: 222 22% 24%;
+  --card: 210 40% 99%;
+  --card-foreground: 222 22% 24%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 246 28% 95%;
-  --secondary-foreground: 238 18% 22%;
-  --muted-fg: 239 10% 48%;
-  --accent: 250 68% 95%;
-  --accent-foreground: 250 55% 45%;
-  --border: 244 24% 89%;
-  --input: 242 18% 78%;
-  --ring: 250 64% 57%;
-  --sidebar-bg: 246 35% 97.5%;
-  --sidebar-border: 244 24% 90%;
-  --sidebar-item-active-bg: 250 70% 94.5%;
-  --sidebar-item-hover-bg: 247 34% 95%;
-  --sidebar-text: 239 10% 45%;
-  --sidebar-text-active: 250 55% 43%;
-  --brand: 250 64% 57%;
+  --secondary: 216 35% 94%;
+  --secondary-foreground: 224 30% 20%;
+  --muted-fg: 219 12% 49%;
+  --accent: 191 78% 93%;
+  --accent-foreground: 223 68% 38%;
+  --border: 218 28% 87%;
+  --input: 219 22% 76%;
+  --ring: 226 82% 55%;
+  --sidebar-bg: 220 38% 96.5%;
+  --sidebar-border: 218 28% 88%;
+  --sidebar-item-active-bg: 218 80% 93%;
+  --sidebar-item-hover-bg: 216 38% 94.5%;
+  --sidebar-text: 220 14% 42%;
+  --sidebar-text-active: 226 70% 43%;
+  --brand: 226 82% 55%;
   --brand-foreground: 0 0% 100%;
-  --brand-subtle: 250 70% 95%;
-  --brand-glow: 276 72% 63%;
-  --chart-1: 250 64% 57%;
-  --chart-2: 267 60% 60%;
-  --chart-3: 232 70% 58%;
-  --chart-4: 216 72% 55%;
-  --chart-5: 282 54% 61%;
-  --chart-6: 198 66% 46%;
-  --chart-7: 244 42% 69%;
-  --chart-8: 218 46% 72%;
+  --brand-subtle: 214 90% 94%;
+  --brand-glow: 190 88% 48%;
+  --chart-1: 226 82% 55%;
+  --chart-2: 190 82% 43%;
+  --chart-3: 258 70% 61%;
+  --chart-4: 160 55% 40%;
+  --chart-5: 35 85% 52%;
+  --chart-6: 322 66% 55%;
+  --chart-7: 205 78% 50%;
+  --chart-8: 277 60% 58%;
 
   /* ── Toast ── */
-  --toast-bg: 237 16% 24%;
-  --toast-border: 244 24% 89%;
+  --toast-bg: 224 34% 14%;
+  --toast-border: 218 28% 87%;
 }
 
 /* Manual dark mode toggle (data-theme attribute) */
 [data-theme="dark"] {
-  --primary: 248 82% 72%;
-  --primary-pressed: 248 72% 65%;
-  --primary-deep: 250 64% 58%;
-  --on-primary: 240 25% 10%;
-  --canvas: 239 24% 11%;
-  --surface: 239 22% 14%;
-  --surface-soft: 241 24% 12%;
-  --hairline: 240 18% 22%;
-  --hairline-soft: 241 20% 17%;
-  --hairline-strong: 240 14% 29%;
-  --ink-deep: 246 30% 97%;
-  --ink: 244 22% 91%;
-  --charcoal: 242 15% 83%;
-  --slate: 241 11% 68%;
-  --steel: 240 9% 57%;
-  --stone: 240 7% 44%;
-  --muted: 240 9% 33%;
-  --success: 154 46% 52%;
-  --success-foreground: 240 25% 9%;
-  --warning: 35 72% 59%;
-  --warning-foreground: 240 25% 9%;
-  --destructive: 355 62% 63%;
-  --destructive-foreground: 246 30% 97%;
-  --background: 240 28% 8.5%;
-  --foreground: 242 15% 83%;
-  --card: 239 24% 11%;
-  --card-foreground: 242 15% 83%;
-  --primary-foreground: 240 25% 10%;
-  --secondary: 241 18% 17%;
-  --secondary-foreground: 242 15% 83%;
-  --muted-fg: 240 9% 57%;
-  --accent: 250 30% 19%;
-  --accent-foreground: 248 80% 82%;
-  --border: 240 18% 22%;
-  --input: 240 14% 29%;
-  --ring: 248 82% 72%;
-  --sidebar-bg: 240 30% 7.5%;
-  --sidebar-border: 241 20% 17%;
-  --sidebar-item-active-bg: 250 36% 22%;
-  --sidebar-item-hover-bg: 241 22% 13%;
-  --sidebar-text: 240 9% 58%;
-  --sidebar-text-active: 248 85% 82%;
-  --brand: 248 82% 72%;
-  --brand-foreground: 240 25% 10%;
-  --brand-subtle: 250 34% 19%;
-  --brand-glow: 276 76% 69%;
-  --chart-1: 248 82% 72%;
-  --chart-2: 270 76% 72%;
-  --chart-3: 228 82% 70%;
-  --chart-4: 211 78% 65%;
-  --chart-5: 288 64% 72%;
-  --chart-6: 193 68% 58%;
-  --chart-7: 246 48% 57%;
-  --chart-8: 222 46% 55%;
+  --primary: 190 92% 58%;
+  --primary-pressed: 192 82% 50%;
+  --primary-deep: 226 84% 66%;
+  --on-primary: 224 45% 7%;
+  --canvas: 224 42% 9%;
+  --surface: 222 37% 12.5%;
+  --surface-soft: 224 40% 10.5%;
+  --hairline: 220 28% 20%;
+  --hairline-soft: 222 30% 15.5%;
+  --hairline-strong: 219 24% 28%;
+  --ink-deep: 210 40% 98%;
+  --ink: 213 32% 92%;
+  --charcoal: 215 22% 82%;
+  --slate: 217 15% 68%;
+  --steel: 218 12% 56%;
+  --stone: 220 10% 43%;
+  --muted: 221 13% 31%;
+  --success: 160 64% 52%;
+  --success-foreground: 224 45% 7%;
+  --warning: 38 88% 60%;
+  --warning-foreground: 224 45% 7%;
+  --destructive: 354 78% 66%;
+  --destructive-foreground: 210 40% 98%;
+  --background: 225 48% 6.5%;
+  --foreground: 215 22% 82%;
+  --card: 223 40% 9%;
+  --card-foreground: 215 22% 82%;
+  --primary-foreground: 224 45% 7%;
+  --secondary: 221 30% 15.5%;
+  --secondary-foreground: 215 22% 82%;
+  --muted-fg: 218 12% 56%;
+  --accent: 216 48% 17%;
+  --accent-foreground: 190 86% 72%;
+  --border: 220 28% 20%;
+  --input: 219 24% 28%;
+  --ring: 190 92% 58%;
+  --sidebar-bg: 226 52% 5.5%;
+  --sidebar-border: 220 30% 16%;
+  --sidebar-item-active-bg: 218 48% 17.5%;
+  --sidebar-item-hover-bg: 222 35% 12%;
+  --sidebar-text: 217 13% 59%;
+  --sidebar-text-active: 190 92% 72%;
+  --brand: 190 92% 58%;
+  --brand-foreground: 224 45% 7%;
+  --brand-subtle: 218 48% 17%;
+  --brand-glow: 258 90% 70%;
+  --chart-1: 190 92% 58%;
+  --chart-2: 226 84% 66%;
+  --chart-3: 258 82% 72%;
+  --chart-4: 160 64% 54%;
+  --chart-5: 38 88% 62%;
+  --chart-6: 326 76% 68%;
+  --chart-7: 204 90% 64%;
+  --chart-8: 280 72% 72%;
 
   /* ── Toast (dark) ── */
-  --toast-bg: 240 20% 18%;
-  --toast-border: 240 16% 28%;
+  --toast-bg: 220 30% 14%;
+  --toast-border: 219 24% 28%;
   }
 
   /* ═══ Typography ═══ */
@@ -376,6 +376,14 @@ body {
   line-height: 1.50;
   letter-spacing: -0.011em;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Quiet spectral depth: visible on open areas, never competing with content. */
+#root > .h-screen {
+  background:
+    radial-gradient(circle at 92% -12%, hsl(var(--brand-glow) / 0.09), transparent 34%),
+    radial-gradient(circle at 12% 112%, hsl(var(--primary) / 0.07), transparent 36%),
+    hsl(var(--background)) !important;
 }
 
 * {
@@ -532,9 +540,12 @@ input[type="range"]:focus::-webkit-slider-thumb {
 }
 
 /* ═══ Toast (theme-aware) ═══ */
-[data-theme="dark"] .toast-container > div,
+[data-theme="dark"] .toast-container > div {
+  border: 1px solid hsl(var(--toast-border) / 0.3);
+}
+
 @media (prefers-color-scheme: dark) {
-  .toast-container > div {
+  :root:not([data-theme="light"]) .toast-container > div {
     border: 1px solid hsl(var(--toast-border) / 0.3);
   }
 }

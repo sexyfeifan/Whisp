@@ -15,6 +15,7 @@ const subtitleStyle = params.get("subtitleStyle") ?? "white-black";
 
 const STRINGS = {
   transcribing: lang === "en" ? "Transcribing..." : lang === "ja" ? "転写中..." : "转录中...",
+  fallback: lang === "en" ? "Switching to offline model..." : lang === "ja" ? "オフラインモデルに切替中..." : lang === "ko" ? "오프라인 모델로 전환 중..." : "正在切换至离线模型...",
   cancelled: lang === "en" ? "Cancelled" : lang === "ja" ? "キャンセル" : "已取消",
   failed: lang === "en" ? "Transcription failed" : lang === "ja" ? "転写に失敗しました" : "转录失败",
   silenceStopping: lang === "en" ? "Silence detected..." : lang === "ja" ? "無音検出中..." : "检测到静音...",
@@ -24,6 +25,13 @@ const STRINGS = {
   discard: lang === "en" ? "Discard" : lang === "ja" ? "破棄" : "丢弃",
   duration: lang === "en" ? "Duration" : lang === "ja" ? "長さ" : "时长",
 };
+
+function qualityFromRms(rms: number): AudioQualityLevel {
+  if (rms < 0.005) return "silent";
+  if (rms < 0.02) return "poor";
+  if (rms < 0.05) return "ok";
+  return "good";
+}
 
 const COL_WIDTH = 2;
 const COL_GAP = 2;
@@ -79,6 +87,7 @@ function Overlay() {
   useEffect(() => {
     const unlisten1 = listen<number>("audio-level", (e) => {
       levelRef.current = e.payload;
+      setAudioQuality(qualityFromRms(e.payload));
     });
     const unlisten2 = listen("transcribing", () => setState("transcribing"));
     const unlisten3 = listen<string>("transcription-error", (e) => {
@@ -115,11 +124,7 @@ function Overlay() {
       console.warn("Streaming error:", e.payload);
     });
     const unlisten10 = listen<number>("audio-quality", (e) => {
-      const rms = e.payload;
-      if (rms < 0.005) setAudioQuality("silent");
-      else if (rms < 0.02) setAudioQuality("poor");
-      else if (rms < 0.05) setAudioQuality("ok");
-      else setAudioQuality("good");
+      setAudioQuality(qualityFromRms(e.payload));
     });
     const unlisten11 = listen("transcription-fallback", () => {
       setFallbackMode(true);
@@ -293,37 +298,7 @@ function Overlay() {
       {state === "transcribing" ? (
         <div className="orb-row">
           <ThinkingOrb state="composing" size={64} speed={0.75} />
-          <span className="orb-label">{STRINGS.transcribing}</span>
-          {audioQuality && (
-            <span
-              className="quality-dot"
-              title={audioQuality}
-              style={{
-                display: "inline-block",
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                marginLeft: 8,
-                flexShrink: 0,
-                backgroundColor:
-                  audioQuality === "good"
-                    ? "#4ade80"
-                    : audioQuality === "ok"
-                    ? "#facc15"
-                    : audioQuality === "poor"
-                    ? "#f87171"
-                    : "#9ca3af",
-                boxShadow:
-                  audioQuality === "good"
-                    ? "0 0 6px rgba(74,222,128,0.6)"
-                    : audioQuality === "ok"
-                    ? "0 0 6px rgba(250,204,21,0.6)"
-                    : audioQuality === "poor"
-                    ? "0 0 6px rgba(248,113,113,0.6)"
-                    : "none",
-              }}
-            />
-          )}
+          <span className="orb-label">{fallbackMode ? STRINGS.fallback : STRINGS.transcribing}</span>
         </div>
       ) : state === "silence-stopping" ? (
         <div className="orb-row">
@@ -375,6 +350,31 @@ function Overlay() {
             <ThinkingOrb state="searching" size={64} speed={0.6} theme="auto" />
             <canvas ref={canvasRef} className="wave-canvas" style={{ width: 100, height: CANVAS_HEIGHT }} />
             <span className="orb-timer">{elapsedSec}s</span>
+            {audioQuality && (
+              <span
+                className="quality-dot"
+                title={audioQuality}
+                aria-label={`Audio quality: ${audioQuality}`}
+                style={{
+                  backgroundColor:
+                    audioQuality === "good"
+                      ? "#22d3a6"
+                      : audioQuality === "ok"
+                      ? "#f4b942"
+                      : audioQuality === "poor"
+                      ? "#fb7185"
+                      : "#64748b",
+                  boxShadow:
+                    audioQuality === "good"
+                      ? "0 0 8px rgba(34, 211, 166, 0.72)"
+                      : audioQuality === "ok"
+                      ? "0 0 8px rgba(244, 185, 66, 0.68)"
+                      : audioQuality === "poor"
+                      ? "0 0 8px rgba(251, 113, 133, 0.68)"
+                      : "none",
+                }}
+              />
+            )}
           </div>
           <div className="recording-text-row">
             <span className="streaming-text" style={{ opacity: displayedText ? 1 : 0.5 }}>
